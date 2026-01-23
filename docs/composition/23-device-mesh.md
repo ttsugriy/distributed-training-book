@@ -386,7 +386,7 @@ Axis: ["tp"]
          All connected via NVLink
 ```
 
-All GPUs can communicate at ~600 GB/s.
+All GPUs can communicate at ~900 GB/s (NVLink 4.0).
 
 ### Multi-Node 2D Mesh
 

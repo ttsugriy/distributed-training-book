@@ -143,19 +143,19 @@ LLaMA 3 uses TP=8, matching the 8 GPUs per node connected via NVLink.
 
 **Why 8?** Applying the alpha-beta analysis from Chapter 4:
 
-For TP across NVLink (600 GB/s bidirectional):
+For TP across NVLink (900 GB/s bidirectional on H100):
 $$T_{\text{comm}} = \alpha + \frac{4 \times B \times S \times d_{\text{model}}}{8 \times \beta}$$
 
 For $B=1$, $S=8192$, $d=16384$:
 $$\text{Data per AllReduce} = 4 \times 1 \times 8192 \times 16384 = 537 \text{ MB}$$
 
 With ring AllReduce:
-$$T_{\text{NVLink}} = \frac{2 \times (8-1)/8 \times 537\text{MB}}{600 \text{ GB/s}} \approx 1.6 \text{ ms}$$
+$$T_{\text{NVLink}} = \frac{2 \times (8-1)/8 \times 537\text{MB}}{900 \text{ GB/s}} \approx 1.0 \text{ ms}$$
 
 If we extended TP to 16 (across nodes via IB):
 $$T_{\text{IB}} = \frac{2 \times (16-1)/16 \times 537\text{MB}}{50 \text{ GB/s}} \approx 20 \text{ ms}$$
 
-The 12× slowdown from crossing the node boundary makes TP>8 prohibitive.
+The 20× slowdown from crossing the node boundary makes TP>8 prohibitive.
 
 ### Pipeline Parallelism: 16 Stages
 
@@ -659,7 +659,7 @@ if __name__ == "__main__":
 
 1. **Scale demands 4D+ parallelism**: 405B parameters across 16K GPUs requires combining TP, PP, DP, and CP.
 
-2. **Node boundaries matter**: NVLink (600 GB/s) vs InfiniBand (50 GB/s) dictates where each parallelism dimension operates.
+2. **Node boundaries matter**: NVLink (900 GB/s on H100) vs InfiniBand (50 GB/s) dictates where each parallelism dimension operates.
 
 3. **Memory constrains everything**: The 80GB GPU limit forces FSDP sharding and activation checkpointing.
 

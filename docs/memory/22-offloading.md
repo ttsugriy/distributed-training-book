@@ -21,11 +21,11 @@ Modern training systems have a three-tier memory hierarchy:
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌────────────┐                                              │
-│  │  GPU HBM   │  80GB, 2TB/s bandwidth                       │
+│  │  GPU HBM   │  80GB, 3.35TB/s bandwidth (H100)              │
 │  │  (Hot)     │  Compute happens here                        │
 │  └─────┬──────┘                                              │
 │        │ PCIe Gen4: 32GB/s                                   │
-│        │ NVLink: 600GB/s (intra-node)                        │
+│        │ NVLink: 900GB/s (intra-node, H100)                   │
 │        ▼                                                     │
 │  ┌────────────┐                                              │
 │  │ CPU DRAM   │  512GB-2TB, 200GB/s                          │
@@ -48,7 +48,7 @@ The key insight: **bandwidth decreases exponentially down the hierarchy**.
 
 | Tier | Capacity | Bandwidth | Latency |
 |------|----------|-----------|---------|
-| GPU HBM | 80GB | 2,000 GB/s | ~1μs |
+| GPU HBM | 80GB | 3,350 GB/s | ~1μs |
 | CPU DRAM | 1TB | 200 GB/s | ~100ns |
 | NVMe SSD | 10TB | 7 GB/s | ~10μs |
 | HDD | 100TB | 0.2 GB/s | ~10ms |
