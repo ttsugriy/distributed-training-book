@@ -1,0 +1,16 @@
+# MkDocs and Material theme
+mkdocs>=1.5.0
+mkdocs-material>=9.5.0
+
+# Markdown extensions
+pymdown-extensions>=10.0
+
+# For code examples and testing
+numpy>=1.24.0
+torch>=2.0.0
+matplotlib>=3.7.0
+
+# Development tools
+pytest>=7.0.0
+black>=23.0.0
+ruff>=0.1.0

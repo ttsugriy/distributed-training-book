@@ -1,0 +1,84 @@
+/* Custom styles for The Algebra of Distributed Training */
+
+:root {
+  --md-primary-fg-color: #2563eb;
+  --md-accent-fg-color: #3b82f6;
+}
+
+/* Chapter opener styling */
+.chapter-opener {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--md-default-fg-color--light);
+  margin-bottom: 2rem;
+  padding: 1rem 1.5rem;
+  border-left: 4px solid var(--md-primary-fg-color);
+  background: var(--md-code-bg-color);
+  border-radius: 0 8px 8px 0;
+}
+
+/* Investigation questions */
+.investigation-question {
+  font-size: 1.05rem;
+  padding: 1rem 1.5rem;
+  margin: 1.5rem 0;
+  background: rgba(37, 99, 235, 0.1);
+  border-left: 4px solid var(--md-primary-fg-color);
+  border-radius: 0 8px 8px 0;
+}
+
+.investigation-question strong {
+  color: var(--md-primary-fg-color);
+}
+
+/* Math equations */
+.arithmatex {
+  overflow-x: auto;
+}
+
+/* Tables */
+.md-typeset table:not([class]) {
+  font-size: 0.85rem;
+}
+
+.md-typeset table:not([class]) th {
+  background: var(--md-code-bg-color);
+}
+
+/* Code blocks */
+.md-typeset pre > code {
+  font-size: 0.85rem;
+}
+
+/* Derivation blocks */
+.derivation {
+  margin: 1rem 0;
+  padding: 1rem 1.5rem;
+  background: rgba(202, 138, 4, 0.1);
+  border-left: 4px solid #ca8a04;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Complexity annotations */
+.complexity {
+  font-family: var(--md-code-font-family);
+  font-size: 0.9rem;
+  color: #059669;
+}
+
+/* Improved admonition styling */
+.md-typeset .admonition.note,
+.md-typeset details.note {
+  border-color: var(--md-primary-fg-color);
+}
+
+/* ASCII diagrams */
+.ascii-diagram {
+  font-family: var(--md-code-font-family);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  background: var(--md-code-bg-color);
+  padding: 1rem;
+  border-radius: 8px;
+}

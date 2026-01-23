@@ -1,0 +1,161 @@
+site_name: The Algebra of Distributed Training
+site_description: Mathematical Foundations of Large-Scale Machine Learning
+site_author: Taras Tsugrii
+site_url: https://ttsugriy.github.io/distributed-training-book/
+
+repo_name: ttsugriy/distributed-training-book
+repo_url: https://github.com/ttsugriy/distributed-training-book
+
+copyright: Copyright &copy; 2025 Taras Tsugrii
+
+theme:
+  name: material
+  custom_dir: overrides
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - tags
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ttsugriy
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/ArtOfParallel
+
+nav:
+  - Home: index.md
+
+  - "Part I: Foundations":
+    - foundations/01-scale-imperative.md
+    - foundations/02-extended-roofline.md
+    - foundations/03-cluster-memory-hierarchy.md
+    - foundations/04-alpha-beta-model.md
+    - foundations/05-economics-of-compute.md
+    - foundations/06-estimation-discipline.md
+
+  - "Part II: Scaling Laws":
+    - scaling-laws/07-compute-loss-surface.md
+    - scaling-laws/08-chinchilla-optimality.md
+    - scaling-laws/09-phase-transitions.md
+    - scaling-laws/10-batch-size-dynamics.md
+
+  - "Part III: The Algebra of Collectives":
+    - collectives/11-primitives-properties.md
+    - collectives/12-ring-tree-algorithms.md
+    - collectives/13-collective-cost-model.md
+
+  - "Part IV: Parallelism from Properties":
+    - parallelism/14-data-parallelism-associativity.md
+    - parallelism/15-tensor-parallelism-linearity.md
+    - parallelism/16-pipeline-parallelism-separability.md
+    - parallelism/17-sequence-parallelism-decomposability.md
+    - parallelism/18-expert-parallelism-sparsity.md
+
+  - "Part V: Memory as a Dimension":
+    - memory/19-memory-equation.md
+    - memory/20-zero-sharding.md
+    - memory/21-activation-recomputation.md
+    - memory/22-offloading.md
+
+  - "Part VI: Composition and Resilience":
+    - composition/23-device-mesh.md
+    - composition/24-3d-parallelism.md
+    - composition/25-4d-5d-parallelism.md
+    - composition/26-failures-checkpoints.md
+    - composition/27-configuration-search.md
+
+  - "Part VII: Efficiency Frontiers":
+    - efficiency/28-gradient-compression.md
+    - efficiency/29-asynchrony-local-sgd.md
+    - efficiency/30-reduced-precision.md
+    - efficiency/31-overlapping-communication.md
+
+  - "Part VIII: Synthesis":
+    - synthesis/32-profiling-distributed.md
+    - synthesis/33-investigation-protocol.md
+    - synthesis/34-case-study-llama3.md
+    - synthesis/35-case-study-deepseek.md
+    - synthesis/36-case-study-mistral.md
+    - synthesis/37-conclusion.md
+
+  - Appendices:
+    - appendices/glossary.md
+    - appendices/references.md

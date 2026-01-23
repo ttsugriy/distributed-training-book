@@ -1,0 +1,144 @@
+---
+title: "The Extended Roofline"
+subtitle: "Three Ceilings That Bound Distributed Performance"
+---
+
+::: {.chapter-opener}
+The roofline model transformed how we reason about single-device performance. For distributed systems, we extend it with a third ceiling that often dominates: network bandwidth.
+:::
+
+::: {.investigation-question}
+**The Question**: You're training on 256 GPUs. Each step, every GPU computes gradients and you AllReduce them. Your per-GPU compute takes 100ms. Your AllReduce takes 200ms. You're spending 2/3 of your time on communication. How do you analyze this? How do you improve it?
+:::
+
+## The Original Roofline
+
+The roofline model, introduced by Williams, Waterman, and Patterson (2009), bounds performance by two ceilings:
+
+$$\text{Performance} \leq \min\left(\text{Peak FLOP/s}, \quad \text{Memory BW} \times \text{Arithmetic Intensity}\right)$$
+
+Where **arithmetic intensity** is:
+
+$$I = \frac{\text{FLOPs}}{\text{Bytes accessed from memory}}$$
+
+Operations with high arithmetic intensity (matrix multiplication: $O(n^3)$ FLOPs, $O(n^2)$ memory) are compute-bound. Operations with low intensity (vector addition: $O(n)$ FLOPs, $O(n)$ memory) are memory-bound.
+
+## The Third Ceiling: Network
+
+For distributed training, we add:
+
+$$\text{Performance} \leq \min\left(\text{Peak FLOP/s}, \quad \text{Mem BW} \times I_{\text{mem}}, \quad \text{Net BW} \times I_{\text{net}}\right)$$
+
+Where **communication intensity** is:
+
+$$I_{\text{net}} = \frac{\text{FLOPs}}{\text{Bytes communicated}}$$
+
+This third ceiling often dominates. Consider AllReduce of a 10GB gradient tensor:
+
+- Communication: ~20GB total traffic (reduce-scatter + all-gather)
+- At 400 Gbps InfiniBand: $\frac{20 \times 8}{400} = 0.4$ seconds
+- Compute for same step might be 0.1 seconds
+
+We're 4× communication-bound.
+
+## Visualizing the Extended Roofline
+
+```
+log(Performance)
+       ^
+       |         Compute ceiling
+       |     ___________________
+       |    /
+       |   /     Memory ceiling
+       |  /  ________________
+       | /  /
+       |/  /     Network ceiling
+       +--/-------------------------> log(Intensity)
+         /
+        / "Ridge point" shifts based on
+       /  which bottleneck dominates
+```
+
+## The Three Regimes
+
+### Compute-Bound
+
+When $I_{\text{net}}$ and $I_{\text{mem}}$ are high:
+- GPU utilization is near peak
+- Adding more GPUs helps linearly (strong scaling)
+- Example: Large batch matrix multiplications
+
+### Memory-Bound
+
+When $I_{\text{mem}}$ is low, $I_{\text{net}}$ is high:
+- Limited by HBM bandwidth
+- Techniques: Kernel fusion, recomputation
+- Example: Element-wise operations, small batch attention
+
+### Communication-Bound
+
+When $I_{\text{net}}$ is low:
+- Limited by network bandwidth or latency
+- Techniques: Gradient compression, overlap, reduced precision communication
+- Example: Gradient synchronization, parameter servers
+
+## Calculating Communication Intensity
+
+For different parallelism strategies:
+
+### Data Parallelism
+
+Per step: $6ND$ FLOPs (forward + backward), $2\Psi$ bytes AllReduced
+
+$$I_{\text{net}}^{\text{DP}} = \frac{6ND}{2\Psi} = \frac{3ND}{\Psi}$$
+
+As batch size $N$ increases, communication intensity increases → less communication-bound.
+
+### Tensor Parallelism
+
+Per layer with hidden dim $H$, batch $B$, sequence $S$:
+- FLOPs: $O(BSH^2)$
+- Communication: $O(BSH)$ (AllReduce activations)
+
+$$I_{\text{net}}^{\text{TP}} = O(H)$$
+
+Higher hidden dimension → higher intensity → more efficient tensor parallelism.
+
+### Pipeline Parallelism
+
+Communication only at stage boundaries:
+- FLOPs: Full model computation
+- Communication: Activation tensors between stages
+
+$$I_{\text{net}}^{\text{PP}} = \frac{\text{Total FLOPs}}{\text{Activation size} \times \text{num stages}}$$
+
+Generally the most communication-efficient strategy.
+
+## The Ridge Point
+
+The **ridge point** is where two ceilings intersect. For distributed training:
+
+$$I_{\text{ridge}} = \frac{\text{Peak FLOP/s}}{\text{Network BW}}$$
+
+For an H100 (1979 TFLOP/s) with 400 Gbps (50 GB/s) InfiniBand:
+
+$$I_{\text{ridge}} = \frac{1979 \times 10^{12}}{50 \times 10^9} = 39,580 \text{ FLOPs/byte}$$
+
+Operations with communication intensity below this are network-bound.
+
+## Implications for System Design
+
+1. **Maximize communication intensity**: Increase batch size, use gradient accumulation
+2. **Overlap communication with compute**: Hide latency behind useful work
+3. **Compress communication**: Reduce bytes transferred
+4. **Choose topology wisely**: TP within nodes (high BW), PP across nodes (tolerates latency)
+
+The extended roofline is our primary tool for analyzing distributed training bottlenecks.
+
+## Exercises
+
+1. Calculate the communication intensity of training a 7B parameter model with batch size 1M tokens across 64 GPUs using data parallelism.
+
+2. An H100 DGX system has 900 GB/s NVLink bandwidth within the node and 400 Gbps InfiniBand across nodes. What's the ratio of ridge points for intra-node vs inter-node communication?
+
+3. You observe 35% MFU (Model FLOP Utilization) on a training run. Using the extended roofline, what are the possible bottlenecks and how would you diagnose which one dominates?
