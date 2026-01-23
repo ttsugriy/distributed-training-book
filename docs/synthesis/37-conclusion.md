@@ -15,19 +15,19 @@ This book argued that distributed training has an underlying algebraic structure
 
 Three equations form the backbone of distributed training analysis:
 
-**The Memory Equation** (Chapter 4):
+**The Memory Equation** (Chapter 19):
 
 $$M = \underbrace{P \cdot b_p}_{\text{parameters}} + \underbrace{P \cdot b_o}_{\text{optimizer}} + \underbrace{P \cdot b_g}_{\text{gradients}} + \underbrace{A(B, S, d)}_{\text{activations}}$$
 
 Every parallelism strategy is a different factorization of this equation across GPUs.
 
-**The Communication Model** (Chapter 3):
+**The Communication Model** (Chapter 4):
 
 $$T = \alpha + \frac{n}{\beta}$$
 
 Every collective operation obeys this model. Latency-bound operations (small $n$) minimize $\alpha$ terms through tree algorithms. Bandwidth-bound operations (large $n$) maximize $\beta$ utilization through ring algorithms.
 
-**The Compute Efficiency Model** (Chapter 8):
+**The Compute Efficiency Model** (Chapter 6):
 
 $$\text{MFU} = \frac{\text{Achieved FLOPs}}{\text{Peak FLOPs}} = \frac{6 \cdot P \cdot \text{tokens}}{\text{time} \cdot \text{peak FLOPs}}$$
 
@@ -136,7 +136,7 @@ Chapter 33 introduced a systematic approach to understanding any distributed tra
 1. Memory Analysis
    ├── Parameter count (by component)
    ├── Optimizer states
-   ├── Activation memory (per layer, per microbatch)
+   ├── Activation memory (per layer, per micro-batch)
    └── Temporary buffers
 
 2. Compute Analysis

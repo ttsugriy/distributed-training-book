@@ -332,7 +332,7 @@ $$T_{\text{TP}} = 4 \times T_{\text{AllReduce}}(n_{\text{activation}})$$
 
 ### Pipeline Parallel Send/Recv
 
-Per microbatch:
+Per micro-batch:
 
 $$T_{\text{PP}} = 2 \times \left( \alpha + \frac{n_{\text{activation}}}{\beta} \right)$$
 
@@ -344,8 +344,8 @@ $$T_{\text{PP}} = 2 \times \left( \alpha + \frac{n_{\text{activation}}}{\beta} \
 
 - Gradient size: 70B × 2 bytes = 140 GB (but sharded 8×, so 17.5 GB per DP group)
 - TP activation: 8192 × 4096 × 2 = 64 MB per layer
-- PP activation: 8192 × 4096 × 2 = 64 MB per microbatch
-- 80 layers, 8 microbatches
+- PP activation: 8192 × 4096 × 2 = 64 MB per micro-batch
+- 80 layers, 8 micro-batches
 
 **TP communication** (8 GPUs, NVLink β = 300 GB/s):
 $$T_{\text{TP}} = 80 \times 4 \times \left( 14 \times 1\mu s + \frac{14}{8} \times \frac{64 \times 10^6}{3 \times 10^{11}} \right)$$

@@ -386,11 +386,11 @@ Standard 1F1B (one-forward-one-backward) has bubble fraction:
 
 $$\text{Bubble} = \frac{p-1}{m}$$
 
-For $p=16$ stages and $m=32$ microbatches: $47\%$ bubble!
+For $p=16$ stages and $m=32$ micro-batches: $47\%$ bubble!
 
 ### The DualPipe Innovation
 
-DualPipe overlaps two pipelines operating on different microbatches:
+DualPipe overlaps two pipelines operating on different micro-batches:
 
 ```
 Standard 1F1B (simplified, 4 stages):
@@ -408,7 +408,7 @@ GPU2:          █   █                       █   █
 GPU3:              █   █               █   █
 ```
 
-The key insight: While one microbatch is in forward pass, another can be in backward pass on the same stage.
+The key insight: While one micro-batch is in forward pass, another can be in backward pass on the same stage.
 
 ### DualPipe Schedule
 
@@ -623,8 +623,8 @@ $$F = 6 \times N_{\text{active}} \times T_{\text{batch}} = 6 \times 37\text{B} \
 $$F_{\text{peak}} = 2048 \times 3200 \times 10^{12} = 6.55 \times 10^{18} \text{ FP8 FLOPS}$$
 
 **With overhead (bubble, communication)**:
-If step time is 60 seconds:
-$$\text{MFU} = \frac{8.9 \times 10^{17}}{6.55 \times 10^{18} \times 60} \approx 0.23 = 23\%$$
+If step time is 0.6 seconds:
+$$\text{MFU} = \frac{8.9 \times 10^{17}}{6.55 \times 10^{18} \times 0.6} \approx 0.23 = 23\%$$
 
 ### Where Efficiency Is Lost
 
@@ -804,7 +804,7 @@ if __name__ == "__main__":
 
 3. **FP8 quantization error**: For a layer with weights normally distributed $\mathcal{N}(0, 0.02)$, calculate the expected quantization error using E4M3 with per-tensor vs per-block (block=128) scaling.
 
-4. **DualPipe scheduling**: Implement the complete DualPipe schedule for 8 stages and 16 microbatches. Verify the bubble reduction vs standard 1F1B.
+4. **DualPipe scheduling**: Implement the complete DualPipe schedule for 8 stages and 16 micro-batches. Verify the bubble reduction vs standard 1F1B.
 
 5. **Expert communication**: With 2048 GPUs and 256 experts, design an expert placement that minimizes inter-node communication assuming 8 GPUs per node.
 

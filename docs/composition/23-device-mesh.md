@@ -69,6 +69,36 @@ axis  1 [4] [5] [6] [7]    ← TP group 1: {4,5,6,7}
         DP groups: {0,4}, {1,5}, {2,6}, {3,7}
 ```
 
+```mermaid
+flowchart TB
+    subgraph mesh["2×4 Device Mesh"]
+        subgraph tp0["TP Group 0 (Row 0)"]
+            direction LR
+            G0((0)) --- G1((1)) --- G2((2)) --- G3((3))
+        end
+        subgraph tp1["TP Group 1 (Row 1)"]
+            direction LR
+            G4((4)) --- G5((5)) --- G6((6)) --- G7((7))
+        end
+    end
+
+    G0 -.->|DP| G4
+    G1 -.->|DP| G5
+    G2 -.->|DP| G6
+    G3 -.->|DP| G7
+
+    style G0 fill:#4a9eff,stroke:#0066cc,color:white
+    style G1 fill:#4a9eff,stroke:#0066cc,color:white
+    style G2 fill:#4a9eff,stroke:#0066cc,color:white
+    style G3 fill:#4a9eff,stroke:#0066cc,color:white
+    style G4 fill:#2ecc71,stroke:#27ae60,color:white
+    style G5 fill:#2ecc71,stroke:#27ae60,color:white
+    style G6 fill:#2ecc71,stroke:#27ae60,color:white
+    style G7 fill:#2ecc71,stroke:#27ae60,color:white
+```
+
+**Legend**: Solid lines = TP groups (fast NVLink), Dashed lines = DP groups (network).
+
 ### The Mesh-Group Correspondence
 
 **Theorem (Mesh-Group Bijection)**: For an $n$-dimensional mesh with dimensions $(d_1, \ldots, d_n)$:

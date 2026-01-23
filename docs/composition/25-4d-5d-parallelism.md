@@ -355,7 +355,7 @@ Communication patterns in 4D parallelism:
 |-----------|-----------|-----------|--------|
 | TP | AllReduce | Every layer | $2 \times \frac{T-1}{T} \times H \times B \times S/C$ |
 | CP | Ring P2P | Every attention | $2 \times B \times S/C \times H$ (K+V) |
-| PP | P2P Send/Recv | Every microbatch | $B \times S/C \times H$ |
+| PP | P2P Send/Recv | Every micro-batch | $B \times S/C \times H$ |
 | DP | AllReduce | Every step | $2 \times \frac{D-1}{D} \times \text{Params}/(T \times P)$ |
 
 ### Dimension Ordering for Hardware

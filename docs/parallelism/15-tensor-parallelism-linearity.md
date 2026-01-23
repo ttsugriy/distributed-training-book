@@ -103,23 +103,47 @@ $$\frac{\partial L}{\partial X} = \frac{\partial L}{\partial Y} W^T = \sum_{i=1}
 
 ### Diagram
 
-```
-        GPU 0           GPU 1           GPU 2           GPU 3
+The following diagram shows how the weight matrix is split column-wise across GPUs:
 
-Input X ─────────────────────────────────────────────────────
-   │        │               │               │               │
-   │ Replicated             │               │               │
-   ▼        ▼               ▼               ▼               ▼
- ┌────┐   ┌────┐         ┌────┐         ┌────┐         ┌────┐
- │ W₀ │   │ W₁ │         │ W₂ │         │ W₃ │         (weights)
- └────┘   └────┘         └────┘         └────┘
-   │        │               │               │
-   ▼        ▼               ▼               ▼
-  Y₀       Y₁              Y₂              Y₃          (outputs)
-   │        │               │               │
-   └────────┴───────────────┴───────────────┘
-            Column-partitioned output
+```mermaid
+flowchart TB
+    subgraph input["Input (Replicated)"]
+        X["X<br/>[batch × seq × d_in]"]
+    end
+
+    subgraph weights["Weight Matrix W split by columns"]
+        direction LR
+        W0["W₀<br/>[d_in × d/4]"]
+        W1["W₁<br/>[d_in × d/4]"]
+        W2["W₂<br/>[d_in × d/4]"]
+        W3["W₃<br/>[d_in × d/4]"]
+    end
+
+    subgraph outputs["Output (Column-partitioned)"]
+        direction LR
+        Y0["Y₀ = XW₀"]
+        Y1["Y₁ = XW₁"]
+        Y2["Y₂ = XW₂"]
+        Y3["Y₃ = XW₃"]
+    end
+
+    X --> W0 & W1 & W2 & W3
+    W0 --> Y0
+    W1 --> Y1
+    W2 --> Y2
+    W3 --> Y3
+
+    style W0 fill:#3498db,stroke:#2980b9,color:white
+    style W1 fill:#e74c3c,stroke:#c0392b,color:white
+    style W2 fill:#2ecc71,stroke:#27ae60,color:white
+    style W3 fill:#f39c12,stroke:#d68910,color:white
+    style Y0 fill:#3498db,stroke:#2980b9,color:white
+    style Y1 fill:#e74c3c,stroke:#c0392b,color:white
+    style Y2 fill:#2ecc71,stroke:#27ae60,color:white
+    style Y3 fill:#f39c12,stroke:#d68910,color:white
 ```
+
+**No communication in forward pass** — each GPU computes its output shard independently.
 
 ## Row-Parallel Linear Layers
 
@@ -166,30 +190,59 @@ $$= \sum_{p=1}^{P} (X_p W_p)_{ij} \quad \square$$
 
 ### Diagram
 
-```
-        GPU 0           GPU 1           GPU 2           GPU 3
+The following diagram shows row-parallel computation with AllReduce:
 
-Input X ─────────────────────────────────────────────────────
-   │        │               │               │               │
-   │ Column-partitioned     │               │               │
-   ▼        ▼               ▼               ▼               ▼
-  X₀       X₁              X₂              X₃          (input shards)
-   │        │               │               │
-   ▼        ▼               ▼               ▼
- ┌────┐   ┌────┐         ┌────┐         ┌────┐
- │ W₀ │   │ W₁ │         │ W₂ │         │ W₃ │         (weights)
- └────┘   └────┘         └────┘         └────┘
-   │        │               │               │
-   ▼        ▼               ▼               ▼
-  Z₀       Z₁              Z₂              Z₃          (partial sums)
-   │        │               │               │
-   └────────┴───────────────┴───────────────┘
-                      │
-                      ▼ AllReduce (sum)
-                      │
-                      ▼
-                 Y (replicated)
+```mermaid
+flowchart TB
+    subgraph input["Input X (Column-partitioned)"]
+        direction LR
+        X0["X₀"]
+        X1["X₁"]
+        X2["X₂"]
+        X3["X₃"]
+    end
+
+    subgraph weights["Weight Matrix W split by rows"]
+        direction LR
+        W0["W₀<br/>[d/4 × d_out]"]
+        W1["W₁<br/>[d/4 × d_out]"]
+        W2["W₂<br/>[d/4 × d_out]"]
+        W3["W₃<br/>[d/4 × d_out]"]
+    end
+
+    subgraph partial["Partial Results"]
+        direction LR
+        Z0["Z₀ = X₀W₀"]
+        Z1["Z₁ = X₁W₁"]
+        Z2["Z₂ = X₂W₂"]
+        Z3["Z₃ = X₃W₃"]
+    end
+
+    AR["AllReduce<br/>(Sum)"]
+
+    subgraph output["Output Y (Replicated)"]
+        Y["Y = Z₀ + Z₁ + Z₂ + Z₃"]
+    end
+
+    X0 --> W0 --> Z0
+    X1 --> W1 --> Z1
+    X2 --> W2 --> Z2
+    X3 --> W3 --> Z3
+
+    Z0 & Z1 & Z2 & Z3 --> AR --> Y
+
+    style W0 fill:#3498db,stroke:#2980b9,color:white
+    style W1 fill:#e74c3c,stroke:#c0392b,color:white
+    style W2 fill:#2ecc71,stroke:#27ae60,color:white
+    style W3 fill:#f39c12,stroke:#d68910,color:white
+    style X0 fill:#3498db,stroke:#2980b9,color:white
+    style X1 fill:#e74c3c,stroke:#c0392b,color:white
+    style X2 fill:#2ecc71,stroke:#27ae60,color:white
+    style X3 fill:#f39c12,stroke:#d68910,color:white
+    style AR fill:#9b59b6,stroke:#8e44ad,color:white
 ```
+
+**AllReduce required** — partial results must be summed across all GPUs.
 
 ### Bias Handling
 
@@ -209,17 +262,32 @@ $$\text{MLP}(X) = \text{GeLU}(X W_1) W_2$$
 
 With Megatron parallelism:
 
-```
-Input X (replicated across TP group)
-    │
-    ▼ Column-parallel: Y = XW₁ (no communication)
-    │
-    ▼ GeLU(Y) - local on sharded Y
-    │
-    ▼ Row-parallel: Z = YW₂ (AllReduce)
-    │
-    ▼
-Output Z (replicated)
+```mermaid
+flowchart TB
+    X["Input X<br/>(replicated)"]
+
+    subgraph colpar["Column-Parallel (no comm)"]
+        W1["W₁ sharded<br/>by columns"]
+    end
+
+    Y["Y = XW₁<br/>(column-sharded)"]
+
+    GELU["GeLU(Y)<br/>(local, element-wise)"]
+
+    subgraph rowpar["Row-Parallel"]
+        W2["W₂ sharded<br/>by rows"]
+    end
+
+    AR["AllReduce"]
+
+    Z["Output Z<br/>(replicated)"]
+
+    X --> colpar --> Y --> GELU --> rowpar --> AR --> Z
+
+    style colpar fill:#2ecc71,stroke:#27ae60,color:white
+    style rowpar fill:#3498db,stroke:#2980b9,color:white
+    style GELU fill:#f39c12,stroke:#d68910,color:white
+    style AR fill:#9b59b6,stroke:#8e44ad,color:white
 ```
 
 **Key insight**: Column-parallel produces column-sharded output, which is exactly what row-parallel needs as input!
@@ -252,21 +320,44 @@ Each head is independent. With $h$ heads and $P$ GPUs (where $P$ divides $h$):
 
 Each GPU computes $h/P$ heads.
 
-```
-Input X (replicated)
-    │
-    ├──▶ GPU 0: heads 0, 1, ..., h/P - 1
-    ├──▶ GPU 1: heads h/P, ..., 2h/P - 1
-    ├──▶ ...
-    └──▶ GPU P-1: heads (P-1)h/P, ..., h - 1
-    │
-    ▼ Each GPU: Q, K, V projections (column-parallel)
-    ▼ Each GPU: Attention computation (local)
-    ▼ Each GPU: Output projection (row-parallel)
-    │
-    ▼ AllReduce
-    │
-Output (replicated)
+```mermaid
+flowchart TB
+    X["Input X (replicated)"]
+
+    subgraph heads["Head Distribution (P=4 GPUs, h=32 heads)"]
+        direction LR
+        G0["GPU 0<br/>heads 0-7"]
+        G1["GPU 1<br/>heads 8-15"]
+        G2["GPU 2<br/>heads 16-23"]
+        G3["GPU 3<br/>heads 24-31"]
+    end
+
+    subgraph qkv["Q, K, V Projections (column-parallel, no comm)"]
+        direction TB
+        QKV["Each GPU: W_Q, W_K, W_V for local heads"]
+    end
+
+    subgraph attn["Attention (local per head)"]
+        direction TB
+        ATT["softmax(QK^T / sqrt(d_k)) V"]
+    end
+
+    subgraph out["Output Projection (row-parallel)"]
+        direction TB
+        WO["W_O sharded by rows"]
+    end
+
+    AR["AllReduce"]
+    Y["Output (replicated)"]
+
+    X --> heads
+    G0 & G1 & G2 & G3 --> qkv --> attn --> out --> AR --> Y
+
+    style G0 fill:#3498db,stroke:#2980b9,color:white
+    style G1 fill:#e74c3c,stroke:#c0392b,color:white
+    style G2 fill:#2ecc71,stroke:#27ae60,color:white
+    style G3 fill:#f39c12,stroke:#d68910,color:white
+    style AR fill:#9b59b6,stroke:#8e44ad,color:white
 ```
 
 ### Communication Count

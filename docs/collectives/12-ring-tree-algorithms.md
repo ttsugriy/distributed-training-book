@@ -32,6 +32,21 @@ Ring AllReduce consists of two phases:
 
 **Phase 2: AllGather** — Each process collects all pieces
 
+```mermaid
+flowchart LR
+    subgraph ring["Ring Topology (P=4)"]
+        P0((P0)) --> P1((P1))
+        P1 --> P2((P2))
+        P2 --> P3((P3))
+        P3 --> P0
+    end
+
+    style P0 fill:#4a9eff,stroke:#0066cc,color:white
+    style P1 fill:#4a9eff,stroke:#0066cc,color:white
+    style P2 fill:#4a9eff,stroke:#0066cc,color:white
+    style P3 fill:#4a9eff,stroke:#0066cc,color:white
+```
+
 ### Phase 1: ReduceScatter via Ring
 
 Partition each process's data into $P$ chunks. In $P-1$ steps, each process:
@@ -71,6 +86,30 @@ P3: has complete reduction of chunk 3: A3+B3+C3+D3
 
 Each process now holds 1/P of the fully reduced result.
 
+```mermaid
+flowchart TB
+    subgraph step0["Initial State"]
+        direction LR
+        A0["P0: A₀ A₁ A₂ A₃"] ~~~ B0["P1: B₀ B₁ B₂ B₃"]
+        C0["P2: C₀ C₁ C₂ C₃"] ~~~ D0["P3: D₀ D₁ D₂ D₃"]
+    end
+
+    subgraph step3["After ReduceScatter (P-1 steps)"]
+        direction LR
+        A3["P0: Σ₀ · · ·"] ~~~ B3["P1: · Σ₁ · ·"]
+        C3["P2: · · Σ₂ ·"] ~~~ D3["P3: · · · Σ₃"]
+    end
+
+    step0 --> step3
+
+    style A3 fill:#2ecc71,stroke:#27ae60,color:white
+    style B3 fill:#2ecc71,stroke:#27ae60,color:white
+    style C3 fill:#2ecc71,stroke:#27ae60,color:white
+    style D3 fill:#2ecc71,stroke:#27ae60,color:white
+```
+
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ (the fully reduced chunk i).
+
 ### Phase 2: AllGather via Ring
 
 In $P-1$ steps, each process:
@@ -97,6 +136,28 @@ Step 2: Send what was just received
 After P-1=3 steps:
 P0: [Σ0 Σ1 Σ2 Σ3]    P1: [Σ0 Σ1 Σ2 Σ3]
 P2: [Σ0 Σ1 Σ2 Σ3]    P3: [Σ0 Σ1 Σ2 Σ3]
+```
+
+```mermaid
+flowchart TB
+    subgraph before["After ReduceScatter"]
+        direction LR
+        A1["P0: Σ₀ · · ·"] ~~~ B1["P1: · Σ₁ · ·"]
+        C1["P2: · · Σ₂ ·"] ~~~ D1["P3: · · · Σ₃"]
+    end
+
+    subgraph after["After AllGather (P-1 steps)"]
+        direction LR
+        A2["P0: Σ₀ Σ₁ Σ₂ Σ₃"] ~~~ B2["P1: Σ₀ Σ₁ Σ₂ Σ₃"]
+        C2["P2: Σ₀ Σ₁ Σ₂ Σ₃"] ~~~ D2["P3: Σ₀ Σ₁ Σ₂ Σ₃"]
+    end
+
+    before --> after
+
+    style A2 fill:#9b59b6,stroke:#8e44ad,color:white
+    style B2 fill:#9b59b6,stroke:#8e44ad,color:white
+    style C2 fill:#9b59b6,stroke:#8e44ad,color:white
+    style D2 fill:#9b59b6,stroke:#8e44ad,color:white
 ```
 
 ### Communication Analysis
@@ -165,6 +226,37 @@ Tree AllReduce also has two phases:
 **Phase 1: Reduce** — Aggregate data to root via tree reduction
 
 **Phase 2: Broadcast** — Distribute result from root via tree broadcast
+
+```mermaid
+flowchart TB
+    subgraph reduce["Phase 1: Reduce (log₂P steps)"]
+        direction TB
+        P0r((P0)) --- P1r((P1))
+        P2r((P2)) --- P3r((P3))
+        P0r --- P2r
+        P1r -.->|send| P0r
+        P3r -.->|send| P2r
+        P2r -.->|send| P0r
+    end
+
+    subgraph broadcast["Phase 2: Broadcast (log₂P steps)"]
+        direction TB
+        P0b((P0)) --- P2b((P2))
+        P0b --- P1b((P1))
+        P2b --- P3b((P3))
+        P0b -.->|send| P1b
+        P0b -.->|send| P2b
+        P2b -.->|send| P3b
+    end
+
+    reduce --> broadcast
+
+    style P0r fill:#e74c3c,stroke:#c0392b,color:white
+    style P0b fill:#2ecc71,stroke:#27ae60,color:white
+    style P1b fill:#2ecc71,stroke:#27ae60,color:white
+    style P2b fill:#2ecc71,stroke:#27ae60,color:white
+    style P3b fill:#2ecc71,stroke:#27ae60,color:white
+```
 
 ### Recursive Halving (Reduce Phase)
 

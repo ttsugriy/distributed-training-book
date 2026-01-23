@@ -870,7 +870,7 @@ model.gradient_checkpointing_enable()
 
 5. **Combined optimization**: A 70B model is trained with ZeRO-3 on 64 GPUs with $\sqrt{L}$ checkpointing. Calculate total memory per GPU including model state and activations.
 
-6. **Pipeline interaction**: In a 4-stage pipeline with 8 microbatches, how many activation copies are stored at peak? How does checkpointing affect this?
+6. **Pipeline interaction**: In a 4-stage pipeline with 8 micro-batches, how many activation copies are stored at peak? How does checkpointing affect this?
 
 ## Key Takeaways
 

@@ -169,10 +169,10 @@ This leaves ~32 GB for activations, optimizer states (sharded), and working memo
 
 **Pipeline bubble analysis** (Chapter 16):
 
-For 1F1B schedule with microbatch count $m$:
+For 1F1B schedule with micro-batch count $m$:
 $$\text{Bubble fraction} = \frac{p-1}{m}$$
 
-With $p=16$ and $m=64$ microbatches:
+With $p=16$ and $m=64$ micro-batches:
 $$\text{Bubble} = \frac{15}{64} \approx 23\%$$
 
 This represents a significant efficiency loss, but is necessary for memory constraints.
@@ -249,8 +249,8 @@ $$F_{\text{step}} = 6 \times 405 \times 10^9 \times 10^6 = 2.43 \times 10^{18} \
 **Hardware peak**:
 $$F_{\text{peak}} = 16384 \times 1979 \times 10^{12} = 3.24 \times 10^{19} \text{ FLOPS}$$
 
-If step takes 30 seconds:
-$$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 30} \approx 0.25 = 25\%$$
+If step takes 0.3 seconds:
+$$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 0.3} \approx 0.25 = 25\%$$
 
 ### Efficiency Breakdown
 

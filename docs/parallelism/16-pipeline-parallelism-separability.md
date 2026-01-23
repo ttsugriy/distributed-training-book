@@ -70,6 +70,35 @@ Stage 3:             [F₃][B₃]
               ↑ Idle time (bubbles)
 ```
 
+```mermaid
+gantt
+    title Single Batch Pipeline (4 Stages) - 75% Bubble
+    dateFormat X
+    axisFormat %s
+
+    section Stage 0
+    Forward F₀    :f0, 0, 1
+    Idle          :crit, 1, 6
+    Backward B₀   :b0, 7, 8
+
+    section Stage 1
+    Idle          :crit, 0, 1
+    Forward F₁    :f1, 1, 2
+    Idle          :crit, 2, 6
+    Backward B₁   :b1, 6, 7
+
+    section Stage 2
+    Idle          :crit, 0, 2
+    Forward F₂    :f2, 2, 3
+    Idle          :crit, 3, 5
+    Backward B₂   :b2, 5, 6
+
+    section Stage 3
+    Idle          :crit, 0, 3
+    Forward F₃    :f3, 3, 4
+    Backward B₃   :b3, 4, 5
+```
+
 Where:
 
 - $F_i$: Forward pass on stage $i$
@@ -114,6 +143,58 @@ Stage 2:         [F₂₀][F₂₁][F₂₂][F₂₃]    [B₂₃][B₂₂][B₂
 Stage 3:             [F₃₀][F₃₁][F₃₂][F₃₃][B₃₃][B₃₂][B₃₁][B₃₀]
                                       ↑
                                Pipeline flush
+```
+
+```mermaid
+gantt
+    title GPipe Schedule (4 Stages, 4 Micro-batches) - 43% Bubble
+    dateFormat X
+    axisFormat %s
+
+    section Stage 0
+    F₀ :f00, 0, 1
+    F₁ :f01, 1, 2
+    F₂ :f02, 2, 3
+    F₃ :f03, 3, 4
+    Idle :crit, 4, 7
+    B₃ :b03, 7, 8
+    B₂ :b02, 8, 9
+    B₁ :b01, 9, 10
+    B₀ :b00, 10, 11
+
+    section Stage 1
+    Idle :crit, 0, 1
+    F₀ :f10, 1, 2
+    F₁ :f11, 2, 3
+    F₂ :f12, 3, 4
+    F₃ :f13, 4, 5
+    Idle :crit, 5, 6
+    B₃ :b13, 6, 7
+    B₂ :b12, 7, 8
+    B₁ :b11, 8, 9
+    B₀ :b10, 9, 10
+
+    section Stage 2
+    Idle :crit, 0, 2
+    F₀ :f20, 2, 3
+    F₁ :f21, 3, 4
+    F₂ :f22, 4, 5
+    F₃ :f23, 5, 6
+    B₃ :b23, 6, 7
+    B₂ :b22, 7, 8
+    B₁ :b21, 8, 9
+    B₀ :b20, 9, 10
+
+    section Stage 3
+    Idle :crit, 0, 3
+    F₀ :f30, 3, 4
+    F₁ :f31, 4, 5
+    F₂ :f32, 5, 6
+    F₃ :f33, 6, 7
+    B₃ :b33, 7, 8
+    B₂ :b32, 8, 9
+    B₁ :b31, 9, 10
+    B₀ :b30, 10, 11
 ```
 
 ### Bubble Analysis with Micro-batches
@@ -211,6 +292,90 @@ Stage 0: [F₀][F₁][F₂][F₃][F₄][F₅][F₆][F₇]      [B₇][B₆][B₅
 1F1B:
 Stage 0: [F₀][F₁][F₂][F₃][B₀][F₄][B₁][F₅][B₂][F₆][B₃][F₇][B₄][B₅][B₆][B₇]
                     ↑ Peak memory: 4 activations
+```
+
+The key difference is visible in the interleaving pattern:
+
+```mermaid
+gantt
+    title 1F1B Schedule (4 Stages, 8 Micro-batches)
+    dateFormat X
+    axisFormat %s
+
+    section Stage 0
+    F₀ :f0, 0, 1
+    F₁ :f1, 1, 2
+    F₂ :f2, 2, 3
+    F₃ :f3, 3, 4
+    B₀ :b0, 4, 5
+    F₄ :f4, 5, 6
+    B₁ :b1, 6, 7
+    F₅ :f5, 7, 8
+    B₂ :b2, 8, 9
+    F₆ :f6, 9, 10
+    B₃ :b3, 10, 11
+    F₇ :f7, 11, 12
+    B₄ :b4, 12, 13
+    B₅ :b5, 13, 14
+    B₆ :b6, 14, 15
+    B₇ :b7, 15, 16
+
+    section Stage 1
+    Idle :crit, 0, 1
+    F₀ :f10, 1, 2
+    F₁ :f11, 2, 3
+    F₂ :f12, 3, 4
+    B₀ :b10, 4, 5
+    F₃ :f13, 5, 6
+    B₁ :b11, 6, 7
+    F₄ :f14, 7, 8
+    B₂ :b12, 8, 9
+    F₅ :f15, 9, 10
+    B₃ :b13, 10, 11
+    F₆ :f16, 11, 12
+    B₄ :b14, 12, 13
+    F₇ :f17, 13, 14
+    B₅ :b15, 14, 15
+    B₆ :b16, 15, 16
+    B₇ :b17, 16, 17
+
+    section Stage 2
+    Idle :crit, 0, 2
+    F₀ :f20, 2, 3
+    F₁ :f21, 3, 4
+    B₀ :b20, 4, 5
+    F₂ :f22, 5, 6
+    B₁ :b21, 6, 7
+    F₃ :f23, 7, 8
+    B₂ :b22, 8, 9
+    F₄ :f24, 9, 10
+    B₃ :b23, 10, 11
+    F₅ :f25, 11, 12
+    B₄ :b24, 12, 13
+    F₆ :f26, 13, 14
+    B₅ :b25, 14, 15
+    F₇ :f27, 15, 16
+    B₆ :b26, 16, 17
+    B₇ :b27, 17, 18
+
+    section Stage 3
+    Idle :crit, 0, 3
+    F₀ :f30, 3, 4
+    B₀ :b30, 4, 5
+    F₁ :f31, 5, 6
+    B₁ :b31, 6, 7
+    F₂ :f32, 7, 8
+    B₂ :b32, 8, 9
+    F₃ :f33, 9, 10
+    B₃ :b33, 10, 11
+    F₄ :f34, 11, 12
+    B₄ :b34, 12, 13
+    F₅ :f35, 13, 14
+    B₅ :b35, 14, 15
+    F₆ :f36, 15, 16
+    B₆ :b36, 16, 17
+    F₇ :f37, 17, 18
+    B₇ :b37, 18, 19
 ```
 
 ### Memory Bound

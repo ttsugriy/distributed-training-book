@@ -829,7 +829,7 @@ Mixtral uses a hybrid approach:
 ### Communication Pattern
 
 ```
-Per forward pass (one microbatch):
+Per forward pass (one micro-batch):
 ├── Layer 1
 │   ├── Attention: local compute
 │   └── MoE: all-to-all (tokens to experts)

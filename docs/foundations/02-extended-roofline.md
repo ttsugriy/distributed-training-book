@@ -43,21 +43,57 @@ We're 4× communication-bound.
 
 ## Visualizing the Extended Roofline
 
+The extended roofline model shows three performance ceilings. As arithmetic intensity increases (moving right), you transition through different bottleneck regimes:
+
+```mermaid
+flowchart LR
+    subgraph low["Low Intensity"]
+        N["Network-Bound"]
+    end
+
+    subgraph mid["Medium Intensity"]
+        M["Memory-Bound"]
+    end
+
+    subgraph high["High Intensity"]
+        C["Compute-Bound"]
+    end
+
+    N -->|"Ridge Point 1<br/>(Net → Mem)"| M
+    M -->|"Ridge Point 2<br/>(Mem → Compute)"| C
+
+    style N fill:#2ecc71,stroke:#27ae60,color:white
+    style M fill:#3498db,stroke:#2980b9,color:white
+    style C fill:#e74c3c,stroke:#c0392b,color:white
 ```
-log(Performance)
-       ^
-       |         Compute ceiling
-       |     ___________________
-       |    /
-       |   /     Memory ceiling
-       |  /  ________________
-       | /  /
-       |/  /     Network ceiling
-       +--/-------------------------> log(Intensity)
-         /
-        / "Ridge point" shifts based on
-       /  which bottleneck dominates
+
+**The Roofline Shape:**
+
 ```
+Performance (FLOP/s)
+    ↑
+    │                              ┌─────────────────── Compute Ceiling (Peak FLOP/s)
+    │                         ╱────┘
+    │                    ╱────      Memory Ceiling
+    │               ╱────
+    │          ╱────
+    │     ╱────                     Network Ceiling
+    │╱────
+    └──────────────────────────────────────────────→ Intensity (FLOPs/byte)
+         ↑              ↑
+     Ridge Point 1  Ridge Point 2
+     (Net→Mem)      (Mem→Compute)
+```
+
+| Region | Ceiling | Intensity | Performance Limited By |
+|--------|---------|-----------|------------------------|
+| Left slope | Network | Low $I_{net}$ | Network bandwidth |
+| Middle slope | Memory | Low $I_{mem}$ | HBM bandwidth |
+| Flat top | Compute | High | Peak FLOP/s |
+
+**Ridge points** mark transitions between regimes. For H100 with 400 Gbps InfiniBand:
+
+$$I_{ridge}^{net} = \frac{1979 \times 10^{12} \text{ FLOP/s}}{50 \times 10^9 \text{ B/s}} \approx 39,580 \text{ FLOPs/byte}$$
 
 ## The Three Regimes
 

@@ -51,6 +51,50 @@ ZeRO partitions training state progressively:
 | ZeRO-2 | + Gradients | $2N + \frac{14N}{P}$ | +0% |
 | ZeRO-3 | + Parameters | $\frac{16N}{P}$ | +50% |
 
+```mermaid
+flowchart LR
+    subgraph baseline["Data Parallel (No ZeRO)"]
+        direction TB
+        B_P["Params (2N)"]
+        B_G["Gradients (2N)"]
+        B_O["Optimizer (12N)"]
+    end
+
+    subgraph zero1["ZeRO Stage 1"]
+        direction TB
+        Z1_P["Params (2N)"]
+        Z1_G["Gradients (2N)"]
+        Z1_O["Optimizer (12N/P)"]
+    end
+
+    subgraph zero2["ZeRO Stage 2"]
+        direction TB
+        Z2_P["Params (2N)"]
+        Z2_G["Gradients (2N/P)"]
+        Z2_O["Optimizer (12N/P)"]
+    end
+
+    subgraph zero3["ZeRO Stage 3"]
+        direction TB
+        Z3_P["Params (2N/P)"]
+        Z3_G["Gradients (2N/P)"]
+        Z3_O["Optimizer (12N/P)"]
+    end
+
+    baseline --> zero1 --> zero2 --> zero3
+
+    style B_O fill:#e74c3c,stroke:#c0392b,color:white
+    style Z1_O fill:#2ecc71,stroke:#27ae60,color:white
+    style B_G fill:#e74c3c,stroke:#c0392b,color:white
+    style Z2_O fill:#2ecc71,stroke:#27ae60,color:white
+    style Z2_G fill:#2ecc71,stroke:#27ae60,color:white
+    style Z3_P fill:#2ecc71,stroke:#27ae60,color:white
+    style Z3_G fill:#2ecc71,stroke:#27ae60,color:white
+    style Z3_O fill:#2ecc71,stroke:#27ae60,color:white
+```
+
+**Legend**: Red = replicated (memory waste), Green = sharded (memory efficient).
+
 Let's derive each stage rigorously.
 
 ## ZeRO Stage 1: Optimizer State Sharding

@@ -48,7 +48,7 @@ The $2046\alpha$ latency term destroys throughput.
 
 **Weakness**: Pipeline bubbles.
 
-With $P$ stages and microbatch count $M$:
+With $P$ stages and micro-batch count $M$:
 $$\text{Bubble fraction} = \frac{P - 1}{P + M - 1}$$
 
 With $P = 1024$ and $M = 4$:
@@ -227,7 +227,7 @@ Stage 0 → Stage 1 → Stage 2 → ... → Stage 7
     activations  activations  activations
 ```
 
-**Bandwidth**: $H \cdot B$ per microbatch boundary (much less than TP).
+**Bandwidth**: $H \cdot B$ per micro-batch boundary (much less than TP).
 
 ### Data Parallelism Communication
 
@@ -255,15 +255,15 @@ DP Group (ranks across nodes):
 With 3D parallelism, memory is distributed:
 
 **Model Parameters** (sharded by TP and PP):
-$$M_{\text{params}} = \frac{N_{\text{params}} \times 2}{T \times P}$$
+$$M_{\text{params}} = \frac{\Psi \times 2}{T \times P}$$
 
 **Optimizer States** (sharded by TP and PP):
-$$M_{\text{optimizer}} = \frac{N_{\text{params}} \times 8}{T \times P}$$
+$$M_{\text{optimizer}} = \frac{\Psi \times 8}{T \times P}$$
 
 **Activations** (sharded by TP, multiplied by pipeline depth):
 $$M_{\text{activations}} = \frac{B \times L_{\text{stage}} \times H}{T} \times k_{\text{buffer}}$$
 
-Where $k_{\text{buffer}}$ accounts for in-flight microbatches.
+Where $k_{\text{buffer}}$ accounts for in-flight micro-batches.
 
 ### Example: 175B Model on 1024 GPUs
 
@@ -275,7 +275,7 @@ $$\frac{175\text{B} \times 2}{4 \times 8} = \frac{350\text{GB}}{32} = 10.9\text{
 **Optimizer per GPU**:
 $$\frac{175\text{B} \times 8}{4 \times 8} = \frac{1.4\text{TB}}{32} = 43.8\text{ GB}$$
 
-**Activations per GPU** (with $B=32$ microbatches in flight):
+**Activations per GPU** (with $B=32$ micro-batches in flight):
 $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 
 **Total**: 10.9 + 43.8 + 24 ≈ **79 GB** (fits in 80GB A100).
@@ -284,25 +284,25 @@ $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 
 ### Compute Time
 
-Forward and backward pass time (per microbatch):
-$$T_{\text{compute}} = \frac{6 \times N_{\text{params}} \times B_{\mu}}{P \times \text{FLOPS}_{\text{GPU}}}$$
+Forward and backward pass time (per micro-batch):
+$$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu}}{P \times \text{FLOPS}_{\text{GPU}}}$$
 
-Where $B_{\mu}$ is microbatch size.
+Where $B_{\mu}$ is micro-batch size.
 
 ### Communication Time
 
 **TP Communication** (per layer, both forward and backward):
 $$T_{\text{TP}} = 4 \times L_{\text{stage}} \times \left(\alpha + \frac{2(T-1)}{T} \times \frac{H \times B_{\mu}}{\beta_{\text{NVLink}}}\right)$$
 
-**PP Communication** (per microbatch):
+**PP Communication** (per micro-batch):
 $$T_{\text{PP}} = 2 \times \left(\alpha + \frac{H \times B_{\mu}}{\beta_{\text{IB}}}\right)$$
 
 **DP Communication** (once per step):
-$$T_{\text{DP}} = \frac{2(D-1)}{D} \times \frac{N_{\text{params}}/(T \times P)}{\beta_{\text{IB}}}$$
+$$T_{\text{DP}} = \frac{2(D-1)}{D} \times \frac{\Psi/(T \times P)}{\beta_{\text{IB}}}$$
 
 ### Pipeline Efficiency
 
-With 1F1B schedule and $M$ microbatches:
+With 1F1B schedule and $M$ micro-batches:
 $$\eta_{\text{pipeline}} = \frac{M}{M + P - 1}$$
 
 ### Total Step Time
@@ -879,7 +879,7 @@ Memory savings: (D-1)/D of optimizer memory
 2. **Communication analysis**: For configuration DP=8, PP=4, TP=4 training a model with hidden_dim=8192 and batch_size=512:
 
    - Calculate TP communication volume per layer
-   - Calculate PP communication volume per microbatch
+   - Calculate PP communication volume per micro-batch
    - Calculate DP communication volume per step
    - Which is the bottleneck?
 
@@ -908,7 +908,7 @@ Memory savings: (D-1)/D of optimizer memory
 
 3. **TP innermost**: Use NVLink bandwidth within nodes.
 
-4. **Pipeline efficiency**: Use many microbatches and interleaving.
+4. **Pipeline efficiency**: Use many micro-batches and interleaving.
 
 5. **Configuration is an optimization problem**: Balance memory, compute, and communication.
 
