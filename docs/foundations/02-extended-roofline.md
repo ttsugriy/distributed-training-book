@@ -43,47 +43,23 @@ We're 4× communication-bound.
 
 ## Visualizing the Extended Roofline
 
-The extended roofline model shows three performance ceilings. As arithmetic intensity increases (moving right), you transition through different bottleneck regimes:
+The extended roofline model bounds performance by three ceilings. The chart below shows performance vs. arithmetic intensity on log-log axes:
 
 ```mermaid
-flowchart LR
-    subgraph low["Low Intensity"]
-        N["Network-Bound"]
-    end
-
-    subgraph mid["Medium Intensity"]
-        M["Memory-Bound"]
-    end
-
-    subgraph high["High Intensity"]
-        C["Compute-Bound"]
-    end
-
-    N -->|"Ridge Point 1<br/>(Net → Mem)"| M
-    M -->|"Ridge Point 2<br/>(Mem → Compute)"| C
-
-    style N fill:#2ecc71,stroke:#27ae60,color:white
-    style M fill:#3498db,stroke:#2980b9,color:white
-    style C fill:#e74c3c,stroke:#c0392b,color:white
+xychart-beta
+    title "Extended Roofline Model"
+    x-axis "Arithmetic Intensity (FLOPs/byte)" [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+    y-axis "Performance (TFLOP/s)" 0 --> 2000
+    line "Network Ceiling" [50, 100, 200, 400, 800, 1600, 1979, 1979, 1979, 1979, 1979]
+    line "Memory Ceiling" [100, 200, 400, 800, 1600, 1979, 1979, 1979, 1979, 1979, 1979]
+    line "Compute Ceiling" [1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979]
 ```
 
-**The Roofline Shape:**
+**How to read this:**
 
-```
-Performance (FLOP/s)
-    ↑
-    │                              ┌─────────────────── Compute Ceiling (Peak FLOP/s)
-    │                         ╱────┘
-    │                    ╱────      Memory Ceiling
-    │               ╱────
-    │          ╱────
-    │     ╱────                     Network Ceiling
-    │╱────
-    └──────────────────────────────────────────────→ Intensity (FLOPs/byte)
-         ↑              ↑
-     Ridge Point 1  Ridge Point 2
-     (Net→Mem)      (Mem→Compute)
-```
+- **Sloped regions**: Performance scales with intensity (bandwidth-limited)
+- **Flat region**: Performance hits peak FLOP/s (compute-limited)
+- **Ridge points**: Where slopes meet ceilings (transitions between regimes)
 
 | Region | Ceiling | Intensity | Performance Limited By |
 |--------|---------|-----------|------------------------|
