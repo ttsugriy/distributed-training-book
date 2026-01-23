@@ -3,13 +3,13 @@ title: "Gradient Compression"
 subtitle: "Trading Fidelity for Bandwidth"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Communication costs dominate large-scale training. Gradient compression offers a seemingly magical solution: transmit less data while converging to the same result. The mathematics of why this works—and when it fails—reveals deep connections between optimization theory and information theory.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You compress gradients to 1% of their original size, yet the model converges to the same quality. How is this possible? What information is truly necessary for convergence?
-:::
+</div>
 
 ## The Communication Bottleneck
 

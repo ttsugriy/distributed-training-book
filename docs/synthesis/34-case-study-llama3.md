@@ -3,13 +3,13 @@ title: "Case Study: LLaMA 3"
 subtitle: "Deconstructing Meta's Training Infrastructure"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 LLaMA 3 represents the state of the art in open-weight large language models. By analyzing its training infrastructure through the lens of this book's frameworks, we can understand why specific choices were made and how the mathematics of distributed training shaped the final system.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: How did Meta train a 405B parameter model on 16,000 H100 GPUs across 15 trillion tokens? What constraints drove their parallelism choices, and how do these align with the theoretical frameworks we've developed?
-:::
+</div>
 
 ## The Scale of the Challenge
 

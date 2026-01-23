@@ -3,13 +3,13 @@ title: "Expert Parallelism from Sparsity"
 subtitle: "Routing Tokens to Distributed Experts"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Mixture of Experts models activate only a subset of parameters per token. This sparsity enables massive parameter counts without proportional compute costs—but requires careful routing to balance load across distributed experts.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A model has 8 experts distributed across 8 GPUs. A token is routed to experts on GPUs 3 and 7. How does the token get there and back? What if all tokens want the same expert?
-:::
+</div>
 
 ## The Sparsity Property
 

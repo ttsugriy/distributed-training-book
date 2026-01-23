@@ -3,13 +3,13 @@ title: "Overlapping Communication with Computation"
 subtitle: "Hiding Latency Through Concurrent Execution"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 The fastest communication is communication you don't wait for. By overlapping data transfers with computation, we can approach the theoretical limit where communication cost approaches zero.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A training step has 100ms of compute and 50ms of communication. The naive approach takes 150ms. Perfect overlap would take 100ms. What determines where you land between these extremes?
-:::
+</div>
 
 ## The Overlap Opportunity
 

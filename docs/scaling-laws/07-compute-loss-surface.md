@@ -3,13 +3,13 @@ title: "The Compute-Loss Surface"
 subtitle: "Mapping the Relationship Between Resources and Performance"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Loss is a function of two investments: model size and training data. Understanding this surface is the first step to allocating compute efficiently.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You have a fixed compute budget C. Should you train a larger model on less data or a smaller model on more data? The loss surface tells us there's an optimal allocation—and most models before 2022 got it wrong.
-:::
+</div>
 
 ## The Empirical Discovery
 

@@ -3,13 +3,13 @@ title: "The Device Mesh Abstraction"
 subtitle: "Organizing Parallelism Across Multi-Dimensional Hardware"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 A cluster of GPUs is not a flat collection—it's a structured topology with varying bandwidths at each level. The device mesh abstraction captures this structure, enabling systematic composition of parallelism strategies.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You have 4096 GPUs organized as 512 nodes × 8 GPUs/node. How do you express "tensor parallel within node, data parallel across nodes"? What abstraction makes such compositions natural and correct?
-:::
+</div>
 
 ## From Flat to Structured
 

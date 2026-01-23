@@ -3,13 +3,13 @@ title: "Asynchrony and Local SGD"
 subtitle: "Breaking the Synchronization Barrier"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Synchronous training is mathematically clean but operationally costly. Every worker waits for the slowest. Asynchronous methods eliminate this barrier, but introduce staleness. Local SGD finds a middle ground: synchronize periodically rather than constantly. The mathematics of these trade-offs reveals when each approach wins.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: If workers can compute gradients in parallel without waiting, why does asynchronous training often converge slower than synchronous? What's lost in translation, and can we recover it?
-:::
+</div>
 
 ## The Synchronization Tax
 

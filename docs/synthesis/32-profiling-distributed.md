@@ -3,13 +3,13 @@ title: "Profiling Distributed Training"
 subtitle: "Instrumenting, Measuring, and Optimizing Parallel Systems"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 A distributed training run consumes thousands of GPU-hours. Yet most practitioners have no idea where that time goes. Profiling transforms intuition into data, revealing whether you're compute-bound, communication-bound, or simply waiting.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOPS Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
-:::
+</div>
 
 ## The Profiling Imperative
 

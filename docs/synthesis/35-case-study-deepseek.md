@@ -3,13 +3,13 @@ title: "Case Study: DeepSeek-V3"
 subtitle: "Efficiency Through Architectural Innovation"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 DeepSeek-V3 demonstrates that training cost can be reduced by an order of magnitude through architectural innovation. By analyzing their techniques—Multi-head Latent Attention, fine-grained MoE, FP8 training, and DualPipe scheduling—we uncover principles for efficient large-scale training.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: DeepSeek claims to have trained a 671B parameter model for $5.5M—roughly 10× cheaper than comparable models. What architectural and systems innovations enabled this efficiency, and how do they map to our theoretical frameworks?
-:::
+</div>
 
 ## The DeepSeek-V3 Specification
 

@@ -3,13 +3,13 @@ title: "Collective Primitives and Properties"
 subtitle: "The Building Blocks of Distributed Communication"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Every distributed training algorithm is built from a small set of collective operations. Understanding their algebraic properties reveals why certain compositions work and others fail.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Why is AllReduce = ReduceScatter ∘ AllGather? What properties must hold for this decomposition to be valid? What happens when these properties are violated?
-:::
+</div>
 
 ## The Seven Primitives
 

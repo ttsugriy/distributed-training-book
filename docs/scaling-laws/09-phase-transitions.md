@@ -3,13 +3,13 @@ title: "Phase Transitions in Scaling"
 subtitle: "When Smooth Laws Break and Capabilities Emerge"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Scaling is not smooth. There are regimes where model capacity dominates, others where optimizer noise dominates, and transitions between them. Understanding these phases lets us predict when capabilities will emerge—and when throwing more compute won't help.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A 10B parameter model can't do multi-step arithmetic. A 100B model can. Where did this capability come from? The loss curves are smooth, but the capability appeared suddenly. How do we explain—and predict—these phase transitions?
-:::
+</div>
 
 ## The Puzzle of Emergence
 

@@ -3,13 +3,13 @@ title: "Configuration Search"
 subtitle: "Finding Optimal Parallelism in Exponential Spaces"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 With 5 parallelism dimensions and dozens of hyperparameters, the configuration space for large-scale training grows exponentially. A 10,000 GPU cluster with DP, PP, TP, CP, and EP each ranging from 1 to 16 has over 100,000 possible configurations. Finding the optimal one is not trial-and-error—it's applied mathematics.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Given a model architecture, target batch size, and cluster specification, how do you systematically find the configuration that minimizes training time while satisfying memory constraints? Can we do better than exhaustive search?
-:::
+</div>
 
 ## The Configuration Space
 

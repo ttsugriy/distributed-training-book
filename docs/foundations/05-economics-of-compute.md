@@ -3,13 +3,13 @@ title: "The Economics of Compute"
 subtitle: "Cost Models for Distributed Training"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Hardware is expensive. Time is expensive. Inefficiency is waste. Capacity Engineers must reason about cost as fluently as they reason about performance.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You have a $10M budget to train a 70B parameter model. Do you rent 1000 H100s for 2 weeks or 500 H100s for 4 weeks? The answer depends on efficiency curves, not just total GPU-hours.
-:::
+</div>
 
 ## The Basic Cost Equation
 

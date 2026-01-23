@@ -3,13 +3,13 @@ title: "The Memory Equation"
 subtitle: "Anatomy of GPU Memory in Training"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Training large models is fundamentally a memory problem. Before we can solve it, we must understand it precisely: what consumes memory, how much, and when? The memory equation gives us this understanding.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A 7B parameter model in fp16 is 14GB. But training it requires 120GB+ of memory. Where does the other 106GB go?
-:::
+</div>
 
 ## The Memory Budget
 

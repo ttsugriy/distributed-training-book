@@ -3,13 +3,13 @@ title: "The Scale Imperative"
 subtitle: "Why Distributed Training Is No Longer Optional"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 In 2017, a single GPU could train the largest language models. By 2024, the largest models require thousands of GPUs running for months. This is not a temporary inconvenience—it is the new reality of machine learning.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A model has 70 billion parameters. Each parameter is 2 bytes (FP16). That's 140GB just for weights—before gradients, optimizer states, or activations. A single H100 has 80GB of memory. How do we train this model at all?
-:::
+</div>
 
 ## The Three Walls
 

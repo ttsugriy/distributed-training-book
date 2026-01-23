@@ -3,13 +3,13 @@ title: "Data Parallelism from Associativity"
 subtitle: "Why Gradient Accumulation Enables Distribution"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Data parallelism works because gradient accumulation is associative. This isn't an implementation detail—it's the mathematical foundation that makes the entire approach valid. Understanding this foundation reveals both the power and the limits of data parallelism.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: We compute gradients on different batches on different GPUs, then sum them. Why does this give us the same result as computing on the full batch? When does it fail?
-:::
+</div>
 
 ## The Mathematical Foundation
 

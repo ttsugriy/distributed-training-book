@@ -3,13 +3,13 @@ title: "Estimation as Discipline"
 subtitle: "Back-of-Envelope Calculations for Distributed Training"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Before running expensive experiments, estimate. A capacity engineer should predict training time, memory usage, and communication costs within 2× of actual values using only basic arithmetic.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You're planning to train a 30B parameter model on 128 H100s. Without running anything, estimate: (1) memory per GPU, (2) time per step, (3) tokens per second. Your estimates should guide hardware selection before spending a dollar.
-:::
+</div>
 
 ## The Estimation Mindset
 

@@ -3,13 +3,13 @@ title: "Pipeline Parallelism from Separability"
 subtitle: "Decomposing Sequential Computation"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 A neural network is a composition of layers: $f = f_L \circ f_{L-1} \circ \cdots \circ f_1$. This sequential structure enables pipeline parallelism, but creates "bubbles" of idle time that we must minimize.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: If we split a 32-layer model into 4 stages of 8 layers each, how much time is wasted to "pipeline bubbles"? Can we reduce it to zero?
-:::
+</div>
 
 ## The Separability Property
 

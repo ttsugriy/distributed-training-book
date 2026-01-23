@@ -3,13 +3,13 @@ title: "Ring and Tree Algorithms"
 subtitle: "Bandwidth-Optimal and Latency-Optimal Collectives"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 The same logical operation—AllReduce—can be implemented many ways. Ring algorithms optimize for bandwidth; tree algorithms optimize for latency. Choosing correctly depends on message size.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Why is ring AllReduce bandwidth-optimal? Can we prove it achieves the theoretical minimum communication volume? And when should we use tree algorithms instead?
-:::
+</div>
 
 ## The Algorithm Design Space
 

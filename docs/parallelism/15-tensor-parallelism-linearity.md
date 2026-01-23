@@ -3,13 +3,13 @@ title: "Tensor Parallelism from Linearity"
 subtitle: "Why Matrix Multiplication Shards and GELU Doesn't"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. This single property enables tensor parallelism. Non-linear operations like GELU break this property, forcing synchronization. Understanding linearity reveals which operations can be parallelized and which force communication.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: We want to shard a linear layer $Y = XW$ across 8 GPUs. Can we split $W$ column-wise? Row-wise? What about the bias? What about LayerNorm? What about GELU?
-:::
+</div>
 
 ## The Linearity Property
 

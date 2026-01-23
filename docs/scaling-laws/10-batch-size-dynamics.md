@@ -3,13 +3,13 @@ title: "Batch Size and Learning Dynamics"
 subtitle: "Critical Batch Size, Learning Rate Scaling, and LARS/LAMB"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Batch size is not just a memory parameter—it fundamentally affects learning dynamics. There's a critical batch size beyond which returns diminish rapidly. Understanding this is essential for scaling to thousands of GPUs.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You want to scale from 8 GPUs to 10,000 GPUs. The naive approach: increase batch size 1,250×. But models trained with batch size 1M often fail to converge. What's the limit, and how do we push past it?
-:::
+</div>
 
 ## Gradient Noise and Batch Size
 

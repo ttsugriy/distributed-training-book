@@ -3,13 +3,13 @@ title: "The Memory Hierarchy of a Cluster"
 subtitle: "From Registers to the Datacenter"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 A single machine has a memory hierarchy: registers, L1, L2, L3, DRAM. A cluster extends this hierarchy across machines: HBM, NVLink, InfiniBand, Ethernet. Understanding the bandwidth and latency at each level determines where we can afford to place data.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Why does tensor parallelism work within a node but struggle across nodes? Why is pipeline parallelism preferred for cross-node communication? The answer lies in the 20× bandwidth gap between NVLink and InfiniBand.
-:::
+</div>
 
 ## The Extended Hierarchy
 

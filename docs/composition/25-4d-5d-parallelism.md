@@ -3,13 +3,13 @@ title: "4D and 5D Parallelism"
 subtitle: "Context Parallelism and Expert Parallelism in the Mix"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 As context windows grow to millions of tokens and sparse Mixture-of-Experts models reach trillions of parameters, 3D parallelism hits new walls. The fourth dimension—context parallelism—handles long sequences. The fifth—expert parallelism—handles sparse capacity. Together, they enable the largest models in existence.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You're training a 1T parameter MoE model with 128K context length on 16,384 GPUs. 3D parallelism can handle neither the sequence memory nor the expert routing. What additional dimensions of parallelism do you need, and how do they compose with the existing three?
-:::
+</div>
 
 ## Beyond 3D: New Constraints
 

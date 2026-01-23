@@ -3,9 +3,9 @@ title: "Conclusion: The Algebra of Scale"
 subtitle: "Principles, Practice, and the Future"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 We began with seven collective primitives and end with systems training trillion-parameter models across thousands of GPUs. The journey revealed that distributed training is not a collection of tricks but a coherent mathematical discipline.
-:::
+</div>
 
 ## The Unified Framework
 
@@ -351,6 +351,6 @@ Science advances through shared knowledge. We hope this book contributes to that
 
 ---
 
-::: {.key-insight}
+<div class="key-insight" markdown>
 **Final Takeaway**: Distributed training is mathematics. Learn the equations, understand the constraints, and the configurations follow. The algebra of scale is the algebra of AI.
-:::
+</div>

@@ -3,13 +3,13 @@ title: "Activation Recomputation"
 subtitle: "Trading Compute for Memory Through Gradient Checkpointing"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Activations dominate memory in deep networks. A 7B model's parameters need ~14 GB, but its activations can consume 100+ GB. Activation recomputation—also called gradient checkpointing—trades compute for memory by recomputing activations during the backward pass instead of storing them.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: The backward pass needs activations from the forward pass. Storing them all requires O(L) memory for L layers. Can we reduce this to O(√L) or even O(1)? What's the compute cost of this trade-off?
-:::
+</div>
 
 ## The Activation Memory Problem
 

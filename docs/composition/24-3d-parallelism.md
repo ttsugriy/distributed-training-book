@@ -3,13 +3,13 @@ title: "3D Parallelism"
 subtitle: "The Canonical Composition: DP × TP × PP"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 No single parallelism strategy scales to thousands of GPUs. Data parallelism wastes memory. Tensor parallelism drowns in communication. Pipeline parallelism creates bubbles. The solution: compose all three, each operating at its optimal scale.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You have 1024 GPUs and a 175B parameter model. DP alone: each GPU needs the full model—impossible. TP alone: 1024-way splits create 1023 communication barriers per layer. PP alone: 1023/1024 = 99.9% bubble overhead. How do you combine them to train efficiently?
-:::
+</div>
 
 ## The Limits of Single Strategies
 

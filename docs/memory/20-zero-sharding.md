@@ -3,13 +3,13 @@ title: "ZeRO: Zero Redundancy Optimizer"
 subtitle: "Eliminating Memory Redundancy Through Sharding"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 The memory equation from Chapter 19 reveals massive redundancy: every GPU stores identical copies of optimizer states, gradients, and parameters. ZeRO eliminates this redundancy by sharding—partitioning these tensors across devices. The result is near-linear memory scaling with the number of GPUs.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: With 8 GPUs, you have 8× the aggregate memory. But standard data parallelism still limits you to the memory of a single GPU. How do we achieve the full 8× without fundamentally changing the training algorithm?
-:::
+</div>
 
 ## The Redundancy Problem
 

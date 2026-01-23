@@ -3,13 +3,13 @@ title: "The Collective Cost Model"
 subtitle: "Predicting Communication Time for Any Operation"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Armed with α-β analysis and algorithm knowledge, we can predict the cost of any collective operation before running it. This predictive capability is essential for capacity planning.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Your AllReduce takes 500ms. Is that good or bad? How do you know if you're achieving near-optimal performance? What's the gap between theoretical and achieved, and where does the gap come from?
-:::
+</div>
 
 ## The Complete Cost Formulas
 

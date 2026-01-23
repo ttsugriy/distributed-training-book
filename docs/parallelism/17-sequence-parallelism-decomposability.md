@@ -3,13 +3,13 @@ title: "Sequence Parallelism from Decomposability"
 subtitle: "Sharding Along the Sequence Dimension"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 When sequences grow to millions of tokens, even a single attention computation won't fit in memory. Sequence parallelism exploits the decomposability of attention to split along the sequence dimension.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Attention is O(S²) in sequence length. For S=1M tokens, that's 10^12 attention scores. How do we compute this when no single GPU can hold the attention matrix?
-:::
+</div>
 
 ## Why Sequence Parallelism?
 

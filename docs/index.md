@@ -2,9 +2,11 @@
 title: "Preface"
 ---
 
-::: {.chapter-opener}
+**Read online: [ttsugriy.github.io/distributed-training-book](https://ttsugriy.github.io/distributed-training-book/)**
+
+<div class="chapter-opener" markdown>
 Every parallelism strategy exploits a mathematical property. Every communication pattern has an algebraic structure. Every efficiency gain traces to a fundamental insight about what can be decomposed and what must be synchronized.
-:::
+</div>
 
 ## Why This Book
 

@@ -3,13 +3,13 @@ title: "Case Study: Mistral and Mixtral"
 subtitle: "Efficient Attention and Sparse Mixture-of-Experts"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Mistral AI demonstrated that architectural efficiency can rival scale. Through sliding window attention, grouped-query attention, and sparse MoE, they achieved competitive performance with dramatically fewer resources.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Mistral 7B matches LLaMA 2 13B performance with half the parameters. Mixtral 8x7B matches LLaMA 2 70B while activating only 13B parameters. What architectural innovations enable this efficiency, and what are the distributed training implications?
-:::
+</div>
 
 ## The Mistral Architecture Philosophy
 

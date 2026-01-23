@@ -3,13 +3,13 @@ title: "The Extended Roofline"
 subtitle: "Three Ceilings That Bound Distributed Performance"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 The roofline model transformed how we reason about single-device performance. For distributed systems, we extend it with a third ceiling that often dominates: network bandwidth.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You're training on 256 GPUs. Each step, every GPU computes gradients and you AllReduce them. Your per-GPU compute takes 100ms. Your AllReduce takes 200ms. You're spending 2/3 of your time on communication. How do you analyze this? How do you improve it?
-:::
+</div>
 
 ## The Original Roofline
 

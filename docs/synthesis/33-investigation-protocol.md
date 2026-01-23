@@ -3,13 +3,13 @@ title: "Investigation Protocol"
 subtitle: "A Systematic Approach to Distributed Training Problems"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 When training fails at 3 AM across 256 GPUs, you need a methodology, not luck. This chapter provides a systematic protocol for investigating distributed training problems—from initial symptoms to root cause to fix.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: Your training run has stalled. Loss hasn't decreased in hours. Some GPUs show 100% utilization, others 20%. One node is unreachable. Where do you start? In what order do you investigate? How do you isolate the problem?
-:::
+</div>
 
 ## The Investigation Mindset
 

@@ -3,13 +3,13 @@ title: "Reduced Precision Training"
 subtitle: "The Bit-Level Economics of Computation"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Every bit costs bandwidth. Every mantissa bit costs compute. Mixed-precision training exploits the gap between what hardware computes efficiently and what training actually requires.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: FP32 has 23 mantissa bits. FP16 has 10. BF16 has 7. Yet all three train similar quality models. Why don't those 16 missing bits matter—and when do they?
-:::
+</div>
 
 ## The Anatomy of Floating-Point
 

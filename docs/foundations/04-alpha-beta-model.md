@@ -3,13 +3,13 @@ title: "The α-β Model"
 subtitle: "Latency, Bandwidth, and the Mathematics of Communication"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 Every communication operation has a cost. The α-β model gives us a simple, powerful framework for reasoning about that cost: a fixed latency to start, plus time proportional to the data transferred.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: You need to AllReduce a 1GB tensor across 64 GPUs. Is it faster to send one large message or break it into 1000 smaller chunks? The answer depends on whether you're latency-bound or bandwidth-bound.
-:::
+</div>
 
 ## The Model
 

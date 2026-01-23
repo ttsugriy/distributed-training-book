@@ -3,13 +3,13 @@ title: "Offloading: Extending Memory Beyond the GPU"
 subtitle: "CPU and NVMe as Memory Hierarchy Extensions"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 When GPU memory isn't enough, we don't just add more GPUs—we extend the memory hierarchy. Offloading treats CPU memory and NVMe storage as slower tiers of GPU memory, enabling training of models that exceed any single GPU's capacity.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: A 175B parameter model requires 350GB just for parameters in fp16. The largest GPU has 80GB. How do we train this model on a single node? What are the bandwidth constraints, and how do we hide latency?
-:::
+</div>
 
 ## The Memory Hierarchy
 

@@ -82,3 +82,30 @@
   padding: 1rem;
   border-radius: 8px;
 }
+
+/* Key insight callouts */
+.key-insight {
+  font-size: 1.1rem;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+  background: rgba(16, 185, 129, 0.1);
+  border-left: 4px solid #10b981;
+  border-radius: 0 8px 8px 0;
+}
+
+.key-insight strong {
+  color: #059669;
+}
+
+/* Definition blocks */
+.definition {
+  padding: 1rem 1.5rem;
+  margin: 1rem 0;
+  background: rgba(139, 92, 246, 0.1);
+  border-left: 4px solid #8b5cf6;
+  border-radius: 0 8px 8px 0;
+}
+
+.definition strong {
+  color: #7c3aed;
+}

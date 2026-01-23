@@ -3,13 +3,13 @@ title: "Failures and Checkpointing"
 subtitle: "Fault Tolerance as a Mathematical Invariant"
 ---
 
-::: {.chapter-opener}
+<div class="chapter-opener" markdown>
 At scale, failures are not exceptions—they are expectations. A 10,000 GPU cluster with 4-hour MTBF per GPU will lose one GPU every 1.4 seconds on average. The mathematics of checkpointing determines whether training completes or collapses.
-:::
+</div>
 
-::: {.investigation-question}
+<div class="investigation-question" markdown>
 **The Question**: How do you checkpoint a 1TB model distributed across 8192 GPUs such that any failure loses at most 5 minutes of work, while checkpoint overhead consumes less than 1% of training time? What mathematical invariants must the checkpoint maintain?
-:::
+</div>
 
 ## The Scale of the Problem
 
@@ -62,9 +62,9 @@ The job will **never complete** without checkpointing.
 
 A valid checkpoint must satisfy the **consistency invariant**:
 
-::: {.definition}
+<div class="definition" markdown>
 **Checkpoint Consistency**: A checkpoint $C$ is consistent if and only if resuming training from $C$ produces the same sequence of model states as uninterrupted training would have produced from the point $C$ was taken.
-:::
+</div>
 
 For distributed training, this requires:
 
