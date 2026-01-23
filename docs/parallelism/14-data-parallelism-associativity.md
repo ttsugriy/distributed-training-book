@@ -4,7 +4,7 @@ subtitle: "Why Gradient Accumulation Enables Distribution"
 ---
 
 ::: {.chapter-opener}
-Data parallelism works because gradient accumulation is associative. This isn't an implementation detail—it's the mathematical foundation that makes the entire approach valid.
+Data parallelism works because gradient accumulation is associative. This isn't an implementation detail—it's the mathematical foundation that makes the entire approach valid. Understanding this foundation reveals both the power and the limits of data parallelism.
 :::
 
 ::: {.investigation-question}
@@ -13,48 +13,682 @@ Data parallelism works because gradient accumulation is associative. This isn't 
 
 ## The Mathematical Foundation
 
-Gradient of loss over batch $B$:
+### The Loss Function Structure
 
-$$\nabla_\theta L(B) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x, \theta)$$
+Consider a loss function over a dataset $\mathcal{D}$:
 
-Splitting batch $B = B_1 \cup B_2 \cup \cdots \cup B_P$:
+$$L(\theta) = \frac{1}{|\mathcal{D}|} \sum_{x \in \mathcal{D}} \ell(x, \theta)$$
 
-$$\nabla_\theta L(B) = \frac{1}{|B|} \sum_{i=1}^{P} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta) = \frac{1}{P} \sum_{i=1}^{P} \nabla_\theta L(B_i)$$
+where $\ell(x, \theta)$ is the per-sample loss.
 
-This works because:
-1. Summation is **associative**: $(a + b) + c = a + (b + c)$
-2. Summation is **commutative**: $a + b = b + a$
+In minibatch SGD, we approximate this with a batch $B$:
 
-## The Algorithm
+$$L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \ell(x, \theta)$$
+
+The gradient is:
+
+$$\nabla_\theta L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x, \theta)$$
+
+### The Partitioning Theorem
+
+**Theorem**: For a batch $B$ partitioned into $P$ disjoint subsets $B = B_1 \cup B_2 \cup \cdots \cup B_P$ with $|B_i| = |B|/P$ for all $i$:
+
+$$\nabla_\theta L_B(\theta) = \frac{1}{P} \sum_{i=1}^{P} \nabla_\theta L_{B_i}(\theta)$$
+
+**Proof**:
+
+Starting from the definition:
+
+$$\nabla_\theta L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x, \theta)$$
+
+Since $B = \bigcup_{i=1}^{P} B_i$ with disjoint $B_i$:
+
+$$= \frac{1}{|B|} \sum_{i=1}^{P} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
+
+With $|B_i| = |B|/P$:
+
+$$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \frac{1}{|B_i|} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
+
+$$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \nabla_\theta L_{B_i}(\theta)$$
+
+$$= \frac{1}{|B|} \sum_{i=1}^{P} \frac{|B|}{P} \cdot \nabla_\theta L_{B_i}(\theta)$$
+
+$$= \frac{1}{P} \sum_{i=1}^{P} \nabla_\theta L_{B_i}(\theta) \quad \square$$
+
+This partitioning is valid because:
+
+1. **Addition is associative**: $(a + b) + c = a + (b + c)$
+2. **Addition is commutative**: $a + b = b + a$
+3. **Gradients are elements of a vector space**: They inherit these properties from real numbers
+
+### The Key Insight
+
+The gradient of a sum equals the sum of gradients:
+
+$$\nabla_\theta \left( \sum_i f_i(\theta) \right) = \sum_i \nabla_\theta f_i(\theta)$$
+
+This **linearity of the gradient operator** combined with **associativity of addition** is what makes data parallelism mathematically sound.
+
+## The Synchronous Data Parallel Algorithm
+
+### Basic Algorithm
 
 ```
-# On each GPU i:
-1. Forward pass on local batch B_i
-2. Backward pass to compute ∇L(B_i)
-3. AllReduce gradients: g = (1/P) Σ ∇L(B_i)
-4. Update: θ ← θ - η·g
+Input: Model θ, Dataset D, P GPUs, learning rate η
+Output: Trained model θ
+
+1. Broadcast θ to all P GPUs
+2. For each training step:
+   a. Sample batch B of size |B| = P × b
+   b. Partition: Bi = samples [(i-1)b : ib] for GPU i
+   c. On each GPU i in parallel:
+      - Forward: yi = f(Bi; θ)
+      - Loss: Li = L(yi, targets)
+      - Backward: gi = ∇θLi
+   d. AllReduce: g = (1/P) Σi gi
+   e. Update: θ ← θ - η·g
+   f. (Implicit) All GPUs now have identical θ
+3. Return θ
+```
+
+### Correctness Invariant
+
+**Invariant**: At the start of each step, all GPUs hold identical model parameters.
+
+**Proof by induction**:
+
+*Base case*: Step 0 broadcasts θ, so all GPUs start identical.
+
+*Inductive step*: Assume all GPUs have identical θ at step $t$. After AllReduce, all GPUs have identical gradient $g$. Applying the same update rule with the same learning rate:
+
+$$\theta^{(t+1)} = \theta^{(t)} - \eta \cdot g$$
+
+produces identical $\theta^{(t+1)}$ on all GPUs. $\square$
+
+This invariant is why we don't need to broadcast parameters every step—the identical update maintains synchronization.
+
+### Pseudocode Implementation
+
+```python
+import torch
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+def train_data_parallel(model, dataloader, optimizer, epochs):
+    """Synchronous data parallel training."""
+
+    rank = dist.get_rank()
+    world_size = dist.get_world_size()
+
+    # Wrap model in DDP (handles gradient synchronization)
+    model = DDP(model, device_ids=[rank])
+
+    for epoch in range(epochs):
+        # Distributed sampler ensures non-overlapping batches
+        dataloader.sampler.set_epoch(epoch)
+
+        for batch in dataloader:
+            # Forward pass (identical on each GPU with different data)
+            loss = model(batch)
+
+            # Backward pass (computes local gradients)
+            loss.backward()
+
+            # DDP automatically performs AllReduce here
+            # Gradients are averaged across all ranks
+
+            # Update (identical update on all GPUs)
+            optimizer.step()
+            optimizer.zero_grad()
 ```
 
 ## Communication Analysis
 
-Per step:
-- Compute: $6\Psi \cdot |B_i|$ FLOPs
-- Communicate: $2\Psi$ bytes (AllReduce gradients)
+### Per-Step Communication Volume
 
-Communication intensity:
-$$I = \frac{6\Psi \cdot |B_i|}{2\Psi} = 3|B_i|$$
+Let $\Psi$ be the number of model parameters (in elements, not bytes).
 
-Larger local batch → higher intensity → less communication-bound.
+**AllReduce volume**: Each parameter's gradient must be synchronized.
+
+Using ring AllReduce:
+$$V = 2 \cdot \frac{P-1}{P} \cdot \Psi \cdot \text{sizeof}(\text{dtype})$$
+
+For 32-bit floats:
+$$V = 8 \cdot \frac{P-1}{P} \cdot \Psi \text{ bytes}$$
+
+As $P \to \infty$:
+$$V \to 8\Psi \text{ bytes}$$
+
+### Communication Time
+
+Using the α-β model with ring AllReduce:
+
+$$T_{\text{comm}} = 2(P-1) \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{\Psi \cdot \text{sizeof}(\text{dtype})}{\beta}$$
+
+For large $P$ and large $\Psi$ (bandwidth-dominated):
+
+$$T_{\text{comm}} \approx \frac{2\Psi \cdot \text{sizeof}(\text{dtype})}{\beta}$$
+
+### Compute Time
+
+Per GPU, with local batch size $b$:
+
+$$T_{\text{compute}} = \frac{6\Psi \cdot b}{F}$$
+
+where $F$ is the GPU's FLOP/s.
+
+### Compute-Communication Ratio
+
+The critical ratio:
+
+$$R = \frac{T_{\text{compute}}}{T_{\text{comm}}} = \frac{6\Psi \cdot b / F}{2\Psi \cdot \text{sizeof}(\text{dtype}) / \beta}$$
+
+Simplifying:
+
+$$R = \frac{3b \cdot \beta}{F \cdot \text{sizeof}(\text{dtype})}$$
+
+For FP16 training:
+
+$$R = \frac{3b \cdot \beta}{2F}$$
+
+**Example**: H100 with $F = 2 \times 10^{15}$ FLOP/s, NVLink $\beta = 900$ GB/s:
+
+$$R = \frac{3b \cdot 900 \times 10^9}{2 \times 2 \times 10^{15}} = \frac{3b \cdot 900}{4 \times 10^6} = \frac{675b}{10^6}$$
+
+For $R > 1$ (compute-bound), need:
+
+$$b > \frac{10^6}{675} \approx 1,500 \text{ samples}$$
+
+### Scaling Efficiency
+
+Define scaling efficiency:
+
+$$E(P) = \frac{T_1}{P \cdot T_P}$$
+
+where $T_1$ is single-GPU time and $T_P$ is $P$-GPU time per step.
+
+With perfect overlap:
+
+$$T_P = \max(T_{\text{compute}}, T_{\text{comm}})$$
+
+**Compute-bound regime** ($T_{\text{compute}} > T_{\text{comm}}$):
+$$E(P) = \frac{T_{\text{compute}}}{P \cdot T_{\text{compute}}} = \frac{1}{P} \cdot P = 1$$
+
+Perfect scaling! But this assumes:
+1. Perfect overlap of communication and computation
+2. No additional overhead
+
+**Communication-bound regime** ($T_{\text{comm}} > T_{\text{compute}}$):
+$$E(P) = \frac{T_{\text{compute}}}{P \cdot T_{\text{comm}}} = \frac{R}{P}$$
+
+Efficiency degrades as $P$ increases.
+
+## Overlapping Communication and Computation
+
+### The Overlap Opportunity
+
+Backward pass computes gradients layer by layer, from output to input. Once a layer's gradient is computed, it can be communicated while computing earlier layers' gradients.
+
+```
+Time →
+Layer 4: [backward][  AllReduce  ]
+Layer 3:          [backward][  AllReduce  ]
+Layer 2:                   [backward][  AllReduce  ]
+Layer 1:                            [backward][  AllReduce  ]
+                                             ↑
+                                    Overlap region
+```
+
+### Bucket-Based Overlap
+
+PyTorch DDP groups gradients into buckets:
+
+```python
+# DDP bucket configuration
+model = DDP(
+    model,
+    device_ids=[rank],
+    bucket_cap_mb=25,  # Bucket size in MB
+)
+```
+
+**Bucketing algorithm**:
+1. Register gradients in reverse computation order
+2. When bucket reaches capacity, trigger AllReduce
+3. Continue computing while AllReduce proceeds
+
+**Optimal bucket size**:
+- Too small: Many small AllReduces (latency overhead)
+- Too large: Less overlap opportunity
+
+Empirically: 10-50 MB buckets work well.
+
+### Gradient Ready Order
+
+DDP uses hooks to detect when gradients are ready:
+
+```python
+class DDPGradientHook:
+    def __init__(self, bucket_manager):
+        self.bucket_manager = bucket_manager
+
+    def __call__(self, grad):
+        # Called when gradient is computed
+        self.bucket_manager.add_gradient(grad)
+        if self.bucket_manager.bucket_ready():
+            # Launch async AllReduce
+            self.bucket_manager.flush_bucket()
+        return grad
+```
+
+The communication for layer $L$ overlaps with backward computation of layers $1, ..., L-1$.
+
+### Theoretical Overlap Efficiency
+
+Let $f_i$ be the fraction of compute time for layer $i$'s backward pass.
+
+Achievable overlap:
+
+$$\text{Overlap} = \sum_{i=1}^{L-1} f_i \cdot \min\left(1, \frac{T_{\text{comm},i}}{T_{\text{compute},<i}}\right)$$
+
+where $T_{\text{compute},<i}$ is compute time for layers before $i$.
+
+In practice, 70-90% overlap is achievable.
 
 ## When Associativity Fails
 
-Floating-point addition is *approximately* associative:
-$$(a + b) + c \approx a + (b + c)$$
+### Floating-Point Non-Associativity
 
-Different reduction orders → slightly different results → non-determinism.
+IEEE 754 floating-point addition is **not associative**:
 
-For reproducibility: fix reduction order, use higher precision for accumulation.
+$$(a + b) + c \neq a + (b + c)$$
+
+**Example**:
+```python
+import numpy as np
+
+a = np.float32(1e20)
+b = np.float32(-1e20)
+c = np.float32(1.0)
+
+print((a + b) + c)  # = 1.0
+print(a + (b + c))  # = 0.0  (c absorbed into b)
+```
+
+### Reduction Order Matters
+
+Different AllReduce implementations use different reduction orders:
+
+**Ring AllReduce**:
+$$g = (\cdots((g_0 + g_1) + g_2) + \cdots + g_{P-1})$$
+
+**Tree AllReduce** (binary tree):
+$$g = ((g_0 + g_1) + (g_2 + g_3)) + ((g_4 + g_5) + (g_6 + g_7))$$
+
+These give slightly different results for the same inputs!
+
+### Sources of Non-Determinism
+
+| Source | Cause | Mitigation |
+|--------|-------|------------|
+| AllReduce order | Ring direction varies | Fix ring order |
+| Tree reduction | Different groupings | Use consistent tree |
+| Async completion | Race conditions | Synchronous reduction |
+| Fused operations | Different algorithms | Disable fusion |
+| Hardware variations | Different GPUs | Homogeneous cluster |
+
+### Achieving Determinism
+
+```python
+import torch
+
+def enable_deterministic_training():
+    """Enable deterministic training for reproducibility."""
+
+    # Set seeds
+    torch.manual_seed(42)
+    torch.cuda.manual_seed_all(42)
+
+    # Enable deterministic algorithms
+    torch.use_deterministic_algorithms(True)
+
+    # Disable auto-tuning (chooses different algorithms)
+    torch.backends.cudnn.benchmark = False
+
+    # Set deterministic NCCL reduction order
+    os.environ["NCCL_ALGO"] = "Ring"
+    os.environ["NCCL_PROTO"] = "Simple"
+```
+
+**Cost of determinism**: Often 10-20% slower due to disabled optimizations.
+
+### Higher Precision Accumulation
+
+For gradient accumulation, use higher precision:
+
+```python
+class HighPrecisionAccumulator:
+    """Accumulate gradients in FP32 even if model is FP16."""
+
+    def __init__(self, model):
+        self.fp32_grads = {
+            name: torch.zeros_like(p, dtype=torch.float32)
+            for name, p in model.named_parameters()
+        }
+
+    def accumulate(self, model):
+        for name, p in model.named_parameters():
+            if p.grad is not None:
+                self.fp32_grads[name] += p.grad.float()
+
+    def get_and_reset(self, model):
+        for name, p in model.named_parameters():
+            p.grad = self.fp32_grads[name].to(p.dtype)
+            self.fp32_grads[name].zero_()
+```
+
+## Gradient Compression
+
+### The Compression Opportunity
+
+Gradients are high-dimensional but often compressible. We can trade computation for communication bandwidth.
+
+### Top-K Sparsification
+
+Keep only the $k$ largest magnitude gradients:
+
+$$\text{TopK}(g, k) = \{g_i : |g_i| \geq |g|_{(k)}\}$$
+
+where $|g|_{(k)}$ is the $k$-th largest magnitude.
+
+**Compression ratio**: $k/d$ where $d$ is gradient dimension.
+
+**Error feedback**: Accumulate dropped gradients for next iteration:
+
+```python
+class TopKCompressor:
+    def __init__(self, model, k_ratio=0.01):
+        self.k_ratio = k_ratio
+        self.error_buffer = {
+            name: torch.zeros_like(p)
+            for name, p in model.named_parameters()
+        }
+
+    def compress(self, name, grad):
+        # Add error from previous round
+        grad = grad + self.error_buffer[name]
+
+        # Select top-k
+        k = max(1, int(self.k_ratio * grad.numel()))
+        values, indices = torch.topk(grad.abs().flatten(), k)
+
+        # Compute error (dropped values)
+        mask = torch.zeros_like(grad.flatten())
+        mask[indices] = 1
+        self.error_buffer[name] = grad * (1 - mask.view_as(grad))
+
+        # Return compressed gradient
+        return indices, grad.flatten()[indices]
+
+    def decompress(self, indices, values, shape):
+        grad = torch.zeros(shape.numel())
+        grad[indices] = values
+        return grad.view(shape)
+```
+
+### Random Sparsification
+
+Randomly sample gradients instead of top-k (faster, but higher variance):
+
+$$\tilde{g}_i = \frac{1}{p} g_i \cdot \mathbb{1}[\text{sample}_i < p]$$
+
+where $p$ is the sampling probability.
+
+**Unbiased**: $\mathbb{E}[\tilde{g}] = g$
+
+### Quantization
+
+Reduce precision of gradients:
+
+**1-bit SGD**: Sign of gradient only:
+$$\tilde{g}_i = \text{sign}(g_i) \cdot \|g\|_1 / d$$
+
+**TernGrad**: Three values $\{-1, 0, +1\}$
+
+**QSGD**: Stochastic quantization to $s$ levels:
+$$Q_s(g_i) = \|g\|_2 \cdot \text{sign}(g_i) \cdot \xi_i(s)$$
+
+where $\xi_i(s)$ is a stochastic quantization function.
+
+### PowerSGD
+
+Low-rank approximation of gradient matrix:
+
+$$G \approx PQ^T$$
+
+where $P \in \mathbb{R}^{m \times r}$, $Q \in \mathbb{R}^{n \times r}$, and $r \ll \min(m, n)$.
+
+**Algorithm**:
+1. Project gradient onto low-rank subspace
+2. Communicate low-rank factors (much smaller)
+3. Reconstruct approximate gradient
+
+**Compression ratio**: $(m + n) \cdot r / (m \cdot n)$
+
+For $m = n = 1000$, $r = 4$: compression ratio = 0.8%
+
+## Gradient Accumulation
+
+### When Memory Limits Batch Size
+
+If local batch $b$ doesn't fit in memory, accumulate over micro-batches:
+
+```python
+def train_with_accumulation(model, batch, accumulation_steps, optimizer):
+    """Gradient accumulation for effective large batches."""
+
+    optimizer.zero_grad()
+
+    # Split batch into micro-batches
+    micro_batches = batch.chunk(accumulation_steps)
+
+    for micro_batch in micro_batches:
+        # Forward and backward (gradients accumulate)
+        loss = model(micro_batch) / accumulation_steps
+        loss.backward()
+
+    # Now perform AllReduce and update
+    # (DDP would AllReduce here automatically)
+    optimizer.step()
+```
+
+### Mathematical Equivalence
+
+With accumulation over $A$ micro-batches of size $b/A$:
+
+$$g_{\text{accum}} = \frac{1}{A} \sum_{j=1}^{A} \nabla L_{B_j}$$
+
+This equals $\nabla L_B$ by the partitioning theorem.
+
+### Communication Pattern
+
+Without accumulation: AllReduce every micro-batch
+With accumulation: AllReduce every $A$ micro-batches
+
+**Speedup from reduced communication**:
+
+$$\frac{T_{\text{no-accum}}}{T_{\text{accum}}} = \frac{A \cdot T_{\text{compute/A}} + A \cdot T_{\text{comm}}}{A \cdot T_{\text{compute/A}} + T_{\text{comm}}} = \frac{A \cdot T_c + A \cdot T_r}{A \cdot T_c + T_r}$$
+
+For $T_r = T_c$: speedup = $(2A)/(A+1)$ → 2× as $A \to \infty$.
+
+## Scaling Behavior
+
+### Weak Scaling
+
+Keep local batch size $b$ constant, add more GPUs:
+- Total batch size: $B = P \cdot b$
+- Compute per GPU: constant
+- Communication: increases with $P$ (latency term)
+
+**Efficiency**:
+$$E_{\text{weak}}(P) = \frac{T_1}{T_P} = \frac{T_c}{T_c + T_r(P)}$$
+
+where $T_r(P) = 2(P-1)\alpha + 2\frac{P-1}{P} \cdot \Psi/\beta$.
+
+### Strong Scaling
+
+Keep total batch size $B$ constant, add more GPUs:
+- Local batch size: $b = B/P$
+- Compute per GPU: decreases as $1/P$
+- Communication: approximately constant (bandwidth term dominates)
+
+**Efficiency**:
+$$E_{\text{strong}}(P) = \frac{T_1}{P \cdot T_P} = \frac{T_c(1)}{P \cdot (T_c(1)/P + T_r)}$$
+
+As $P$ increases, $T_c/P$ becomes small compared to $T_r$, and efficiency drops.
+
+### Practical Limits
+
+| Model Size | Typical P Limit (90% efficiency) |
+|------------|----------------------------------|
+| 1B params | ~256 GPUs |
+| 10B params | ~128 GPUs |
+| 100B params | ~64 GPUs |
+| 1T params | ~16 GPUs |
+
+Beyond these limits, data parallelism alone becomes communication-bound.
+
+## Asynchronous Data Parallelism
+
+### The Synchronization Bottleneck
+
+Synchronous DP waits for the slowest worker ("straggler problem"):
+
+$$T_{\text{step}} = \max_i T_i + T_{\text{AllReduce}}$$
+
+Variance in $T_i$ reduces efficiency.
+
+### Asynchronous SGD
+
+Workers don't wait for each other:
+
+```
+Worker 1: [compute][push grad][pull params][compute]...
+Worker 2: [compute][push][pull][compute][push]...
+Worker 3: [compute][push][pull][compute]...
+          ← Staleness →
+```
+
+**Staleness**: Worker applies update to params $\theta^{(t-\tau)}$ where $\tau$ is delay.
+
+### Staleness-Adjusted Updates
+
+To compensate for staleness:
+
+$$\theta^{(t+1)} = \theta^{(t)} - \eta \cdot f(\tau) \cdot g^{(t-\tau)}$$
+
+where $f(\tau)$ is a staleness penalty:
+- $f(\tau) = 1$: ignore staleness (often diverges)
+- $f(\tau) = 1/\tau$: inverse scaling
+- $f(\tau) = e^{-\lambda\tau}$: exponential decay
+
+### Trade-offs
+
+| Aspect | Synchronous | Asynchronous |
+|--------|-------------|--------------|
+| Correctness | Exact | Approximate |
+| Staleness | 0 | Variable |
+| Straggler handling | Poor | Good |
+| Convergence | Faster per step | More steps needed |
+| Implementation | Simple | Complex |
+| Debugging | Easy | Hard |
+
+**Trend**: Synchronous is dominant in modern large-scale training due to simpler convergence guarantees.
+
+## Implementation: PyTorch DDP
+
+### Architecture
+
+```
+DDP Module
+    ├── Forward Hook: Sync forward (no-op for most cases)
+    ├── Backward Hooks: Register gradient ready callbacks
+    ├── Bucket Manager: Group gradients for AllReduce
+    ├── Reducer: Execute AllReduce operations
+    └── Comm Hook: Customizable communication (compression, etc.)
+```
+
+### Custom Communication Hooks
+
+```python
+import torch.distributed.algorithms.ddp_comm_hooks.default_hooks as default
+
+def compression_hook(state, bucket):
+    """Custom hook for gradient compression."""
+    tensor = bucket.buffer()
+
+    # Compress
+    compressed, ctx = my_compressor.compress(tensor)
+
+    # AllReduce compressed gradient
+    fut = dist.all_reduce(compressed, async_op=True).get_future()
+
+    def decompress(fut):
+        synced = fut.value()[0]
+        return my_compressor.decompress(synced, ctx)
+
+    return fut.then(decompress)
+
+# Register hook
+model = DDP(model)
+model.register_comm_hook(state=None, hook=compression_hook)
+```
+
+### Gradient Synchronization Points
+
+DDP synchronizes at these points:
+1. **First forward** (if `find_unused_parameters=True`)
+2. **After backward** (main gradient sync)
+
+```python
+# For models with unused parameters
+model = DDP(
+    model,
+    device_ids=[rank],
+    find_unused_parameters=True,  # Extra overhead
+)
+```
 
 ## Exercises
 
-*[To be completed]*
+1. **Partitioning proof**: Extend the partitioning theorem to unequal partition sizes. If $|B_i| = w_i \cdot |B|$ where $\sum_i w_i = 1$, what is the correct averaging formula?
+
+2. **Compute-communication balance**: For a 7B parameter model on 8 H100s with NVLink (900 GB/s), what local batch size achieves $R = 2$ (compute 2× communication)?
+
+3. **Overlap analysis**: A model has 100 layers of equal size. If AllReduce for all gradients takes 100ms and backward for all layers takes 80ms, what fraction of communication can be overlapped? What is the effective step time?
+
+4. **Compression analysis**: Top-1% sparsification compresses gradients 100×. If the original AllReduce takes 50ms, what is the new time? Account for compression/decompression compute (assume 5ms each).
+
+5. **Accumulation trade-off**: Training with local batch 32 takes 100ms compute and 40ms AllReduce per micro-batch. If you accumulate over 4 micro-batches, what is the time per effective step? What if memory allowed batch 128 directly (single forward-backward)?
+
+6. **Staleness bound**: In asynchronous SGD with $P = 16$ workers and exponential staleness penalty $f(\tau) = e^{-0.1\tau}$, if maximum staleness is $\tau = 15$, what is the effective learning rate scaling?
+
+7. **Non-determinism quantification**: Two reduction orders $((g_0 + g_1) + g_2)$ and $(g_0 + (g_1 + g_2))$ differ by at most $\epsilon_{\text{machine}} \cdot |g_0 + g_1 + g_2|$. For a 1B parameter model with FP16 gradients ($\epsilon \approx 10^{-3}$), estimate the maximum gradient difference.
+
+## Key Takeaways
+
+1. **Associativity enables data parallelism**: The partitioning theorem is the mathematical foundation—gradient of sum equals sum of gradients.
+
+2. **AllReduce is the communication primitive**: $2(P-1)/P \cdot \Psi$ bytes per step.
+
+3. **Compute-communication ratio determines efficiency**: Need local batch large enough to amortize communication.
+
+4. **Overlap is critical**: Bucket-based AllReduce during backward pass achieves 70-90% overlap.
+
+5. **Floating-point breaks exact associativity**: Determinism requires fixed reduction order and disabled optimizations.
+
+6. **Gradient compression trades compute for bandwidth**: Top-K, quantization, and low-rank methods can achieve 10-100× compression.
+
+7. **Scaling has limits**: Beyond ~100 GPUs for large models, data parallelism alone becomes communication-bound.
+
+8. **Synchronous dominates**: Simpler correctness and convergence make synchronous preferred despite straggler sensitivity.
