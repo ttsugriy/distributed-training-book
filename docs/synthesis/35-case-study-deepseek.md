@@ -55,6 +55,7 @@ $$c_t^{KV} = W^{DKV} h_t$$
 $$k_t = W^{UK} c_t^{KV}, \quad v_t = W^{UV} c_t^{KV}$$
 
 Where:
+
 - $W^{DKV} \in \mathbb{R}^{d_c \times d}$: Down-projection (compression)
 - $W^{UK}, W^{UV} \in \mathbb{R}^{d \times d_c}$: Up-projections for K and V
 - $d_c \ll d$: Latent dimension (typically $d/4$ to $d/8$)
@@ -129,6 +130,7 @@ class MLAAttention:
 ### Memory Analysis
 
 For DeepSeek-V3 with:
+
 - 60 layers
 - $d_{\text{model}} = 7168$
 - 128 attention heads
@@ -456,6 +458,7 @@ DualPipe reduces the bubble by approximately half:
 $$\text{Bubble}_{\text{DualPipe}} \approx \frac{p-1}{2m}$$
 
 For $p=16$, $m=32$:
+
 - Standard: $\frac{15}{32} = 47\%$
 - DualPipe: $\frac{15}{64} \approx 23\%$
 
@@ -499,6 +502,7 @@ With 256 experts across 2,048 GPUs, DeepSeek uses sophisticated expert placement
 
 ```
 2048 GPUs organized as:
+
 - TP = 1 (no tensor parallelism - experts are small)
 - EP = 256 (one expert per 8 GPUs)
 - DP = 8 (8-way data parallelism per expert group)
@@ -663,6 +667,7 @@ For inference with 128K context, this trade-off is highly favorable.
 ### Lesson 3: Fine-grained Sparsity Enables Load Balancing
 
 More, smaller experts (256×) rather than fewer, larger ones:
+
 - Better statistical load balancing
 - More routing flexibility
 - Smaller expert communication
@@ -670,6 +675,7 @@ More, smaller experts (256×) rather than fewer, larger ones:
 ### Lesson 4: Auxiliary-Loss-Free Training Is Possible
 
 Dynamic bias adjustment removes a source of training instability:
+
 - No hyperparameter tuning for balance loss weight
 - Pure gradient signal for main objective
 - Self-correcting load balancing

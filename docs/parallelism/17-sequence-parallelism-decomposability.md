@@ -23,6 +23,7 @@ For a transformer layer:
 $$M_{\text{act}} = 2 \cdot b \cdot S \cdot H + b \cdot S \cdot S \cdot n_h$$
 
 Where:
+
 - First term: Input and output activations ($2 \times b \times S \times H$)
 - Second term: Attention matrix ($b \times n_h \times S \times S$)
 
@@ -270,6 +271,7 @@ Liu et al. (2023) introduced Ring Attention for extremely long sequences.
 ### The Core Idea
 
 Each GPU holds:
+
 - **Query chunk** $Q_i$: Local queries (never moves)
 - **KV buffer**: Key-value pairs that rotate around the ring
 
@@ -383,6 +385,7 @@ def ring_attention(Q_local, K_local, V_local, ring_group):
 ### Communication Pattern
 
 Each step:
+
 - Send $K_i, V_i$ to next rank: $2 \cdot S/P \cdot H$ elements
 - Receive from previous rank: same
 
@@ -394,6 +397,7 @@ $$C = 2(P-1) \cdot \frac{S}{P} \cdot H \cdot \text{sizeof} = 2 \cdot \frac{P-1}{
 ### Compute-Communication Overlap
 
 While computing attention with current K, V:
+
 - Simultaneously send current K, V to next rank
 - Simultaneously receive next K, V from previous rank
 
@@ -809,6 +813,7 @@ class SequenceParallelAttention(nn.Module):
 ## Exercises
 
 1. **Memory calculation**: For a model with $H = 4096$, $n_h = 32$, $S = 256K$, batch 1, bf16:
+
    - Calculate attention matrix memory without sequence parallelism
    - Calculate with $P = 8$ Ring Attention
    - What's the reduction factor?
@@ -828,6 +833,7 @@ class SequenceParallelAttention(nn.Module):
 ## Key Takeaways
 
 1. **Two types of sequence parallelism**:
+
    - Megatron-style: Reduces LayerNorm/Dropout activation memory
    - Context parallelism: Distributes attention computation itself
 

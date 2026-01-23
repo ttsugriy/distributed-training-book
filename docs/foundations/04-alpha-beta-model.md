@@ -18,6 +18,7 @@ Communication time for a point-to-point message of $n$ bytes:
 $$T(n) = \alpha + \frac{n}{\beta}$$
 
 Where:
+
 - $\alpha$ (alpha): **latency** — the time to send a zero-byte message
 - $\beta$ (beta): **bandwidth** — bytes per second once transfer starts
 - $n$: message size in bytes
@@ -27,6 +28,7 @@ This simple model captures the essential trade-off in network communication.
 ## Understanding Latency (α)
 
 Latency includes:
+
 - Software overhead (kernel calls, buffer management)
 - NIC processing time
 - Switch traversal time
@@ -142,6 +144,7 @@ This is why pipelining AllReduce with backward pass is so effective.
 ## The LogP and LogGP Models
 
 For more detailed analysis, extended models add:
+
 - **L**: network latency
 - **o**: CPU overhead per message
 - **g**: gap (minimum time between message sends)

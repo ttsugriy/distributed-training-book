@@ -18,6 +18,7 @@ In data-parallel training, each step requires:
 $$\text{AllReduce}(g) = \frac{1}{P} \sum_{i=0}^{P-1} g_i$$
 
 For a model with $N$ parameters in FP32:
+
 - Communication volume: $2N \cdot 4$ bytes per step (ring AllReduce)
 - For GPT-3 (175B parameters): 1.4 TB per step
 
@@ -533,6 +534,7 @@ A compressor is $\delta$-contractive if:
 $$\mathbb{E}[||\epsilon||^2] \leq \delta^2 ||g||^2$$
 
 **Examples**:
+
 - QSGD with s levels: $\delta^2 = \min(d/s^2, \sqrt{d}/s)$
 - Top-K: $\delta^2 = 1 - k/d$ (without error feedback)
 - Top-K with error feedback: $\delta^2 \to 0$ over time

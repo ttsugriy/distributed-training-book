@@ -65,6 +65,7 @@ where each $W_i \in \mathbb{R}^{d_{in} \times (d_{out}/P)}$.
 ### The Computation
 
 Each GPU $i$ holds:
+
 - Full input $X$ (replicated)
 - Shard $W_i$ of weights
 - Shard $b_i$ of bias
@@ -136,6 +137,7 @@ Requires input split along columns:
 $$X = [X_1 | X_2 | \cdots | X_P]$$
 
 Each GPU $i$ holds:
+
 - Shard $X_i$ of input
 - Shard $W_i$ of weights
 
@@ -192,6 +194,7 @@ Input X ────────────────────────
 ### Bias Handling
 
 For row-parallel with bias $Y = XW + b$:
+
 - Add bias **after** AllReduce (on the full result)
 - Or: add $b/P$ on each GPU before AllReduce (works due to sum)
 
@@ -286,6 +289,7 @@ Per Transformer layer:
 ### Volume per Layer
 
 For a Transformer with:
+
 - Hidden dimension $d$
 - Tensor parallel degree $P$
 - Sequence length $s$
@@ -634,11 +638,13 @@ The tensor parallel degree $P$ is limited by:
 ### When to Use Tensor Parallelism
 
 **Use TP when**:
+
 - Model doesn't fit in single GPU memory
 - Within a single node (fast NVLink)
 - Need to reduce per-GPU memory for activations
 
 **Don't use TP when**:
+
 - Model fits comfortably (DP is simpler)
 - Crossing node boundaries (use PP instead)
 - Very small batch sizes (latency-dominated)

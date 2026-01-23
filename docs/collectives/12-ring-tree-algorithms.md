@@ -102,6 +102,7 @@ P2: [Σ0 Σ1 Σ2 Σ3]    P3: [Σ0 Σ1 Σ2 Σ3]
 ### Communication Analysis
 
 **Per step**:
+
 - Each process sends: $n/P$ bytes
 - Each process receives: $n/P$ bytes
 
@@ -183,6 +184,7 @@ After log₂(P) steps: Root has complete reduction
 ```
 
 At each step:
+
 - Half the active processes send their entire data
 - Other half receives and reduces
 
@@ -203,11 +205,13 @@ Step 2: Each sends to partner
 ### Communication Analysis
 
 **Reduce phase**:
+
 - $\log_2 P$ steps
 - Each step: send/recv $n$ bytes (full data)
 - Time: $\log_2 P \cdot (\alpha + n/\beta)$
 
 **Broadcast phase**:
+
 - $\log_2 P$ steps
 - Each step: send/recv $n$ bytes
 - Time: $\log_2 P \cdot (\alpha + n/\beta)$
@@ -237,6 +241,7 @@ The tree achieves exactly $\log_2 P$ steps in each direction. $\square$
 | Bandwidth-optimal | Yes | No |
 
 **Critical observation**:
+
 - Ring: bandwidth term ≈ $2n/\beta$ (independent of $P$)
 - Tree: bandwidth term = $2\log_2 P \cdot n/\beta$ (grows with $P$)
 
@@ -315,6 +320,7 @@ Actually, the Rabenseifner algorithm for reduce-scatter:
 
 ```
 Step k (of log₂P steps):
+
 - Pair up with process distance 2^(log₂P - k) away
 - Send half the data you're responsible for
 - Receive the other half
@@ -332,6 +338,7 @@ Reverse the communication pattern to collect all pieces.
 $$T_{\text{RHD}} = 2\log_2 P \cdot \alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
 
 **Best of both worlds**:
+
 - Latency of tree: $O(\log P)$ steps
 - Bandwidth of ring: $O(n)$ total data
 
@@ -401,6 +408,7 @@ Tree 1:        Tree 2:
 ```
 
 Both trees run simultaneously, each handling half the data. This achieves:
+
 - $\log P$ latency (tree property)
 - Full bidirectional bandwidth utilization
 
@@ -547,6 +555,7 @@ PyTorch DDP uses 25MB buckets by default.
 3. **Hierarchical analysis**: You have 8 nodes with 8 GPUs each (64 total). Intra-node bandwidth is 600 GB/s (NVLink), inter-node is 100 GB/s. Compare total time for flat ring vs 2D ring for a 1GB AllReduce.
 
 4. **Bucket sizing**: You have 1000 gradient tensors, each 1MB. With α=10μs, β=100 GB/s, compare:
+
    - 1000 individual AllReduce calls
    - Bucketed into 25MB chunks
 

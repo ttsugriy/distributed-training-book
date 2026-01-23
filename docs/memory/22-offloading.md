@@ -134,6 +134,7 @@ class CPUOffloadOptimizer:
     Optimizer that offloads states to CPU memory.
 
     Memory layout:
+
     - GPU: fp16 parameters, gradients (temporary)
     - CPU: fp32 master weights, Adam states (m, v)
 
@@ -725,6 +726,7 @@ class DoubleBufferedLoader:
 ### Compute-Communication Overlap Analysis
 
 For layer $l$ with:
+
 - Parameter size: $P_l$ bytes
 - Compute time: $T_l^{compute}$
 - Transfer bandwidth: $B$
@@ -734,6 +736,7 @@ Transfer time: $T_l^{transfer} = P_l / B$
 **Overlap condition**: $T_l^{transfer} \leq T_{l-1}^{compute}$
 
 For a transformer layer:
+
 - Parameters: ~$12H^2$ (for hidden dim $H$)
 - Compute: ~$24BSH^2$ FLOPs (for batch $B$, sequence $S$)
 
@@ -1000,6 +1003,7 @@ Total step time with offloading:
 $$T_{step} = \max(T_{compute}, T_{transfer}) + T_{sync}$$
 
 Where:
+
 - $T_{compute}$: Forward + backward pass time
 - $T_{transfer}$: Total data movement time
 - $T_{sync}$: Unavoidable synchronization overhead
@@ -1024,11 +1028,13 @@ Target: $\eta_{offload} > 0.9$ (less than 10% overhead)
 ### Case Study: 175B Model on Single Node
 
 Configuration:
+
 - 8× A100 80GB GPUs
 - 2TB CPU memory
 - 10TB NVMe array (RAID 0, 4 drives)
 
 Memory requirements:
+
 - Parameters: 350GB (fp16)
 - Optimizer states: 1.4TB (fp32 Adam)
 - Gradients: 350GB (fp16)

@@ -71,6 +71,7 @@ Stage 3:             [F₃][B₃]
 ```
 
 Where:
+
 - $F_i$: Forward pass on stage $i$
 - $B_i$: Backward pass on stage $i$
 
@@ -225,14 +226,18 @@ This is because we perform a backward as soon as the corresponding forward's gra
 For stage $s$ with $P$ stages and $m$ micro-batches:
 
 **Warmup phase** (stage $s$ waits for $s$ forwards from earlier stages):
+
 - Perform $s$ forward passes
 
 **Steady state** (alternate 1 forward, 1 backward):
+
 - For micro-batch $i$ from $s$ to $m - P + s$:
+
   - Backward for micro-batch $i - s$
   - Forward for micro-batch $i$
 
 **Cooldown phase** (drain remaining backwards):
+
 - Perform remaining $P - s - 1$ backward passes
 
 ```python
@@ -339,6 +344,7 @@ These can be computed separately:
 $$B = B_h + B_W$$
 
 Where:
+
 - $B_h$: Compute gradient w.r.t. input (must happen in sequence)
 - $B_W$: Compute gradient w.r.t. weights (can be delayed)
 
@@ -378,6 +384,7 @@ With perfect load balancing, zero bubbles achieved.
 ### Memory Trade-off
 
 Zero-bubble schedules require storing:
+
 - Activations for $B_h$ computation
 - Intermediate values for delayed $B_W$ computation
 
@@ -398,6 +405,7 @@ Each stage sends activations to the next stage:
 $$\text{Size} = b \cdot S \cdot H \cdot \text{sizeof(dtype)}$$
 
 Where:
+
 - $b$: micro-batch size
 - $S$: sequence length
 - $H$: hidden dimension
@@ -408,6 +416,7 @@ $$\text{Size} = 1 \times 2048 \times 4096 \times 2 = 16 \text{ MB}$$
 ### Communication Volume per Step
 
 **Per micro-batch per stage**:
+
 - 1 send (forward activation)
 - 1 receive (backward gradient)
 
@@ -423,6 +432,7 @@ Pipeline parallelism volume:
 $$\text{Volume}_{\text{PP}} = 2 \cdot (P-1) \cdot m \cdot b \cdot S \cdot H \cdot \text{sizeof}$$
 
 For large models with many parameters $\Psi$:
+
 - $\Psi \gg m \cdot b \cdot S \cdot H$, so PP has lower communication
 - PP uses P2P (higher bandwidth utilization than collective)
 
@@ -448,6 +458,7 @@ layers_per_stage = total_layers // num_stages
 ```
 
 This often fails because:
+
 - First layer (embedding) is memory-heavy
 - Last layer (LM head) is compute-heavy
 - Attention layers vary with sequence length
@@ -813,6 +824,7 @@ $$E_{\text{PP}} = \frac{\text{Ideal throughput}}{\text{Actual throughput}} = \fr
 $$M_{\text{stage}} = M_{\text{params}} + P \cdot M_{\text{act}} + M_{\text{grad}}$$
 
 Where:
+
 - $M_{\text{params}}$: Parameters for this stage ($\approx \Psi/P$)
 - $M_{\text{act}}$: Activation per micro-batch
 - $M_{\text{grad}}$: Gradient accumulation buffer
@@ -867,6 +879,7 @@ loss.backward()
 5. **Zero-bubble analysis**: In the ZB-H1 schedule, weight gradients are computed last. If each $B_W$ takes 30% as long as $B_h$, what is the actual bubble fraction?
 
 6. **Throughput optimization**: You have a 32-layer model across 8 GPUs. Each forward pass takes 10ms, backward takes 20ms per stage. With 64 micro-batches, calculate:
+
    - Total batch time
    - Pipeline efficiency
    - Throughput in micro-batches per second

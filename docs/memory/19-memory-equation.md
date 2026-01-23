@@ -63,6 +63,7 @@ The model weights themselves:
 $$M_{\text{params}} = N \times b_p$$
 
 where:
+
 - $N$ = number of parameters
 - $b_p$ = bytes per parameter (2 for fp16/bf16, 4 for fp32)
 
@@ -83,11 +84,13 @@ Gradients are typically stored in the same precision as parameters.
 Optimizers maintain additional state per parameter.
 
 **SGD with momentum**:
+
 - Momentum buffer: $N \times b_m$ bytes
 
 $$M_{\text{opt}}^{\text{SGD}} = N \times b_m$$
 
 **Adam/AdamW**:
+
 - First moment ($m$): $N \times b_m$ bytes
 - Second moment ($v$): $N \times b_v$ bytes
 
@@ -166,6 +169,7 @@ Computing $\frac{\partial y}{\partial W}$ typically requires $x$ and/or $y$:
 ### Activation Memory in Transformers
 
 For a transformer with:
+
 - $L$ = number of layers
 - $B$ = batch size
 - $S$ = sequence length
@@ -225,6 +229,7 @@ Operations require workspace memory that exists only during computation.
 ### Matrix Multiplication Workspace
 
 cuBLAS and cuDNN use workspace for:
+
 - Tiling intermediate results
 - Efficient transpose operations
 - Algorithm-specific storage
@@ -254,6 +259,7 @@ Memory: O(S) - only current tile in SRAM
 ```
 
 Flash Attention avoids materializing the full $S \times S$ attention matrix, but requires SRAM workspace for:
+
 - Current query/key/value tiles
 - Running softmax statistics (max, sum)
 - Partial output accumulation
@@ -286,6 +292,7 @@ where $f$ is the fragmentation factor (typically 5-20%).
 ### Worked Example: LLaMA-7B
 
 Model specifications:
+
 - Parameters: $N = 7 \times 10^9$
 - Layers: $L = 32$
 - Hidden: $H = 4096$
@@ -293,6 +300,7 @@ Model specifications:
 - Head dim: 128
 
 Training configuration:
+
 - Batch size: $B = 1$
 - Sequence length: $S = 2048$
 
@@ -355,6 +363,7 @@ Reality: Can't have all three
 ```
 
 This motivates all memory optimization techniques:
+
 - **ZeRO**: Shard model state across GPUs
 - **Activation checkpointing**: Trade compute for activation memory
 - **Offloading**: Use CPU/NVMe as extended memory

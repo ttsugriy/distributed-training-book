@@ -82,6 +82,7 @@ Output: Trained model θ
    a. Sample batch B of size |B| = P × b
    b. Partition: Bi = samples [(i-1)b : ib] for GPU i
    c. On each GPU i in parallel:
+
       - Forward: yi = f(Bi; θ)
       - Loss: Li = L(yi, targets)
       - Backward: gi = ∇θLi
@@ -258,6 +259,7 @@ model = DDP(
 3. Continue computing while AllReduce proceeds
 
 **Optimal bucket size**:
+
 - Too small: Many small AllReduces (latency overhead)
 - Too large: Less overlap opportunity
 
@@ -526,6 +528,7 @@ For $T_r = T_c$: speedup = $(2A)/(A+1)$ → 2× as $A \to \infty$.
 ### Weak Scaling
 
 Keep local batch size $b$ constant, add more GPUs:
+
 - Total batch size: $B = P \cdot b$
 - Compute per GPU: constant
 - Communication: increases with $P$ (latency term)
@@ -538,6 +541,7 @@ where $T_r(P) = 2(P-1)\alpha + 2\frac{P-1}{P} \cdot \Psi/\beta$.
 ### Strong Scaling
 
 Keep total batch size $B$ constant, add more GPUs:
+
 - Local batch size: $b = B/P$
 - Compute per GPU: decreases as $1/P$
 - Communication: approximately constant (bandwidth term dominates)
@@ -588,6 +592,7 @@ To compensate for staleness:
 $$\theta^{(t+1)} = \theta^{(t)} - \eta \cdot f(\tau) \cdot g^{(t-\tau)}$$
 
 where $f(\tau)$ is a staleness penalty:
+
 - $f(\tau) = 1$: ignore staleness (often diverges)
 - $f(\tau) = 1/\tau$: inverse scaling
 - $f(\tau) = e^{-\lambda\tau}$: exponential decay

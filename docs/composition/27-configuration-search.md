@@ -63,6 +63,7 @@ class TrainingConfig:
 ### The Combinatorial Explosion
 
 For a 1024 GPU cluster with:
+
 - DP ∈ {1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024}
 - PP ∈ {1, 2, 4, 8, 16, 32}
 - TP ∈ {1, 2, 4, 8}

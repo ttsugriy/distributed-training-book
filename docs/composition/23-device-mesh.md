@@ -21,6 +21,7 @@ world = [0, 1, 2, 3, 4, 5, 6, 7]
 ```
 
 This ignores crucial structure:
+
 - GPUs 0-7 are on the same node (connected by NVLink)
 - GPUs 0 and 8 are on different nodes (connected by slower network)
 
@@ -656,6 +657,7 @@ def redistribute(
     Redistribute tensor from one sharding to another.
 
     This may involve:
+
     - AllGather (shard → replicate)
     - Scatter or chunk (replicate → shard)
     - AllToAll (reshard to different dimension)
@@ -945,6 +947,7 @@ mesh = auto_mesh(topology, dp_degree=64, tp_degree=8, pp_degree=1)
 3. **Submesh extraction**: Given a (4, 4, 8) mesh with axes ["dp", "pp", "tp"], extract the submesh for DP rank 2. What is its shape and what ranks does it contain?
 
 4. **Sharding specification**: Write a ShardingSpec for a weight matrix that is:
+
    - Replicated across DP axis
    - Sharded on output dimension across TP axis
    - Replicated across PP axis

@@ -82,6 +82,7 @@ GPU 0                 GPU 1                 GPU 2                 GPU 3
 ### Memory Analysis
 
 Before ZeRO-1 (per GPU):
+
 - Parameters: $2N$ bytes (FP16)
 - Gradients: $2N$ bytes (FP16)
 - Optimizer states: $12N$ bytes (master weights + momentum + variance)
@@ -89,6 +90,7 @@ Before ZeRO-1 (per GPU):
 Total: $16N$ bytes
 
 After ZeRO-1 (per GPU):
+
 - Parameters: $2N$ bytes (FP16)
 - Gradients: $2N$ bytes (FP16)
 - Optimizer states: $12N/P$ bytes (sharded)
@@ -113,6 +115,7 @@ $$\rho_1 = \frac{16N}{4N + 12N/P} = \frac{16P}{4P + 12} = \frac{4P}{P + 3}$$
 ZeRO-1 requires an AllGather after the optimizer step to reconstruct parameters.
 
 **Per-step communication**:
+
 - AllReduce gradients: $2 \cdot \frac{P-1}{P} \cdot 2N = \frac{4(P-1)N}{P}$ bytes
 - AllGather parameters: $\frac{P-1}{P} \cdot 2N = \frac{2(P-1)N}{P}$ bytes
 
@@ -132,6 +135,7 @@ Instead of AllReduce → AllGather, use:
 3. AllGather updated parameters
 
 **Communication**:
+
 - ReduceScatter: $\frac{(P-1)N \cdot 2}{P}$ bytes
 - AllGather: $\frac{(P-1)N \cdot 2}{P}$ bytes
 
@@ -183,6 +187,7 @@ def backward_with_gradient_sharding(loss, model, rank, world_size):
 ### Memory Analysis
 
 After ZeRO-2 (per GPU):
+
 - Parameters: $2N$ bytes (FP16)
 - Gradients: $2N/P$ bytes (sharded)
 - Optimizer states: $12N/P$ bytes (sharded)
@@ -205,9 +210,11 @@ $$\rho_2 = \frac{16N}{2N + 14N/P} = \frac{16P}{2P + 14} = \frac{8P}{P + 7}$$
 ### Communication Analysis
 
 **Backward pass**:
+
 - ReduceScatter gradients: $\frac{(P-1) \cdot 2N}{P}$ bytes
 
 **Optimizer step**:
+
 - Local computation on gradient shards
 - AllGather updated parameters: $\frac{(P-1) \cdot 2N}{P}$ bytes
 
@@ -290,6 +297,7 @@ Backward: AllGather → Compute → ReduceScatter → Discard
 ### Memory Analysis
 
 After ZeRO-3 (per GPU):
+
 - Parameters: $2N/P$ bytes (sharded)
 - Gradients: $2N/P$ bytes (sharded)
 - Optimizer states: $12N/P$ bytes (sharded)
@@ -314,9 +322,11 @@ $$\rho_3 = \frac{16N}{16N/P} = P$$
 Now we pay for parameter gathering:
 
 **Forward pass** (per layer $l$):
+
 - AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2N_l}{P}$ bytes
 
 **Backward pass** (per layer $l$):
+
 - AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2N_l}{P}$ bytes (need params for gradient computation)
 - ReduceScatter gradients: $\frac{(P-1) \cdot 2N_l}{P}$ bytes
 
@@ -688,6 +698,7 @@ For mixed-precision AdamW training:
 ### Practical Example
 
 Consider a 7B parameter model:
+
 - $N = 7 \times 10^9$ parameters
 - Base memory: $16N = 112$ GB
 
@@ -705,6 +716,7 @@ ZeRO-3 with 256 GPUs: each GPU needs only **437 MB** for a 7B model!
 ZeRO shards model states, but **activations remain replicated** across data parallel ranks (each processes different data).
 
 For a 7B model with batch 4, sequence 2048:
+
 - Model state: ~1.75 GB (ZeRO-3, 64 GPUs)
 - Activations: ~30 GB
 
@@ -860,6 +872,7 @@ Each stage has its own ZeRO group for sharding.
 1. **ZeRO eliminates redundancy**: By sharding optimizer states, gradients, and parameters across GPUs.
 
 2. **Three stages with different trade-offs**:
+
    - ZeRO-1: 4× memory savings, zero communication overhead
    - ZeRO-2: 8× savings, zero overhead
    - ZeRO-3: Linear scaling, 50% overhead

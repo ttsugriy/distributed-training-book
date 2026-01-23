@@ -437,6 +437,7 @@ With pinned memory and CUDA streams:
 $$T_{\text{copy}} = \frac{C}{B_{\text{PCIe}}} \approx \frac{C}{25 \text{ GB/s}}$$
 
 For a 100GB checkpoint shard:
+
 - $T_{\text{copy}} \approx 4$ seconds
 - $T_{\text{write}} \approx 10$ seconds (100 GB/s parallel FS)
 
@@ -447,6 +448,7 @@ For a 100GB checkpoint shard:
 ### The Cost Model
 
 Let:
+
 - $T_{\text{step}}$: time per training step
 - $T_{\text{ckpt}}$: time to checkpoint (overhead)
 - $\lambda$: failure rate (failures per hour)
@@ -479,6 +481,7 @@ $$f^* = \sqrt{\frac{\lambda \cdot T_{\text{step}}}{2 \cdot T_{\text{ckpt}}}}$$
 ### Numerical Example
 
 Given:
+
 - $T_{\text{step}} = 1$ second
 - $T_{\text{ckpt}} = 60$ seconds (including overhead)
 - $\lambda = 0.625$ failures/hour = $1.74 \times 10^{-4}$ failures/second

@@ -28,6 +28,7 @@ where $S(x) \subseteq \{1, \ldots, E\}$ is an input-dependent *selection functio
 This enables a crucial property.
 
 **Theorem (Sparsity Scaling)**: A Mixture of Experts layer with $E$ experts, each of size $d_{\text{model}} \times d_{\text{ff}}$, has:
+
 - **Parameters**: $E \cdot d_{\text{model}} \cdot d_{\text{ff}}$ (scales with $E$)
 - **FLOPs per token**: $k \cdot d_{\text{model}} \cdot d_{\text{ff}}$ (independent of $E$)
 
@@ -87,6 +88,7 @@ The normalization ensures weights sum to 1 over selected experts.
 ### Why Sparsity Works
 
 **Intuition**: Not all parameters need to be active for all inputs. Different experts can specialize:
+
 - Expert 1: Handles syntax-related computations
 - Expert 2: Handles factual knowledge
 - Expert 3: Handles reasoning chains
@@ -137,10 +139,12 @@ The learned noise allows the model to:
 Instead of tokens choosing experts, experts choose tokens:
 
 **Standard (Token Choice)**:
+
 - Each token picks its top-k experts
 - Leads to load imbalance
 
 **Expert Choice** (Zhou et al., 2022):
+
 - Each expert picks its top-k tokens
 - Guarantees perfect load balance
 - Each expert processes exactly $\text{capacity} = k \cdot T / E$ tokens
@@ -366,11 +370,13 @@ Add a loss term that penalizes imbalanced routing:
 $$\mathcal{L}_{\text{aux}} = \alpha \cdot E \cdot \sum_{i=1}^{E} f_i \cdot p_i$$
 
 where:
+
 - $f_i = \frac{1}{T} \sum_{t=1}^{T} \mathbf{1}[\text{token } t \text{ routes to expert } i]$ (fraction of tokens to expert $i$)
 - $p_i = \frac{1}{T} \sum_{t=1}^{T} g_i^{(t)}$ (average routing probability for expert $i$)
 - $\alpha$ is a balancing coefficient (typically 0.01-0.1)
 
 **Why this works**: The product $f_i \cdot p_i$ is minimized when load is uniform:
+
 - If $f_i$ is high (many tokens), $p_i$ must be low to minimize loss
 - The gradient pushes the router toward balanced assignments
 
@@ -387,12 +393,14 @@ Limit how many tokens each expert can process:
 $$C = \left\lceil \text{capacity\_factor} \times \frac{T \times k}{E} \right\rceil$$
 
 where:
+
 - $T$ = total tokens
 - $k$ = experts per token
 - $E$ = total experts
 - $\text{capacity\_factor} \geq 1.0$ (typically 1.25-2.0)
 
 Tokens exceeding capacity are:
+
 - **Dropped**: Set output to zero or skip (Switch Transformer)
 - **Overflowed**: Route to next-best expert (GShard)
 
@@ -477,6 +485,7 @@ This is an unbiased estimator of the gradient if dropping is random, but routing
 ### The Bias Problem
 
 Tokens routed to popular experts are more likely to be dropped. These are often:
+
 - More common patterns
 - Important for generalization
 - Tokens the model "wants" to process similarly
@@ -761,6 +770,7 @@ The router receives gradient from:
 2. **Auxiliary losses**: Push toward load balance
 
 This means the router learns to select experts that:
+
 - Produce good outputs for the token
 - Don't overload any single expert
 
@@ -797,6 +807,7 @@ Most common combination:
 ```
 
 **Communication pattern**:
+
 - AlltoAll within EP group (expert routing)
 - AllReduce across DP replicas (gradient sync)
 
@@ -861,6 +872,7 @@ def create_3d_moe_groups(
 ### Communication Costs
 
 For a model with:
+
 - $H$ = hidden dimension
 - $E$ = number of experts
 - $T$ = tokens per batch
@@ -877,11 +889,13 @@ For a model with:
 ### When to Use MoE
 
 **Good fit for MoE**:
+
 - Very large models where dense is prohibitively expensive
 - High throughput requirements (more params, same compute)
 - Tasks benefiting from specialization
 
 **Poor fit for MoE**:
+
 - Small models (routing overhead dominates)
 - Low-latency inference (routing adds latency)
 - Limited GPU interconnect (AlltoAll is bandwidth-intensive)
@@ -901,6 +915,7 @@ For a model with:
 **Pitfall 1: Routing collapse**
 
 All tokens route to one expert. Signs:
+
 - One expert sees 90%+ of tokens
 - Auxiliary loss stays high
 - Model quality degrades
@@ -910,6 +925,7 @@ Fix: Increase aux_loss_coef, add jitter noise, check initialization.
 **Pitfall 2: Capacity overflow**
 
 Too many tokens dropped. Signs:
+
 - High drop rate (>10%)
 - Training loss unstable
 - Gradient variance increases
@@ -919,6 +935,7 @@ Fix: Increase capacity_factor, reduce batch size, more experts.
 **Pitfall 3: AlltoAll bottleneck**
 
 Communication dominates compute. Signs:
+
 - Low GPU utilization
 - Training much slower than expected
 - AlltoAll takes >50% of step time
@@ -928,6 +945,7 @@ Fix: Increase tokens per batch, reduce EP size, improve network.
 **Pitfall 4: Expert underutilization**
 
 Some experts rarely used. Signs:
+
 - Load imbalance metrics show skew
 - Some expert parameters barely update
 - Model capacity wasted

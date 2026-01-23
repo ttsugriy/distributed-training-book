@@ -32,6 +32,7 @@ Using the Chinchilla optimal scaling (Chapter 8):
 $$C = 6ND$$
 
 where:
+
 - $N = 405 \times 10^9$ parameters
 - $D = 15.6 \times 10^{12}$ tokens
 
@@ -40,6 +41,7 @@ $$C = 6 \times (405 \times 10^9) \times (15.6 \times 10^{12}) \approx 3.79 \time
 ### Hardware Capacity
 
 Each H100 SXM provides:
+
 - Peak FP16/BF16: 1,979 TFLOPS
 - Peak FP8: 3,958 TFLOPS
 - HBM3 Memory: 80 GB
@@ -54,6 +56,7 @@ $$\text{Effective FLOPS} = 16384 \times 1979 \times 10^{12} \times 0.40 \approx 
 $$\text{Training time} = \frac{C}{\text{Effective FLOPS}} = \frac{3.79 \times 10^{25}}{1.3 \times 10^{19}} \approx 2.9 \times 10^6 \text{ seconds} \approx 34 \text{ days}$$
 
 The actual training took approximately 54 days, suggesting:
+
 - Effective MFU closer to 25-30%
 - Time lost to failures and restarts
 - Validation and checkpoint overhead
@@ -181,6 +184,7 @@ The remaining dimension is sharded data parallelism:
 $$DP = \frac{16384}{8 \times 16} = 128$$
 
 **FSDP shards**:
+
 - Model parameters: 810 GB / 128 = 6.3 GB per rank
 - Optimizer states: 3,240 GB / 128 = 25.3 GB per rank
 - Gradients: 810 GB / 128 = 6.3 GB per rank
@@ -291,12 +295,14 @@ LLaMA 3 uses:
 **Peak learning rate**: $1.5 \times 10^{-4}$
 
 With AdamW:
+
 - $\beta_1 = 0.9$, $\beta_2 = 0.95$
 - Weight decay: $0.1$
 
 ### Numerical Stability
 
 **Mixed precision strategy**:
+
 - Weights: BF16
 - Activations: BF16
 - Gradients: BF16
@@ -304,6 +310,7 @@ With AdamW:
 - Loss scaling: Dynamic
 
 **Why BF16 over FP16?** The larger exponent range (8 bits vs 5) prevents overflow during:
+
 - Attention softmax with long sequences
 - Large gradient magnitudes early in training
 - Cross-entropy loss with large vocabulary
@@ -437,6 +444,7 @@ Across nodes (IB): PP=16, DP=128
 ### Pattern 2: Memory-Compute-Communication Balance
 
 The configuration balances:
+
 - **Memory**: FSDP keeps sharded state within 80GB limit
 - **Compute**: Pipeline keeps all stages busy (except bubble)
 - **Communication**: Overlap hides most DP communication
@@ -444,6 +452,7 @@ The configuration balances:
 ### Pattern 3: Progressive Scaling
 
 Training parameters evolved:
+
 - Batch size: Increased during training
 - Learning rate: Warmup then decay
 - Sequence length: Extended in final phase

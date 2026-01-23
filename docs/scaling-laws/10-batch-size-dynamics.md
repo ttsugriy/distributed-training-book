@@ -41,6 +41,7 @@ McCandlish et al. (2018) derived the critical batch size $B_{\text{crit}}$:
 $$B_{\text{crit}} = \frac{G^2}{H}$$
 
 Where:
+
 - $G^2 = \mathbb{E}[||\nabla L||^2]$: expected gradient norm squared
 - $H = \mathbb{E}[(\nabla L)^T \nabla^2 L (\nabla L)]$: curvature along gradient
 
@@ -111,6 +112,7 @@ $$\eta(B) = \eta_0 \cdot \frac{B}{B_0}$$
 **Intuition**: If batch size doubles, the gradient is twice as reliable, so we can take twice as large a step.
 
 **Valid when**:
+
 - $B \leq B_{\text{crit}}$
 - Using SGD with momentum
 
@@ -131,6 +133,7 @@ $$\eta(B) = \eta_0 \cdot \sqrt{\frac{B}{B_0}}$$
 **Intuition**: The noise in the gradient scales as $1/\sqrt{B}$, so learning rate should scale with noise reduction.
 
 **Valid when**:
+
 - Beyond $B_{\text{crit}}$
 - Loss landscape is more complex
 
@@ -165,6 +168,7 @@ Early in training:
 3. Model is far from any minimum
 
 Large steps cause:
+
 - Gradient explosion
 - Catastrophic updates
 - Divergence
@@ -249,11 +253,13 @@ Above $B_{\text{crit}}$: $E$ drops rapidly
 ### When to Scale
 
 **Scale batch** when:
+
 - Wall-clock time is the constraint
 - You're below $B_{\text{crit}}$
 - GPU utilization is high
 
 **Don't scale batch** when:
+
 - Already above $B_{\text{crit}}$
 - Final quality matters more than speed
 - Hyperparameter tuning is difficult
@@ -274,6 +280,7 @@ for i, batch in enumerate(mini_batches):
 ```
 
 **Mathematically equivalent** to large batch, but:
+
 - More forward/backward passes
 - Same memory as small batch
 - Slower than true data parallelism
@@ -287,6 +294,7 @@ $B_{\text{crit}}$ increases during training. Optimal strategy: **increase batch 
 ### LLAMA's Approach
 
 LLaMA increased batch size mid-training:
+
 - Start: batch size 2M tokens
 - After N steps: increase to 4M tokens
 
@@ -315,6 +323,7 @@ When noise scale drops, safe to increase batch size.
 5. **Consider LARS/LAMB**: Essential for $B > 8K$ typically
 
 6. **Monitor carefully**:
+
    - Loss spikes → reduce LR or increase warmup
    - Slow convergence → may have exceeded $B_{\text{crit}}$
    - Layer-wise gradient norms → check for imbalance

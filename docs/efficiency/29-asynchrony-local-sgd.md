@@ -30,6 +30,7 @@ $$T_{\text{step}} = \max_{i \in [P]} T_{\text{compute}}^{(i)} + T_{\text{comm}}$
 ### The Straggler Problem
 
 Worker compute times vary due to:
+
 - Hardware variance (thermal throttling, memory speeds)
 - Software variance (garbage collection, OS scheduling)
 - Data variance (variable-length sequences, dynamic computation)
@@ -206,6 +207,7 @@ For smooth non-convex functions:
 $$\mathbb{E}[||w^{(T)} - w^*||^2] = O\left(\frac{1}{\sqrt{T}}\right) + O(\tau^2 \eta^2 G^2)$$
 
 Where:
+
 - $\tau$ = maximum staleness
 - $\eta$ = learning rate
 - $G$ = gradient bound
@@ -356,10 +358,12 @@ class SparseGradientWorker:
 ```
 
 **When Hogwild! works**:
+
 - Sparsity: $\mathbb{E}[|\text{supp}(g_i) \cap \text{supp}(g_j)|] \ll d$
 - Examples: matrix factorization, sparse logistic regression
 
 **When it fails**:
+
 - Dense gradients (neural networks)
 - High update frequency on same parameters
 
@@ -391,6 +395,7 @@ class LocalSGDWorker:
     Local SGD worker: accumulate updates, sync periodically.
 
     Also known as:
+
     - Federated Averaging (FedAvg) in federated learning
     - Periodic averaging SGD
     """
@@ -479,6 +484,7 @@ def local_sgd_training(workers: List[LocalSGDWorker],
 $$\mathbb{E}\left[\frac{1}{T}\sum_{t=1}^T ||\nabla f(w_t)||^2\right] \leq O\left(\frac{1}{\sqrt{HT}}\right) + O\left(\frac{H\sigma^2}{T}\right)$$
 
 Where:
+
 - First term: standard SGD convergence
 - Second term: penalty from local divergence
 
@@ -730,6 +736,7 @@ def diloco_training(config: DiLoCoConfig,
 ```
 
 **DiLoCo results**:
+
 - 500× less communication than fully synchronous training
 - Matches quality of synchronous training on 70B parameter models
 - Enables training across geographic regions
@@ -843,6 +850,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     Find optimal synchronization interval H.
 
     Balance:
+
     - Communication savings: higher H → less overhead
     - Variance penalty: higher H → more local drift
 
@@ -871,6 +879,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
 2. **Local SGD interval**: Given compute time = 100ms, communication time = 50ms, and variance growth rate = 0.001 per step, find the optimal sync interval $H$.
 
 3. **Convergence comparison**: Implement Local SGD and fully synchronous SGD. Train a simple model on MNIST. Compare:
+
    - Wall-clock time to reach 95% accuracy
    - Number of gradient steps
    - Total communication volume

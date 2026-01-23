@@ -387,6 +387,7 @@ For a Mixture-of-Experts layer:
 
 ```
 Standard MoE Layer:
+
 - Router: H → E weights (small)
 - Experts: E × (H → 4H → H) (large)
 - Typically E = 64-256 experts
@@ -1004,10 +1005,12 @@ Training Mixtral with 8 experts:
 1. **4D design**: You have 4,096 GPUs and need to train a 70B model with 256K context. Design a 4D configuration. What's the memory per GPU?
 
 2. **EP communication**: For a MoE with 64 experts, EP=8, and batch×seq=16384 tokens with top-2 routing:
+
    - How many tokens does each EP rank send in AlltoAll?
    - What's the AlltoAll volume?
 
 3. **Ring attention analysis**: For CP=8 and sequence length 128K:
+
    - How many ring steps are needed?
    - What's the memory for K,V buffers?
    - Compare to AllGather memory requirement

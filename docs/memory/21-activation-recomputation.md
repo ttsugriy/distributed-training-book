@@ -18,6 +18,7 @@ During backpropagation, computing gradients requires activations from the forwar
 $$\frac{\partial L}{\partial W_l} = \frac{\partial L}{\partial y_l} \cdot \frac{\partial y_l}{\partial W_l} = \delta_l \cdot a_{l-1}^T$$
 
 Where:
+
 - $\delta_l = \partial L / \partial y_l$: the error signal
 - $a_{l-1}$: the input activation (from forward pass)
 
@@ -40,6 +41,7 @@ For a transformer with $L$ layers, the stored activations include:
 **Total per layer**: approximately $20BSH + 4BnS^2$ bytes (FP16).
 
 For a 7B model ($L=32$, $H=4096$, $n=32$) with $B=4$, $S=2048$:
+
 - Per layer: $20 \times 4 \times 2048 \times 4096 \times 2 + 4 \times 4 \times 32 \times 2048^2 \times 2$
 - Per layer: $1.34$ GB + $4.29$ GB = $5.63$ GB
 - Total: $32 \times 5.63$ GB = **180 GB**
@@ -65,6 +67,7 @@ Backward: Recompute aL-1 → grad L → Recompute aL-2 → grad L-1 → ...
 ### The Fundamental Trade-off
 
 Let:
+
 - $M$: memory for activations
 - $C$: compute for forward passes
 - $K$: number of checkpoints
@@ -314,6 +317,7 @@ class CheckpointedAttention(nn.Module):
 ```
 
 **Memory savings**:
+
 - Without checkpointing: $2 \times B \times n \times S^2$ bytes for scores + softmax
 - With checkpointing: Only Q, K, V stored ($6BSH$ bytes)
 
@@ -389,11 +393,13 @@ def forward_with_sequential_checkpoint(self, x: torch.Tensor) -> torch.Tensor:
 PyTorch offers two checkpointing modes:
 
 **Reentrant** (legacy):
+
 - Uses `torch.autograd.grad` internally
 - Can have subtle bugs with certain operations
 - Being deprecated
 
 **Non-Reentrant** (recommended):
+
 - Uses saved tensor hooks
 - More robust with complex graphs
 - Preserves RNG state correctly
@@ -413,6 +419,7 @@ hidden = checkpoint(
 ### Single Checkpoint
 
 Checkpointing layer $l$ means:
+
 - Forward: compute layer $l$ once
 - Backward: recompute layer $l$ once before computing gradients
 
@@ -421,6 +428,7 @@ Checkpointing layer $l$ means:
 ### Full Model Analysis
 
 Let:
+
 - $F$: FLOPs for one forward pass
 - $B$: FLOPs for one backward pass ($B \approx 2F$ typically)
 - $c$: fraction of layers checkpointed
@@ -576,6 +584,7 @@ class SelectiveRecompute(nn.Module):
 ### Checkpointing + ZeRO
 
 These are complementary:
+
 - ZeRO reduces model state memory (parameters, gradients, optimizer)
 - Checkpointing reduces activation memory
 
@@ -598,6 +607,7 @@ class ZeROWithCheckpointing:
 ```
 
 **Combined memory**:
+
 - Model state: $16N/P$ (ZeRO-3)
 - Activations: $O(\sqrt{L})$ (checkpointing)
 

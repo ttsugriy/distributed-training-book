@@ -129,6 +129,7 @@ If your NIC is 400 Gbps = 50 GB/s, you're achieving 70% of peak—good performan
 ## Hierarchical Cost Analysis
 
 Real clusters have network hierarchy. A DGX cluster might have:
+
 - **Intra-node**: 8 GPUs connected via NVLink (900 GB/s per GPU)
 - **Inter-node**: 8× 400 Gbps NICs (400 GB/s per node)
 
@@ -157,6 +158,7 @@ $$T_{\text{hier}} = T_1 + T_2 + T_3$$
 **Setup**: 8 nodes × 8 GPUs = 64 GPUs, AllReduce 2 GB
 
 **Parameters**:
+
 - $\alpha_{\text{NV}} = 1 \mu s$, $\beta_{\text{NV}} = 300$ GB/s (NVSwitch)
 - $\alpha_{\text{net}} = 5 \mu s$, $\beta_{\text{net}} = 50$ GB/s (400 GbE)
 
@@ -339,6 +341,7 @@ $$T_{\text{PP}} = 2 \times \left( \alpha + \frac{n_{\text{activation}}}{\beta} \
 **Setup**: 70B parameters, FP16, 512 GPUs with 8-way TP, 8-way DP, 8-way PP
 
 **Parameters**:
+
 - Gradient size: 70B × 2 bytes = 140 GB (but sharded 8×, so 17.5 GB per DP group)
 - TP activation: 8192 × 4096 × 2 = 64 MB per layer
 - PP activation: 8192 × 4096 × 2 = 64 MB per microbatch
@@ -418,16 +421,19 @@ Always validate your model against measurements.
 ## Exercises
 
 1. **Formula verification**: For P=16, n=100 MB, α=10μs, β=100 GB/s, calculate:
+
    - AllReduce time (ring algorithm)
    - AllGather time
    - Speedup of hierarchical (4 nodes × 4 GPUs) vs flat
 
 2. **Efficiency analysis**: Your 8-GPU AllReduce of 1 GB takes 80ms. Network is 400 Gbps. Calculate:
+
    - Algorithmic bandwidth
    - Bus bandwidth
    - Efficiency vs theoretical peak
 
 3. **Training time prediction**: A 13B model has:
+
    - 4B parameters in attention (TP)
    - 9B parameters in FFN (TP)
    - Sequence length 4096, hidden 5120, batch 2M tokens
@@ -436,6 +442,7 @@ Always validate your model against measurements.
    Estimate communication time per step. Which parallelism dominates?
 
 4. **Hierarchical benefit**: You're choosing between:
+
    - 64 GPUs: 8 nodes × 8 GPUs
    - 64 GPUs: 16 nodes × 4 GPUs
 
@@ -444,6 +451,7 @@ Always validate your model against measurements.
 5. **Overlap potential**: Compute takes 2000ms, communication takes 600ms. If you can overlap 80% of communication, what's the speedup?
 
 6. **Parameter measurement**: Design an experiment to separately measure:
+
    - GPU-GPU latency (same node)
    - GPU-GPU latency (different nodes)
    - NVLink bandwidth

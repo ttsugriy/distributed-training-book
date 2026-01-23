@@ -165,6 +165,7 @@ A 7B model trained on 2T tokens often outperforms a 70B model trained on 200B to
 ### 2. Compute-Optimal Models Are Memory-Hungry
 
 Chinchilla-optimal training means more data passes through the model. This increases:
+
 - Activation memory during forward pass
 - Gradient accumulation requirements
 - Data loading bandwidth needs

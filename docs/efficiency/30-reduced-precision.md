@@ -22,6 +22,7 @@ A floating-point number is represented as:
 $$x = (-1)^s \times 2^{e-\text{bias}} \times (1 + m)$$
 
 Where:
+
 - $s$: sign bit (1 bit)
 - $e$: exponent (determines range)
 - $m$: mantissa/significand (determines precision)
@@ -66,6 +67,7 @@ The gradient noise $\epsilon_B$ has variance $\sigma^2/B$.
 $$\delta_q \ll \frac{\sigma}{\sqrt{B}}$$
 
 For typical training:
+
 - Gradient noise: $\sim 10\%$ relative error
 - FP16 rounding: $\sim 0.1\%$ relative error
 
@@ -82,6 +84,7 @@ Reduced precision changes the gradient direction slightly, but not enough to fli
 ### The Regularization Argument
 
 Quantization noise acts as regularization, similar to:
+
 - Dropout
 - Weight noise
 - Label smoothing
@@ -154,6 +157,7 @@ Weight updates can be tiny:
 $$\Delta w = \eta \cdot g \approx 10^{-4} \times 10^{-3} = 10^{-7}$$
 
 In FP16 with weights $\sim 1$:
+
 - Smallest representable difference: $2^{-10} \approx 10^{-3}$
 - Update $10^{-7}$ rounds to zero!
 
@@ -212,10 +216,12 @@ def select_precision(operation: str, tensor_size: int) -> str:
 ### The Underflow Problem
 
 FP16 has limited dynamic range:
+
 - Smallest positive normal: $2^{-14} \approx 6 \times 10^{-5}$
 - Smallest subnormal: $2^{-24} \approx 6 \times 10^{-8}$
 
 Gradients can be smaller:
+
 - Typical gradient: $10^{-3}$ to $10^{-6}$
 - Deep network gradients: $10^{-7}$ to $10^{-10}$
 
@@ -329,11 +335,13 @@ Loss Scale over Training:
 ### Why BF16 Emerged
 
 FP16's limited range ($\pm 6.5 \times 10^4$) causes problems:
+
 - Activation spikes during attention
 - Large gradient magnitudes early in training
 - Exploding gradients in deep networks
 
 BF16 trades mantissa bits for exponent bits:
+
 - Same range as FP32 ($\pm 3.4 \times 10^{38}$)
 - Simpler conversion: just truncate lower 16 bits
 
@@ -430,11 +438,13 @@ FP8 pushes precision reduction further, targeting inference and increasingly tra
 ### Two FP8 Variants
 
 **E4M3** (4-bit exponent, 3-bit mantissa):
+
 - Range: $\pm 448$
 - Precision: 8 values per power of 2
 - Best for: Forward pass (weights, activations)
 
 **E5M2** (5-bit exponent, 2-bit mantissa):
+
 - Range: $\pm 57344$
 - Precision: 4 values per power of 2
 - Best for: Backward pass (gradients need more range)
@@ -514,6 +524,7 @@ Tensor Core Operation:
 D = A × B + C
 
 Where:
+
 - A, B: FP16/BF16/FP8 matrices (fragment tiles)
 - C, D: FP16/BF16/FP32 matrices
 ```
@@ -580,6 +591,7 @@ Through $L$ layers:
 $$|\epsilon_L| \lesssim L \cdot n \cdot u \cdot \prod_{i=1}^L |W_i|$$
 
 **Implications**:
+
 - Error grows with depth $L$
 - Error grows with layer width $n$
 - Error multiplied by weight magnitudes
@@ -593,6 +605,7 @@ If $a \approx b$, relative error explodes:
 $$\frac{|\hat{y} - y|}{|y|} \approx \frac{|a|}{|a - b|} \cdot u$$
 
 This occurs in:
+
 - Softmax: $e^{x_i} - e^{x_j}$ when $x_i \approx x_j$
 - LayerNorm: variance computation when inputs are similar
 - Residual connections: $x + f(x)$ when $f(x) \approx 0$

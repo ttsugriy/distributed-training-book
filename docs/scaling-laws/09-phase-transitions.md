@@ -49,6 +49,7 @@ These aren't gradual improvements. Below threshold: 0% accuracy. Above: 80%+ acc
 $$P(c | L) = \sigma\left(\frac{L_c - L}{\tau}\right)$$
 
 Where:
+
 - $L_c$: critical loss threshold for capability $c$
 - $\tau$: transition sharpness
 - $\sigma$: sigmoid function
@@ -124,6 +125,7 @@ $$L \approx L_{\infty}(N) = \frac{A}{N^\alpha}$$
 Loss is determined by model size, independent of data or optimization.
 
 *Symptoms*:
+
 - Adding more data doesn't help
 - Longer training doesn't help
 - Need a bigger model
@@ -137,6 +139,7 @@ $$L \approx L_{\text{opt}}(B, \eta) = \frac{\sigma^2}{B \cdot f(\eta)}$$
 Where $B$ is batch size and $\eta$ is learning rate.
 
 *Symptoms*:
+
 - Larger batch sizes help
 - Learning rate tuning matters a lot
 - Loss fluctuates around a floor
@@ -148,6 +151,7 @@ Not enough data to learn the task.
 $$L \approx \frac{B}{D^\beta}$$
 
 *Symptoms*:
+
 - More data directly reduces loss
 - Model may be overfitting
 - Validation loss >> training loss
@@ -159,6 +163,7 @@ The balanced regime where Chinchilla optimality holds.
 $$L = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
 *Symptoms*:
+
 - Both model size and data matter
 - Smooth power law scaling
 - Optimal allocation is $D \approx 20N$
@@ -242,6 +247,7 @@ $$N_c \approx \left(\frac{A}{L_c - L_\infty}\right)^{1/\alpha}$$
 **Method 2**: Use linear probes
 
 Train a linear classifier on intermediate representations. When linear probe accuracy exceeds random:
+
 - The representation contains the capability
 - Full capability may emerge soon
 
@@ -265,6 +271,7 @@ Know which phase you're in:
 ### 2. Checkpoint Strategy
 
 Near phase transitions:
+
 - Checkpoint more frequently
 - Capabilities may appear between evaluations
 - Don't stop just before a transition
@@ -272,16 +279,19 @@ Near phase transitions:
 ### 3. Batch Size Dynamics
 
 In optimizer-noise-limited phase:
+
 - Larger batches help
 - Can scale batch size with training
 
 In data-limited phase:
+
 - Batch size doesn't help loss
 - But larger batch = faster iteration
 
 ### 4. Curriculum Effects
 
 Some evidence that training order affects phase transitions:
+
 - Easy examples first may accelerate Phase I→IV transition
 - Hard examples early may delay grokking
 
@@ -302,10 +312,12 @@ A strong form of the scaling hypothesis:
 > Given enough compute, any capability will emerge.
 
 Evidence for:
+
 - Larger models consistently gain capabilities
 - No capability has been found that doesn't eventually appear
 
 Evidence against:
+
 - Some capabilities may require architectural changes
 - Data quality limits may be fundamental
 - Compute/time may be practically infeasible

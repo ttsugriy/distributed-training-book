@@ -187,6 +187,7 @@ class ThreeDMesh:
 5. Each device belongs to exactly one group of each type
 
 **Proof**: Each TP group is determined by fixing $(d, p)$, giving $D \cdot P$ groups. Similarly for PP and DP. A device at $(d, p, t)$ belongs to:
+
 - TP group $(d, p, *)$
 - PP group $(d, *, t)$
 - DP group $(*, p, t)$
@@ -562,6 +563,7 @@ class TPLinear(nn.Module):
 ## Choosing Dimensions
 
 The art of 3D parallelism is choosing $(D, P, T)$ given:
+
 - Total GPUs $N$
 - Model size $M$
 - Per-GPU memory $G$
@@ -713,6 +715,7 @@ Megatron-LM trains large models with 3D parallelism:
 | Microbatches | 32 |
 
 **Memory per GPU**:
+
 - Parameters: 175B × 2 / (8 × 16) = 2.7 GB
 - Optimizer: 175B × 8 / (8 × 16) = 10.9 GB
 - Activations: ~40 GB
@@ -874,12 +877,14 @@ Memory savings: (D-1)/D of optimizer memory
 1. **Configuration design**: You have 256 A100 GPUs (32 nodes × 8 GPUs) and want to train a 40B parameter model. Design a 3D parallelism configuration. Calculate memory per GPU and expected pipeline efficiency.
 
 2. **Communication analysis**: For configuration DP=8, PP=4, TP=4 training a model with hidden_dim=8192 and batch_size=512:
+
    - Calculate TP communication volume per layer
    - Calculate PP communication volume per microbatch
    - Calculate DP communication volume per step
    - Which is the bottleneck?
 
 3. **Interleaving trade-off**: Compare bubble fraction for PP=16, M=32 with:
+
    - No interleaving (v=1)
    - v=2 interleaving
    - v=4 interleaving
@@ -888,6 +893,7 @@ Memory savings: (D-1)/D of optimizer memory
 4. **Scaling efficiency**: A 3D parallel configuration achieves 50% MFU on 512 GPUs. When scaling to 2048 GPUs (4× DP), predict the new MFU. What are the bottlenecks?
 
 5. **ZeRO integration**: For DP=32, PP=8, TP=4 with 175B parameters:
+
    - Calculate optimizer memory per GPU without ZeRO
    - Calculate optimizer memory per GPU with ZeRO-1
    - What's the activation memory budget freed up?

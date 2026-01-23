@@ -64,6 +64,7 @@ log(Performance)
 ### Compute-Bound
 
 When $I_{\text{net}}$ and $I_{\text{mem}}$ are high:
+
 - GPU utilization is near peak
 - Adding more GPUs helps linearly (strong scaling)
 - Example: Large batch matrix multiplications
@@ -71,6 +72,7 @@ When $I_{\text{net}}$ and $I_{\text{mem}}$ are high:
 ### Memory-Bound
 
 When $I_{\text{mem}}$ is low, $I_{\text{net}}$ is high:
+
 - Limited by HBM bandwidth
 - Techniques: Kernel fusion, recomputation
 - Example: Element-wise operations, small batch attention
@@ -78,6 +80,7 @@ When $I_{\text{mem}}$ is low, $I_{\text{net}}$ is high:
 ### Communication-Bound
 
 When $I_{\text{net}}$ is low:
+
 - Limited by network bandwidth or latency
 - Techniques: Gradient compression, overlap, reduced precision communication
 - Example: Gradient synchronization, parameter servers
@@ -97,6 +100,7 @@ As batch size $N$ increases, communication intensity increases → less communic
 ### Tensor Parallelism
 
 Per layer with hidden dim $H$, batch $B$, sequence $S$:
+
 - FLOPs: $O(BSH^2)$
 - Communication: $O(BSH)$ (AllReduce activations)
 
@@ -107,6 +111,7 @@ Higher hidden dimension → higher intensity → more efficient tensor paralleli
 ### Pipeline Parallelism
 
 Communication only at stage boundaries:
+
 - FLOPs: Full model computation
 - Communication: Activation tensors between stages
 

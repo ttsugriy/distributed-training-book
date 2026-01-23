@@ -64,6 +64,7 @@ Profiling reveals where you are on this spectrum.
 ### NVIDIA Nsight Systems
 
 The gold standard for GPU profiling. Captures:
+
 - CUDA kernel execution
 - Memory operations
 - NCCL collective calls

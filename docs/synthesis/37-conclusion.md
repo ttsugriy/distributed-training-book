@@ -208,6 +208,7 @@ The extreme: **training entire models on a single massive accelerator**. This el
 ### Trend 2: Heterogeneous Compute
 
 Current systems assume homogeneous GPUs. Future systems may mix:
+
 - Different GPU generations
 - GPUs and other accelerators (TPUs, custom ASICs)
 - CPU computation for sparse operations
@@ -218,6 +219,7 @@ Heterogeneous scheduling is an open research problem.
 ### Trend 3: Elastic Training
 
 Current systems require fixed GPU counts. Elastic training adds or removes GPUs without stopping:
+
 - Scale up when resources become available
 - Scale down when preempted
 - Continue through partial failures
@@ -227,6 +229,7 @@ This requires dynamic parallelism reconfiguration and robust checkpointing.
 ### Trend 4: Communication-Aware Architectures
 
 Model architectures will increasingly co-design with communication patterns:
+
 - Mixture-of-Experts with communication-optimal routing
 - Attention patterns that minimize cross-device communication
 - Hierarchical models that match hardware hierarchies
@@ -236,6 +239,7 @@ The distinction between "ML research" and "systems research" will continue blurr
 ### Trend 5: Automatic Parallelization
 
 Manual parallelism configuration is expert-intensive. Automatic systems promise to:
+
 - Search parallelism strategies given hardware constraints
 - Compile models to distributed execution
 - Optimize communication patterns automatically

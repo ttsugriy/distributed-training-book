@@ -24,6 +24,7 @@ Naive execution (sequential):
 ```
 
 But computation and communication use different resources:
+
 - **Compute**: GPU SMs (Streaming Multiprocessors)
 - **Communication**: NVLink/InfiniBand + network interface
 
@@ -42,6 +43,7 @@ The key insight: **gradients for early layers are computed late in backpropagati
 ### Theoretical Speedup
 
 Define:
+
 - $T_c$: Compute time (forward + backward)
 - $T_m$: Communication time (AllReduce)
 - $\alpha$: Overlap fraction (0 = no overlap, 1 = perfect overlap)
@@ -121,6 +123,7 @@ The overlap window equals the backward compute time minus one layer.
 ### Why Bucketing?
 
 Small messages have high overhead:
+
 - Per-message latency $\alpha$ dominates for small transfers
 - Network underutilization
 - NCCL kernel launch overhead
@@ -173,11 +176,13 @@ class GradientBucketer:
 Bucket size affects overlap quality:
 
 **Too small**:
+
 - High per-bucket latency overhead
 - Many small AllReduce operations
 - Communication cannot keep up with computation
 
 **Too large**:
+
 - Delayed start of communication
 - Less overlap opportunity
 - Memory pressure from buffering
@@ -187,6 +192,7 @@ Bucket size affects overlap quality:
 $$B^* = \underset{B}{\text{argmax}} \left[ \alpha(B) - \frac{\alpha_{\text{comm}}}{B} \right]$$
 
 Where:
+
 - $\alpha(B)$: Overlap fraction with bucket size $B$
 - $\alpha_{\text{comm}}$: Per-bucket latency overhead
 

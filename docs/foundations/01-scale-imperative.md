@@ -22,6 +22,7 @@ A model with $\Psi$ parameters in mixed precision requires approximately:
 $$\text{Memory} = 2\Psi + 2\Psi + 12\Psi = 16\Psi \text{ bytes}$$
 
 Where:
+
 - $2\Psi$: FP16 parameters
 - $2\Psi$: FP16 gradients
 - $12\Psi$: FP32 optimizer states (Adam: parameters, momentum, variance)
@@ -37,6 +38,7 @@ Even if memory weren't a constraint, training time would be:
 $$T = \frac{6 \cdot N \cdot D}{F}$$
 
 Where:
+
 - $N$: parameters
 - $D$: training tokens
 - $F$: FLOP/s of the device

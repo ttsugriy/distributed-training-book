@@ -82,6 +82,7 @@ Communication time follows:
 $$T(n) = \alpha + \frac{n}{\beta}$$
 
 Where:
+
 - $\alpha$: latency (fixed startup cost)
 - $n$: message size in bytes
 - $\beta$: bandwidth in bytes/second

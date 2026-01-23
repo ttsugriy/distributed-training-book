@@ -198,6 +198,7 @@ $$a \oplus b = b \oplus a$$
 **Why it matters**: Order of contributions doesn't affect result.
 
 **Examples**:
+
 - Sum: commutative ✓
 - Max: commutative ✓
 - Concatenation: not commutative ✗
@@ -209,6 +210,7 @@ An **identity element** $e$ satisfies:
 $$a \oplus e = e \oplus a = a$$
 
 **Examples**:
+
 - Sum: $e = 0$
 - Product: $e = 1$
 - Max: $e = -\infty$
@@ -312,6 +314,7 @@ ncclAllGather(sendbuff, recvbuff, sendcount, datatype,
 ```
 
 **NCCL automatically selects algorithms** based on:
+
 - Message size (ring vs tree vs direct)
 - Topology (NVLink vs PCIe vs network)
 - Number of GPUs
@@ -361,6 +364,7 @@ gradients = handle.wait()  # Eventually complete
 2. **Associativity test**: Write code that demonstrates floating-point non-associativity. Find inputs where tree-reduction gives different results than sequential reduction.
 
 3. **Communication volume**: For AllReduce of an $n$-byte tensor across $P$ processes:
+
    - Calculate total bytes sent using naive reduce + broadcast
    - Calculate total bytes sent using ring AllReduce
    - What's the improvement factor?

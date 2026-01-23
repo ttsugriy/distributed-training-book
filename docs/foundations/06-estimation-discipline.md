@@ -14,6 +14,7 @@ Before running expensive experiments, estimate. A capacity engineer should predi
 ## The Estimation Mindset
 
 Good estimates are:
+
 - **Fast**: 5 minutes of calculation, not 5 days of profiling
 - **Approximate**: Within 2× is usually sufficient for planning
 - **Conservative**: Overestimate costs, underestimate throughput
@@ -25,6 +26,7 @@ The goal is to identify infeasible configurations quickly and focus experimentat
 ### Model Memory
 
 For a transformer with:
+
 - $L$ layers
 - $H$ hidden dimension
 - $V$ vocabulary size
@@ -84,6 +86,7 @@ $$F_{\text{total}} = 6\Psi$$
 $$T_{\text{step}} = \frac{F_{\text{step}}}{\text{MFU} \times \text{Peak FLOP/s} \times P}$$
 
 Where:
+
 - $F_{\text{step}} = 6\Psi \cdot B \cdot S$ (batch × sequence tokens)
 - MFU ≈ 0.40-0.50 for well-optimized training
 - P = number of GPUs

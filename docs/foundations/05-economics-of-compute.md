@@ -18,6 +18,7 @@ Total training cost:
 $$C_{\text{total}} = \underbrace{P \cdot R \cdot T}_{\text{GPU cost}} + \underbrace{C_{\text{network}}}_{\text{networking}} + \underbrace{C_{\text{storage}}}_{\text{data/checkpoints}} + \underbrace{C_{\text{ops}}}_{\text{operations}}$$
 
 Where:
+
 - $P$: number of GPUs
 - $R$: hourly rate per GPU
 - $T$: training time in hours
@@ -83,6 +84,7 @@ MFU
 ```
 
 Causes:
+
 - Communication overhead increases with scale
 - Pipeline bubbles don't shrink proportionally
 - Load imbalance across parallel dimensions
@@ -112,6 +114,7 @@ For a given model, there's often a "sweet spot" of parallelism where $/FLOP is m
 ## Case Study: DeepSeek's $5.6M Training
 
 DeepSeek V3 (671B MoE, 37B active) trained for ~$5.6M:
+
 - 2048 H800 GPUs
 - 14.8T tokens
 - FP8 training

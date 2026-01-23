@@ -16,10 +16,12 @@ For years, the field scaled models without enough data. Chinchilla revealed the 
 Before 2022, the dominant scaling strategy was: **make the model bigger**.
 
 This belief came from Kaplan et al. (2020), which suggested:
+
 - Model size should scale as $N \propto C^{0.73}$
 - Data should scale as $D \propto C^{0.27}$
 
 Under this prescription, doubling compute meant:
+
 - 1.66× more parameters
 - 1.20× more tokens
 
@@ -83,6 +85,7 @@ From the optimal allocation (Chapter 7):
 $$\frac{D^*}{N^*} = \frac{B\beta}{A\alpha}$$
 
 Substituting Chinchilla's fitted values:
+
 - $A = 406.4$, $\alpha = 0.34$
 - $B = 410.7$, $\beta = 0.28$
 
@@ -97,6 +100,7 @@ $$N_{\text{opt}} = 0.6225 \cdot C^{0.4957}$$
 $$D_{\text{opt}} = 1.8421 \cdot C^{0.5043}$$
 
 At $C = 10^{21}$ FLOPs:
+
 - $N_{\text{opt}} \approx 1.9 \times 10^{10}$ (19B)
 - $D_{\text{opt}} \approx 4.0 \times 10^{11}$ (400B)
 - Ratio: $D/N \approx 21$
@@ -247,6 +251,7 @@ Some tasks benefit more from model size; others from data.
 ### Mixture-of-Experts Scaling
 
 MoE models have different scaling:
+
 - $N_{\text{total}}$ vs $N_{\text{active}}$
 - Only active parameters contribute to FLOPs per token
 - More total parameters can improve loss at fixed compute
