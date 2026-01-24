@@ -59,7 +59,6 @@ import threading
 import queue
 import time
 
-
 @dataclass
 class ParameterServer:
     """
@@ -100,7 +99,6 @@ class ParameterServer:
             self.version += 1
 
             return staleness
-
 
 class AsyncWorker:
     """Asynchronous SGD worker."""
@@ -160,7 +158,6 @@ class AsyncWorker:
             gradients[name] = (loss_plus - loss) / eps
 
         return gradients
-
 
 def run_async_training(num_workers: int, num_steps: int,
                        initial_weights: Dict[str, np.ndarray],
@@ -254,7 +251,6 @@ class StalenessAdaptiveServer(ParameterServer):
 
             return staleness
 
-
 class BoundedStalenessServer(ParameterServer):
     """
     Parameter server that bounds staleness.
@@ -332,7 +328,6 @@ class HogwildSGD:
         """Read current weights (may be inconsistent)."""
         return self.weights.copy()
 
-
 class SparseGradientWorker:
     """Worker for Hogwild! training."""
 
@@ -381,14 +376,12 @@ from dataclasses import dataclass
 from typing import Dict, List
 import numpy as np
 
-
 @dataclass
 class LocalSGDConfig:
     """Configuration for Local SGD."""
     num_workers: int
     local_steps: int  # H: steps between synchronization
     learning_rate: float
-
 
 class LocalSGDWorker:
     """
@@ -425,7 +418,6 @@ class LocalSGDWorker:
         """Update local weights with global average."""
         self.local_weights = {k: v.copy() for k, v in averaged.items()}
         self.step_in_epoch = 0
-
 
 def local_sgd_training(workers: List[LocalSGDWorker],
                        data_iterators: list,
@@ -545,7 +537,6 @@ class LocalSGDWithMomentumCorrection:
 
         self.global_control = {k: v.copy() for k, v in global_control.items()}
 
-
 class FedProx:
     """
     FedProx: Local SGD with proximal regularization.
@@ -595,7 +586,6 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 import numpy as np
 
-
 @dataclass
 class DiLoCoConfig:
     """Configuration for DiLoCo distributed training."""
@@ -606,7 +596,6 @@ class DiLoCoConfig:
     inner_lr: float
     outer_lr: float
     outer_momentum: float
-
 
 class DiLoCoWorker:
     """
@@ -693,7 +682,6 @@ class DiLoCoWorker:
         self.m = {k: np.zeros_like(v) for k, v in self.weights.items()}
         self.v = {k: np.zeros_like(v) for k, v in self.weights.items()}
 
-
 def diloco_training(config: DiLoCoConfig,
                     initial_weights: Dict[str, np.ndarray],
                     data_iterators: list,
@@ -749,14 +737,12 @@ def diloco_training(config: DiLoCoConfig,
 from dataclasses import dataclass
 from enum import Enum
 
-
 class SyncStrategy(Enum):
     FULLY_SYNC = "fully_synchronous"  # AllReduce every step
     BOUNDED_ASYNC = "bounded_async"    # Async with max staleness
     LOCAL_SGD = "local_sgd"            # Periodic sync
     DILOCO = "diloco"                  # Different inner/outer optimizers
     HOGWILD = "hogwild"                # Lock-free for sparse
-
 
 @dataclass
 class WorkloadProfile:
@@ -766,7 +752,6 @@ class WorkloadProfile:
     compute_variance: float         # Variance in compute time
     gradient_sparsity: float        # Fraction of non-zero gradients
     data_heterogeneity: float       # KL divergence between worker distributions
-
 
 class SyncStrategyAdvisor:
     """Recommend synchronization strategy based on workload."""
@@ -843,7 +828,6 @@ class SyncStrategyAdvisor:
 
         return 1.0
 
-
 def optimal_sync_interval(compute_time: float, comm_time: float,
                           variance_growth: float) -> int:
     """
@@ -907,6 +891,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     **For 16 workers with expected staleness 7.5:**
 
     Using the staleness-aware rule with $c = 0.5$:
+
     $$\eta_{async} = \frac{\eta_{sync}}{1 + 0.5 \times 7.5} = \frac{\eta_{sync}}{4.75}$$
 
     **Effective learning rate reduction:**
@@ -946,6 +931,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     **Variance cost:**
 
     After $H$ local steps, model divergence causes variance proportional to $H$:
+
     $$\text{Variance cost} \propto \gamma H = 0.001 H$$
 
     **Total effective cost per step:**
@@ -956,6 +942,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     **Optimization:**
 
     Taking derivative and setting to zero:
+
     $$\frac{dC}{dH} = -\frac{T_{comm}}{H^2} + \lambda \gamma = 0$$
 
     $$H^* = \sqrt{\frac{T_{comm}}{\lambda \gamma}}$$
@@ -1030,7 +1017,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
             x = self.relu(self.fc2(x))
             return self.fc3(x)
 
-
     def simulate_sync_sgd(model, train_loader, test_loader, num_workers=4,
                           comm_time=0.01, lr=0.01, target_acc=0.95):
         """Fully synchronous SGD simulation"""
@@ -1061,7 +1047,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
                 return total_time, total_steps, total_comm, acc
 
         return total_time, total_steps, total_comm, acc
-
 
     def simulate_local_sgd(model, train_loader, test_loader, num_workers=4,
                            H=10, comm_time=0.01, lr=0.01, target_acc=0.95):
@@ -1108,7 +1093,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
                 return total_time, total_steps, total_comm, acc
 
         return total_time, total_steps, total_comm, acc
-
 
     def evaluate(model, test_loader):
         model.eval()
@@ -1256,7 +1240,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
             # Outer optimization step
             self.outer_step()
 
-
     # Comparison experiment
     def compare_diloco_vs_localsgd():
         results = {
@@ -1318,6 +1301,7 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     **Key theoretical result:**
 
     For a problem with sparsity $\rho$ (fraction of parameters touched per update), Hogwild! converges at rate:
+
     $$\mathbb{E}[f(x_T) - f^*] \leq \frac{||x_0 - x^*||^2 + \sigma^2 T}{2\eta T} + O(\eta \rho P)$$
 
     where $P$ is number of workers.
@@ -1325,17 +1309,21 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
     **Matching locked SGD:**
 
     Locked SGD convergence (no conflicts):
+
     $$\mathbb{E}[f(x_T) - f^*] \leq \frac{||x_0 - x^*||^2 + \sigma^2 T}{2\eta T}$$
 
     For Hogwild! to match, the conflict term must be negligible:
+
     $$\eta \rho P \ll \frac{1}{T}$$
 
     **Sparsity threshold:**
 
     For practical convergence (conflict term < 10% of convergence rate):
+
     $$\rho < \frac{0.1}{\eta P T^{1/2}}$$
 
     **Numerical example** (P=16 workers, T=10000 steps, η=0.01):
+
     $$\rho < \frac{0.1}{0.01 \times 16 \times 100} = \frac{0.1}{16} \approx 0.00625$$
 
     $$\boxed{\rho < 0.6\% \text{ sparsity for 16 workers}}$$
@@ -1409,7 +1397,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
 
         return final_loss, elapsed
 
-
     # Run experiments
     results = []
     for sparsity in [0.001, 0.01, 0.05, 0.1, 0.25, 0.5]:
@@ -1482,7 +1469,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
 
         return worker_indices
 
-
     # Algorithm implementations
     class LocalSGD:
         """Standard Local SGD with averaging"""
@@ -1508,7 +1494,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
                     avg = sum(p.data for p in param_group) / len(param_group)
                     for p in param_group:
                         p.data.copy_(avg)
-
 
     class FedProx:
         """FedProx: Local SGD with proximal regularization"""
@@ -1550,7 +1535,6 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
 
             # Update global model
             self.global_model.load_state_dict(self.models[0].state_dict())
-
 
     class SCAFFOLD:
         """SCAFFOLD: Variance reduction for federated learning"""

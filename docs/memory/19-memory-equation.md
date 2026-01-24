@@ -608,7 +608,6 @@ def estimate_memory_requirements(
         'total_gb': total / (1024**3)
     }
 
-
 # Example usage
 memory = estimate_memory_requirements(
     num_params=7_000_000_000,
@@ -720,6 +719,7 @@ Only 12.5% of memory holds actual model parameters!
     $$M_{\text{linear}} \approx 8H \text{ bytes per token (bf16)}$$
 
     With $B$ batch, $S$ sequence:
+
     $$M_{\text{linear}} = 2 \times 8 \times B \times S \times H = 16BSH \text{ bytes}$$
 
     **Attention activations per layer:**
@@ -733,11 +733,13 @@ Only 12.5% of memory holds actual model parameters!
     **Crossover condition:**
 
     Attention exceeds linear when:
+
     $$2BAS^2 > 16BSH$$
     $$AS^2 > 8SH$$
     $$S > \frac{8H}{A}$$
 
     With $H = 4096$, $A = 32$:
+
     $$S > \frac{8 \times 4096}{32} = \frac{32768}{32} = \boxed{1024}$$
 
     **Interpretation:**
@@ -776,6 +778,7 @@ Only 12.5% of memory holds actual model parameters!
     $$= BS \times 4096 \times (34 + 80) = BS \times 4096 \times 114$$
 
     Total (32 layers, with checkpointing every 4 layers):
+
     $$M_{\text{act}} \approx 8 \times BS \times 4096 \times 114 \times 2 \text{ bytes} \approx 7.5 \times BS \text{ GB}$$
 
     **Solving for batch size:**
@@ -885,7 +888,6 @@ Only 12.5% of memory holds actual model parameters!
             report += "-" * 60 + "\n"
             report += f"{'Total':<40} {total/1e6:>8.2f}MB\n"
             return report
-
 
     # Usage example
     def profile_transformer():

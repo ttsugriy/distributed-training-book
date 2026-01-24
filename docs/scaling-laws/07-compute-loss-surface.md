@@ -222,6 +222,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
     The optimal ratio is $D^*/N^* \approx 20$.
 
     Substituting into the compute constraint $C = 6ND$:
+
     $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
 
     **Solving for optimal model size:**
@@ -281,6 +282,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
     **Part 1: Chinchilla-optimal token count**
 
     Using the 20:1 rule:
+
     $$D^* = 20 \times N = 20 \times 7 \times 10^9 = \boxed{140\text{B tokens}}$$
 
     **Part 2: Overtraining factor**
@@ -292,9 +294,11 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
     Using $L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$ with Chinchilla exponents ($\alpha = 0.34$, $\beta = 0.28$):
 
     The data-dependent term improvement:
+
     $$\Delta L_{\text{data}} = B\left(\frac{1}{D_{\text{opt}}^\beta} - \frac{1}{D_{\text{overtrain}}^\beta}\right)$$
 
     Ratio of data terms:
+
     $$\frac{(140\text{B})^{0.28}}{(2\text{T})^{0.28}} = \left(\frac{140}{2000}\right)^{0.28} = 0.07^{0.28} = 0.50$$
 
     The overtrained model achieves ~50% reduction in the data-dependent loss term compared to Chinchilla-optimal.
@@ -359,6 +363,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
     **For Chinchilla ($\alpha = \beta$, $A = B$):**
 
     The condition simplifies to:
+
     $$N_0^\alpha = D_0^\alpha \implies N_0 = D_0$$
 
     But the 20:1 rule ($D^*/N^* = 20$) suggests $A \neq B$. The actual indifference point is at the Chinchilla optimum where marginal returns are equal.

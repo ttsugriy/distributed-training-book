@@ -547,7 +547,6 @@ class PerformanceModel:
 
         return overhead
 
-
 @dataclass
 class StepTimePrediction:
     """Breakdown of predicted step time."""
@@ -565,7 +564,6 @@ class StepTimePrediction:
                                    batch_size: int,
                                    seq_length: int) -> float:
         return batch_size * seq_length / self.total
-
 
 @dataclass
 class HardwareSpec:
@@ -1718,17 +1716,21 @@ config = TrainingConfig(
     **Activation memory:**
 
     Per-layer activation (with TP=4):
+
     $$M_{act}^{layer} = \frac{BSH \times 34}{TP}$$
 
     Assuming B=4, S=4096:
+
     $$M_{act}^{layer} = \frac{4 \times 4096 \times 7168 \times 34}{4} = 997 \text{ MB/layer}$$
 
     Layers per PP stage: $40/4 = 10$ layers
 
     With activation checkpointing (every layer):
+
     $$M_{act}^{total} \approx 2 \times 997 = 1.99 \text{ GB}$$
 
     Without checkpointing:
+
     $$M_{act}^{total} = 10 \times 997 = 9.97 \text{ GB}$$
 
     **Total memory per GPU:**
@@ -1763,16 +1765,19 @@ config = TrainingConfig(
     **Stage 1: GPU count constraint**
 
     Removes 80%:
+
     $$N_1 = 10000 \times (1 - 0.80) = 10000 \times 0.20 = 2000$$
 
     **Stage 2: Divisibility constraint**
 
     Removes 50% of remainder:
+
     $$N_2 = 2000 \times (1 - 0.50) = 2000 \times 0.50 = 1000$$
 
     **Stage 3: Memory constraint**
 
     Removes 30% of remainder:
+
     $$N_3 = 1000 \times (1 - 0.30) = 1000 \times 0.70 = 700$$
 
     **Answer:**
@@ -1810,6 +1815,7 @@ config = TrainingConfig(
     - Time per evaluation: 6 minutes
 
     Total time:
+
     $$T_{bayes} = 50 \times 6 = 300 \text{ minutes} = \boxed{5 \text{ hours}}$$
 
     **Time savings:**
@@ -1896,6 +1902,7 @@ config = TrainingConfig(
     **Memory validation:**
 
     Parameters per GPU:
+
     $$\Psi_{GPU} = \frac{13B}{TP \times PP} = \frac{13B}{16} = 812.5M$$
 
     **Memory breakdown:**
@@ -1908,6 +1915,7 @@ config = TrainingConfig(
     | **Static total** | | **13.0 GB** |
 
     With ZeRO-1 (DP=4):
+
     $$M_{opt}^{ZeRO1} = 9.75 / 4 = 2.44 \text{ GB}$$
     Static with ZeRO-1: 5.7 GB
 
@@ -1918,6 +1926,7 @@ config = TrainingConfig(
     Layers per stage: 10
 
     With checkpointing:
+
     $$M_{act} \approx 2 \times 1.43 = 2.86 \text{ GB}$$
 
     **Total per GPU:**
@@ -1966,6 +1975,7 @@ config = TrainingConfig(
     $$\frac{7}{GA + 7} < \frac{3}{19}$$
 
     Solve:
+
     $$7 \times 19 < 3 \times (GA + 7)$$
     $$133 < 3 \cdot GA + 21$$
     $$112 < 3 \cdot GA$$

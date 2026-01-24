@@ -186,12 +186,15 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     $$M_{act}^{layer} = 167.8\text{M} \times 194 \text{ bytes} \approx 32.5 \text{ GB per layer}$$
 
     **With TP=4**: Activations are distributed, reducing per-GPU cost by ~4×:
+
     $$M_{act}^{layer, TP} \approx 8.1 \text{ GB per layer}$$
 
     **With activation checkpointing** (checkpoint every 4 layers):
+
     $$M_{act}^{total} = \frac{40}{4} \times 8.1 \approx 81 \text{ GB}$$
 
     Wait—this exceeds GPU memory! Let's apply more aggressive checkpointing (every layer):
+
     $$M_{act}^{total} \approx 2 \times 8.1 = 16.2 \text{ GB}$$
 
     **Total memory per GPU:**
@@ -236,6 +239,7 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     **Expected MFU for well-optimized 7B training:** 40-50%
 
     At 45% MFU, expected throughput would be:
+
     $$\text{tokens/s} = \frac{0.45 \times 126,656 \times 10^{12}}{42 \times 10^9} = 1.36\text{M tokens/s}$$
 
     The observed 150K is only 11% of this potential.

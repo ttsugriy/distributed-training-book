@@ -1003,9 +1003,11 @@ Memory savings: (D-1)/D of optimizer memory
     **Bubble fraction formula:**
 
     Without interleaving (1F1B):
+
     $$\text{Bubble} = \frac{P - 1}{M + P - 1}$$
 
     With interleaving factor $v$:
+
     $$\text{Bubble}_{interleaved} = \frac{P - 1}{v \times M + P - 1}$$
 
     **Calculations:**
@@ -1033,12 +1035,15 @@ Memory savings: (D-1)/D of optimizer memory
     Let $T_c$ = compute time, $T_{comm}$ = base PP communication time.
 
     Interleaving benefits when:
+
     $$\Delta\text{Bubble} \times T_c > (v-1) \times T_{comm}$$
 
     For v=2:
+
     $$0.129 \times T_c > 1 \times T_{comm}$$
 
     If $T_c = 1000$ ms and $T_{comm} = 50$ ms:
+
     $$129 \text{ ms} > 50 \text{ ms} \checkmark$$
 
     **Summary:**
@@ -1077,9 +1082,11 @@ Memory savings: (D-1)/D of optimizer memory
     **DP scaling impact:**
 
     At 512 GPUs with DP=D:
+
     $$T_{DP}^{512} = \frac{D-1}{D} \times \frac{2\Psi}{B}$$
 
     At 2048 GPUs with DP=4D:
+
     $$T_{DP}^{2048} = \frac{4D-1}{4D} \times \frac{2\Psi}{B}$$
 
     Ratio: $\frac{T_{DP}^{2048}}{T_{DP}^{512}} = \frac{(4D-1)/4D}{(D-1)/D} = \frac{4D-1}{4(D-1)} \approx 1.0$ for large D
@@ -1089,6 +1096,7 @@ Memory savings: (D-1)/D of optimizer memory
     **Real bottleneck: Batch size scaling**
 
     To maintain efficiency, global batch must scale 4×:
+
     $$B_{global}^{new} = 4 \times B_{global}^{old}$$
 
     If we **don't** scale batch:
@@ -1123,6 +1131,7 @@ Memory savings: (D-1)/D of optimizer memory
     **Model partitioning:**
 
     Parameters per GPU (before ZeRO):
+
     $$\Psi_{GPU} = \frac{175B}{PP \times TP} = \frac{175B}{32} = 5.47B \text{ params}$$
 
     **Without ZeRO:**
@@ -1152,6 +1161,7 @@ Memory savings: (D-1)/D of optimizer memory
     **Activation memory budget freed:**
 
     Memory saved:
+
     $$\Delta M = 87.4 - 23.85 = 63.55 \text{ GB}$$
 
     On an 80GB A100:

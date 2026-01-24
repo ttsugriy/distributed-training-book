@@ -801,19 +801,23 @@ PyTorch DDP uses 25MB buckets by default.
     **Option A: 1000 individual AllReduce calls:**
 
     Per-call time (assuming P=8):
+
     $$T_{\text{call}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{10^6}{10^{11}}$$
     $$= 140\mu s + 17.5\mu s = 157.5\mu s$$
 
     Total time:
+
     $$T_A = 1000 \times 157.5\mu s = \boxed{157.5 \text{ ms}}$$
 
     **Option B: Bucketed into 25 MB chunks (40 calls):**
 
     Per-bucket time:
+
     $$T_{\text{bucket}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{25 \times 10^6}{10^{11}}$$
     $$= 140\mu s + 437.5\mu s = 577.5\mu s$$
 
     Total time:
+
     $$T_B = 40 \times 577.5\mu s = \boxed{23.1 \text{ ms}}$$
 
     **Speedup:**
@@ -880,6 +884,7 @@ PyTorch DDP uses 25MB buckets by default.
     **Option 3: Ring algorithm (always works)**
 
     Just use ring AllReduce—no power-of-2 constraint:
+
     $$T_{\text{ring}} = 2(P-1)\alpha + 2\frac{P-1}{P}\frac{n}{\beta}$$
 
     Works for any P. Only ~10% slower than Rabenseifner for typical sizes.

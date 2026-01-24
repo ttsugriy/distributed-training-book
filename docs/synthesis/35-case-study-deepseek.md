@@ -775,7 +775,6 @@ class DeepSeekV3Analyzer:
 
         return hours * self.gpus * cost_per_hour
 
-
 def analyze_deepseek():
     analyzer = DeepSeekV3Analyzer()
 
@@ -799,7 +798,6 @@ def analyze_deepseek():
 
     cost = analyzer.training_cost(14.8e12)
     print(f"Estimated training cost: ${cost/1e6:.1f}M")
-
 
 if __name__ == "__main__":
     analyze_deepseek()
@@ -841,9 +839,11 @@ if __name__ == "__main__":
     **Extra FLOPs for compression/decompression:**
 
     Compression (per token):
+
     $$F_{compress} = 2 \times H \times d_c = 2 \times 16384 \times 512 = 16.8\text{M FLOPs}$$
 
     Decompression (per query token, for all KV):
+
     $$F_{decompress} = S \times 2 \times d_c \times H = S \times 2 \times 512 \times 16384 = 16.8S \text{M FLOPs}$$
 
     **Standard attention FLOPs (for comparison):**
@@ -887,6 +887,7 @@ if __name__ == "__main__":
     $$\sigma_A = \sqrt{\frac{N}{32} \times (1 - \frac{8}{256})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
 
     Coefficient of variation:
+
     $$CV_A = \frac{\sigma_A}{\mu_A} = \frac{0.174\sqrt{N}}{N/32} = \frac{5.57}{\sqrt{N}}$$
 
     **Option B (64 experts, top-2):**
@@ -900,6 +901,7 @@ if __name__ == "__main__":
     **Max load analysis (more important for efficiency):**
 
     With 256 experts, the maximum load is distributed across more "bins":
+
     $$E[\max] \propto \mu + \sigma\sqrt{2\ln E}$$
 
     For E=256: $\sqrt{2\ln 256} = 3.33$
@@ -930,6 +932,7 @@ if __name__ == "__main__":
     Scale factor: $s = \frac{\max(|w|)}{448}$
 
     For $\mathcal{N}(0, 0.02)$ with 10M weights:
+
     $$\max(|w|) \approx \sigma \times \sqrt{2\ln N} = 0.02 \times \sqrt{2\ln 10^7} \approx 0.02 \times 5.7 = 0.114$$
 
     Scale: $s = \frac{0.114}{448} = 2.54 \times 10^{-4}$
@@ -942,6 +945,7 @@ if __name__ == "__main__":
     **Per-block scaling (block=128):**
 
     For block of 128 weights from $\mathcal{N}(0, 0.02)$:
+
     $$\max(|w|)_{block} \approx 0.02 \times \sqrt{2\ln 128} \approx 0.02 \times 3.1 = 0.062$$
 
     Scale: $s_{block} = \frac{0.062}{448} = 1.38 \times 10^{-4}$
@@ -1206,9 +1210,11 @@ if __name__ == "__main__":
     Chinchilla scaling: $N_{opt} = 0.7 \times D^{0.5}$ (approximate)
 
     For equivalent compute budget with dense model:
+
     $$C = 6ND$$
 
     Given C = $3.29 \times 10^{24}$ FLOPs and Chinchilla ratio $D = 20N$:
+
     $$3.29 \times 10^{24} = 6 \times N \times 20N = 120N^2$$
     $$N = \sqrt{\frac{3.29 \times 10^{24}}{120}} = 165B \text{ parameters}$$
 
@@ -1225,6 +1231,7 @@ if __name__ == "__main__":
     $$C_{dense} = 6 \times 300B \times 3T = 5.4 \times 10^{24} \text{ FLOPs}$$
 
     DeepSeek-V3 actual:
+
     $$C_{MoE} = 6 \times 37B \times 14.8T = 3.29 \times 10^{24} \text{ FLOPs}$$
 
     **Cost comparison (at $2/H100-hour, 50% MFU):**

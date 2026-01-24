@@ -174,7 +174,6 @@ class SequenceParallelLayerNorm(nn.Module):
         # LayerNorm is per-token, so no cross-rank communication needed
         return F.layer_norm(x, (x.size(-1),), self.weight, self.bias, self.eps)
 
-
 def sequence_parallel_attention(q, k, v, tp_group):
     """Attention with sequence-parallel input/output."""
     # Input: (batch, seq_local, hidden)
@@ -192,14 +191,12 @@ def sequence_parallel_attention(q, k, v, tp_group):
 
     return output_local  # (batch, seq_local, hidden)
 
-
 def all_gather_sequence(x: torch.Tensor, group) -> torch.Tensor:
     """AllGather along sequence dimension."""
     world_size = dist.get_world_size(group)
     gathered = [torch.empty_like(x) for _ in range(world_size)]
     dist.all_gather(gathered, x, group=group)
     return torch.cat(gathered, dim=1)  # Concat along seq dimension
-
 
 def reduce_scatter_sequence(x: torch.Tensor, group) -> torch.Tensor:
     """ReduceScatter along sequence dimension."""
@@ -499,7 +496,6 @@ def ulysses_attention(Q, K, V, sp_group):
 
     return output
 
-
 def all_to_all(x, dim_scatter, dim_gather, group):
     """AlltoAll with specified scatter and gather dimensions."""
     world_size = dist.get_world_size(group)
@@ -760,7 +756,6 @@ class SequenceParallelTransformerLayer(nn.Module):
         x = residual + x
 
         return x
-
 
 class SequenceParallelAttention(nn.Module):
     """Attention with context parallelism (Ring or Ulysses)."""
@@ -1044,6 +1039,7 @@ class SequenceParallelAttention(nn.Module):
     **General formula for $P$ GPUs:**
 
     Average skippable steps:
+
     $$\text{Avg skip} = \frac{\sum_{r=0}^{P-1} (P - 1 - r)}{P} = \frac{(P-1)P/2}{P} = \frac{P-1}{2}$$
 
     For $P = 8$: $\frac{8-1}{2} = 3.5$ ✓
@@ -1304,6 +1300,7 @@ class SequenceParallelAttention(nn.Module):
     2. **Weighted sums combine correctly**: The exponential rescaling ensures sums are always normalized to the global maximum.
 
     3. **Softmax decomposition**: For any partition of keys:
+
        $$\text{softmax}([x_A; x_B; x_C]) = \frac{[e^{x_A}; e^{x_B}; e^{x_C}]}{e^{m_A}s_A + e^{m_B}s_B + e^{m_C}s_C}$$
 
        This can be computed incrementally by tracking $(m, s, o)$ and combining associatively.

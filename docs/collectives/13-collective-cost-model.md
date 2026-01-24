@@ -442,12 +442,15 @@ Always validate your model against measurements.
     **Part 1: AllReduce time (ring algorithm)**
 
     Using the ring AllReduce formula:
+
     $$T_{\text{AllReduce}} = 2(P-1) \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
     Latency term:
+
     $$T_\alpha = 2(16-1) \times 10^{-5} = 30 \times 10^{-5} = 0.3 \text{ ms}$$
 
     Bandwidth term:
+
     $$T_\beta = 2 \times \frac{15}{16} \times \frac{10^8}{10^{11}} = 2 \times 0.9375 \times 10^{-3} = 1.875 \text{ ms}$$
 
     $$\boxed{T_{\text{AllReduce}} = 0.3 + 1.875 = 2.175 \text{ ms}}$$
@@ -455,6 +458,7 @@ Always validate your model against measurements.
     **Part 2: AllGather time**
 
     Using the ring AllGather formula:
+
     $$T_{\text{AllGather}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
     $$T_{\text{AllGather}} = 15 \times 10^{-5} + \frac{15}{16} \times \frac{10^8}{10^{11}}$$
@@ -567,16 +571,19 @@ Always validate your model against measurements.
     TP requires AllReduce of activations within each TP group.
 
     Activation size per layer:
+
     $$n_{\text{act}} = B \times S \times H \times 2 \text{ bytes (FP16)}$$
     $$= 61 \times 4096 \times 5120 \times 2 = 2.56 \text{ GB}$$
 
     Per transformer layer: 4 AllReduce operations (2 forward, 2 backward)
 
     Each AllReduce (ring, P=8, NVLink):
+
     $$T_{\text{AR}} = 2(8-1) \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{2.56 \times 10^9}{3 \times 10^{11}}$$
     $$= 14 \mu s + 14.9 \text{ ms} = 14.9 \text{ ms}$$
 
     Assuming ~40 layers:
+
     $$T_{\text{TP}} = 40 \times 4 \times 14.9 = \boxed{2,384 \text{ ms}}$$
 
     **Part 2: Data Parallel Communication**
@@ -588,6 +595,7 @@ Always validate your model against measurements.
     But with TP=8, each TP group only has 26/8 = 3.25 GB of unique gradients to sync.
 
     AllReduce across DP=8 groups (network):
+
     $$T_{\text{DP}} = 2(8-1) \times 5 \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{3.25 \times 10^9}{5 \times 10^{10}}$$
     $$= 70 \mu s + 113.75 \text{ ms} = \boxed{114 \text{ ms}}$$
 
@@ -719,6 +727,7 @@ Always validate your model against measurements.
     | 100% overlap | 2000 ms | 1.30× |
 
     **Theoretical maximum speedup** (perfect overlap):
+
     $$\text{Speedup}_{\text{max}} = \frac{T_{\text{compute}} + T_{\text{comm}}}{T_{\text{compute}}} = \frac{2600}{2000} = 1.30\times$$
 
     We achieve $\frac{1.23 - 1.00}{1.30 - 1.00} = 77\%$ of the theoretical maximum benefit.

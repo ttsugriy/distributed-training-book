@@ -999,7 +999,6 @@ class MixedPrecisionTrainer:
             'relative_error_bf16': (error_bf16 / C_fp32.abs().clamp(min=1e-8)).mean().item(),
         }
 
-
     # Test across matrix sizes
     sizes = [100, 500, 1000, 2000, 4000]
     results = []
@@ -1080,7 +1079,6 @@ class MixedPrecisionTrainer:
             recovered = grad_fp16.float() / scale
             print(f"  {val:.0e} -> scaled -> FP16 -> unscaled -> {recovered.item():.2e}")
 
-
     test_underflow()
     ```
 
@@ -1120,7 +1118,6 @@ class MixedPrecisionTrainer:
 
         return min_scale_pow2
 
-
     # For gradient = 1e-6
     target = 1e-6
     min_scale = find_minimum_scale(target)
@@ -1135,6 +1132,7 @@ class MixedPrecisionTrainer:
     **Minimum scale calculation:**
 
     For gradient $g = 10^{-6}$:
+
     $$\text{scale}_{min} = \frac{2^{-14}}{10^{-6}} = \frac{6.1 \times 10^{-5}}{10^{-6}} = 61$$
 
     Rounded to power of 2: $\text{scale}_{min} = 64 = 2^6$
@@ -1197,7 +1195,6 @@ class MixedPrecisionTrainer:
             'bf16_overflow_frac': bf16_overflow.float().mean().item(),
             'bf16_total_lost': bf16_lost.float().mean().item(),
         }
-
 
     results = analyze_dynamic_range_loss()
     print(f"FP16 - Underflow: {results['fp16_underflow_frac']:.2%}, "
@@ -1366,6 +1363,7 @@ class MixedPrecisionTrainer:
     Therefore: $e^{x_i - x_{max}} \leq 1$ — never overflows!
 
     The mathematical equivalence:
+
     $$\frac{e^{x_i}}{\sum_j e^{x_j}} = \frac{e^{x_i - x_{max}}}{\sum_j e^{x_j - x_{max}}}$$
 
     | Input range | Unstable | Stable |

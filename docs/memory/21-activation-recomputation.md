@@ -155,7 +155,6 @@ def uniform_checkpoint_forward(input: torch.Tensor,
 
     return hidden, checkpoints
 
-
 def uniform_checkpoint_backward(grad_output: torch.Tensor,
                                 layers: nn.ModuleList,
                                 checkpoints: List[torch.Tensor],
@@ -241,7 +240,6 @@ def analyze_layer_memory(layer: nn.Module,
         h.remove()
 
     return sum(activation_sizes)
-
 
 def select_checkpoints(layers: nn.ModuleList,
                        memory_budget: int,
@@ -871,6 +869,7 @@ model.gradient_checkpointing_enable()
     **Optimal checkpoint interval:**
 
     Using the $\sqrt{L}$ rule:
+
     $$k^* = \sqrt{L} = \sqrt{48} \approx 6.93$$
 
     Round to practical value: $k = 7$ layers between checkpoints.
@@ -1267,6 +1266,7 @@ model.gradient_checkpointing_enable()
     **Interleaved Pipeline (more micro-batches in flight):**
 
     With interleaved schedule (virtual stages), peak increases:
+
     $$\text{Peak} = \frac{p \times v}{v} = p$$
 
     Still bounded by $p$ per physical stage, but more total memory across all virtual stages.

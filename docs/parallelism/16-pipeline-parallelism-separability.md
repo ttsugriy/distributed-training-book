@@ -1050,17 +1050,21 @@ loss.backward()
     **(a) GPipe scheduling:**
 
     The bubble fraction formula is:
+
     $$\text{Bubble} = \frac{P-1}{P-1+m}$$
 
     Substituting:
+
     $$\text{Bubble}_{\text{GPipe}} = \frac{8-1}{8-1+48} = \frac{7}{55} = \boxed{12.7\%}$$
 
     **(b) Interleaved scheduling with $v = 2$:**
 
     The interleaved bubble fraction is:
+
     $$\text{Bubble}_{\text{interleaved}} = \frac{P-1}{m \cdot v}$$
 
     Substituting:
+
     $$\text{Bubble}_{\text{interleaved}} = \frac{8-1}{48 \times 2} = \frac{7}{96} = \boxed{7.3\%}$$
 
     **Comparison:**
@@ -1227,6 +1231,7 @@ loss.backward()
     **Standard 1F1B bubble analysis (for reference):**
 
     With $P$ stages and $m$ micro-batches:
+
     $$\text{Bubble}_{1F1B} = \frac{P-1}{P-1+m}$$
 
     **ZB-H1 schedule structure:**
@@ -1337,6 +1342,7 @@ loss.backward()
     $$E = \frac{m}{m + P - 1} = \frac{64}{64 + 7} = \frac{64}{71} = \boxed{90.1\%}$$
 
     Alternatively, bubble fraction:
+
     $$\text{Bubble} = \frac{P - 1}{m + P - 1} = \frac{7}{71} = 9.9\%$$
 
     **Throughput in micro-batches per second:**
@@ -1346,6 +1352,7 @@ loss.backward()
     **Tokens per second (if each micro-batch has $b \cdot S$ tokens):**
 
     For $b = 4$, $S = 2048$:
+
     $$\text{Tokens/s} = 30.0 \times 4 \times 2048 = 245,760 \text{ tokens/s}$$
 
     **Summary:**
@@ -1492,6 +1499,7 @@ loss.backward()
     **Memory savings:**
 
     For a stage with 8 layers, checkpoint segments = 2:
+
     $$\text{Savings} = 1 - \frac{2}{8} = \boxed{75\%}$$
 
     **Interaction with 1F1B scheduling:**

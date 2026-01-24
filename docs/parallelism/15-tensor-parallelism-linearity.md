@@ -759,14 +759,17 @@ The tensor parallel degree $P$ is limited by:
     Partitioning bias similarly: $b = [b_1 | b_2 | \cdots | b_P]$
 
     On GPU $i$:
+
     $$Y_i = XW_i + b_i$$
 
     **Why this is correct:**
 
     The full computation is:
+
     $$Y = XW + b = [XW_1 | XW_2 | \cdots | XW_P] + [b_1 | b_2 | \cdots | b_P]$$
 
     Since bias addition is element-wise and the column partitioning aligns:
+
     $$= [XW_1 + b_1 | XW_2 + b_2 | \cdots | XW_P + b_P] = [Y_1 | Y_2 | \cdots | Y_P] \quad \checkmark$$
 
     **Part 2: Row-parallel bias handling**
@@ -774,6 +777,7 @@ The tensor parallel degree $P$ is limited by:
     For row-parallel: $Y = XW + b$ where $W = \begin{bmatrix} W_1 \\ W_2 \\ \vdots \\ W_P \end{bmatrix}$
 
     On GPU $i$:
+
     $$Z_i = X_i W_i$$
 
     The full result requires: $Y = \sum_{i=1}^{P} Z_i + b$
@@ -781,9 +785,11 @@ The tensor parallel degree $P$ is limited by:
     **Why bias must come after AllReduce:**
 
     If each GPU added $b$ before AllReduce:
+
     $$\hat{Z}_i = X_i W_i + b$$
 
     After AllReduce:
+
     $$\hat{Y} = \sum_{i=1}^{P} \hat{Z}_i = \sum_{i=1}^{P} (X_i W_i + b) = \sum_{i=1}^{P} X_i W_i + Pb = XW + Pb$$
 
     This is **wrong** — the bias is multiplied by $P$!
@@ -816,6 +822,7 @@ The tensor parallel degree $P$ is limited by:
     **Tensor size per AllReduce:**
 
     Each AllReduce synchronizes the activation tensor:
+
     $$\text{Tensor size} = b \times s \times d \times \text{sizeof(FP16)}$$
     $$= 4 \times 2048 \times 4096 \times 2 = 67,108,864 \text{ bytes} = 64 \text{ MB}$$
 
@@ -836,6 +843,7 @@ The tensor parallel degree $P$ is limited by:
     **Per-GPU bandwidth calculation:**
 
     In ring AllReduce, each GPU sends and receives:
+
     $$V_{\text{per-GPU}} = 2 \times \frac{P-1}{P} \times 64 \text{ MB} = 112 \text{ MB per AllReduce}$$
 
     With 2 AllReduces: $224$ MB per GPU per layer.
@@ -856,6 +864,7 @@ The tensor parallel degree $P$ is limited by:
     **Compute per layer (forward pass):**
 
     For a Transformer layer:
+
     $$C_{\text{layer}} \approx 4bsd^2 + 2bs^2d$$
 
     With $d = 4096$, $s = 2048$:
@@ -877,6 +886,7 @@ The tensor parallel degree $P$ is limited by:
     Volume per layer: 224 MB = $2.24 \times 10^8$ bytes
 
     Using bandwidth-dominated model (2 AllReduces):
+
     $$T_{\text{comm}} = \frac{V_{\text{layer}}}{\beta} = \frac{2.24 \times 10^8}{900 \times 10^9} = 249 \text{ μs}$$
 
     **Compute-communication ratio:**
@@ -916,12 +926,15 @@ The tensor parallel degree $P$ is limited by:
     $$\mu = \frac{1}{d} \sum_{j=1}^{d} X_j = \frac{1}{d} \sum_{i=1}^{P} \sum_{j \in \text{shard } i} X_j$$
 
     Each GPU computes local sum:
+
     $$S_i = \sum_{j \in \text{shard } i} X_j$$
 
     AllReduce to get global sum:
+
     $$S = \sum_{i=1}^{P} S_i$$
 
     Global mean:
+
     $$\mu = \frac{S}{d}$$
 
     **Global variance:**
@@ -929,12 +942,15 @@ The tensor parallel degree $P$ is limited by:
     $$\sigma^2 = \frac{1}{d} \sum_{j=1}^{d} (X_j - \mu)^2 = \frac{1}{d} \sum_{j=1}^{d} X_j^2 - \mu^2$$
 
     Each GPU computes local sum of squares:
+
     $$Q_i = \sum_{j \in \text{shard } i} X_j^2$$
 
     AllReduce to get global sum of squares:
+
     $$Q = \sum_{i=1}^{P} Q_i$$
 
     Global variance:
+
     $$\sigma^2 = \frac{Q}{d} - \mu^2$$
 
     **Complete algorithm:**
@@ -1004,6 +1020,7 @@ The tensor parallel degree $P$ is limited by:
     - Each $Y_i$ contains complete elements (not partial sums)
 
     GeLU is element-wise:
+
     $$\text{GeLU}([Y_0 | Y_1 | \cdots]) = [\text{GeLU}(Y_0) | \text{GeLU}(Y_1) | \cdots]$$
 
     Each GPU applies GeLU to its local shard independently. No communication needed!
@@ -1023,6 +1040,7 @@ The tensor parallel degree $P$ is limited by:
     ```
 
     This changes the mathematical function:
+
     $$\text{Original: } \text{GeLU}(XW_1)W_2$$
     $$\text{Modified: } \text{GeLU}(XW_1 W_2)$$
 
@@ -1031,6 +1049,7 @@ The tensor parallel degree $P$ is limited by:
     **What goes wrong mathematically:**
 
     The MLP's expressive power comes from the non-linearity between layers. Without it:
+
     $$XW_1W_2 = X(W_1W_2) = XW_{\text{combined}}$$
 
     This collapses to a single linear layer. The GeLU must break this composition.
@@ -1052,6 +1071,7 @@ The tensor parallel degree $P$ is limited by:
     **The problem:**
 
     With $h = 32$ heads and $P = 6$ GPUs:
+
     $$\frac{h}{P} = \frac{32}{6} = 5.33...$$
 
     Heads don't divide evenly! Each GPU can't have the same number of heads.
@@ -1081,6 +1101,7 @@ The tensor parallel degree $P$ is limited by:
     **Option 2: Pad attention heads**
 
     Add dummy heads to make divisible:
+
     $$h' = \lceil h / P \rceil \times P = \lceil 32/6 \rceil \times 6 = 6 \times 6 = 36$$
 
     Add 4 dummy heads (set to zero or mask out).
@@ -1135,9 +1156,11 @@ The tensor parallel degree $P$ is limited by:
     **Gradient with respect to $W_i$ (local weight shard):**
 
     Using chain rule:
+
     $$\frac{\partial L}{\partial W_i} = \frac{\partial Y_i}{\partial W_i}^T \frac{\partial L}{\partial Y_i}$$
 
     Since $Y_i = XW_i$:
+
     $$\frac{\partial L}{\partial W_i} = X^T \frac{\partial L}{\partial Y_i}$$
 
     **Analysis:**
@@ -1152,12 +1175,15 @@ The tensor parallel degree $P$ is limited by:
     **Gradient with respect to $X$:**
 
     Using chain rule:
+
     $$\frac{\partial L}{\partial X} = \sum_{j=1}^{d_{out}} \frac{\partial L}{\partial Y_j} \frac{\partial Y_j}{\partial X}$$
 
     Since $Y = XW$:
+
     $$\frac{\partial L}{\partial X} = \frac{\partial L}{\partial Y} W^T$$
 
     Expanding with column partitioning:
+
     $$= \frac{\partial L}{\partial Y} [W_0 | W_1 | \cdots | W_{P-1}]^T$$
 
     $$= \frac{\partial L}{\partial Y} \begin{bmatrix} W_0^T \\ W_1^T \\ \vdots \\ W_{P-1}^T \end{bmatrix}$$
@@ -1171,6 +1197,7 @@ The tensor parallel degree $P$ is limited by:
     GPU $i$ can compute: $\frac{\partial L}{\partial Y_i} W_i^T \in \mathbb{R}^{m \times d_{in}}$
 
     But the full gradient is the **sum** over all GPUs:
+
     $$\frac{\partial L}{\partial X} = \sum_{i=0}^{P-1} \left( \frac{\partial L}{\partial Y_i} W_i^T \right)$$
 
     $$\boxed{\nabla_X L \text{ requires AllReduce}}$$

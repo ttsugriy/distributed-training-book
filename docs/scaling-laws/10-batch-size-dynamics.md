@@ -366,19 +366,23 @@ When noise scale drops, safe to increase batch size.
     **Set up equations:**
 
     From $S(256) = 100,000$:
+
     $$S_{\min} + \frac{S_{\text{noise}}}{256} = 100,000$$
 
     From $S(1024) = 28,000$:
+
     $$S_{\min} + \frac{S_{\text{noise}}}{1024} = 28,000$$
 
     **Solve:**
 
     Subtract second from first:
+
     $$S_{\text{noise}} \left(\frac{1}{256} - \frac{1}{1024}\right) = 72,000$$
     $$S_{\text{noise}} \times \frac{3}{1024} = 72,000$$
     $$S_{\text{noise}} = 24,576,000$$
 
     Substitute back:
+
     $$S_{\min} = 28,000 - \frac{24,576,000}{1024} = 28,000 - 24,000 = 4,000$$
 
     **Verify with B=4096:**
@@ -389,6 +393,7 @@ When noise scale drops, safe to increase batch size.
     **Estimate $B_{\text{crit}}$:**
 
     The critical batch size is where noise and curvature contributions are equal:
+
     $$\frac{S_{\text{noise}}}{B_{\text{crit}}} = S_{\min}$$
     $$B_{\text{crit}} = \frac{S_{\text{noise}}}{S_{\min}} = \frac{24,576,000}{4,000} = \boxed{6,144}$$
 
@@ -456,6 +461,7 @@ When noise scale drops, safe to increase batch size.
     $$\Delta w_l = -\eta \cdot \phi_l \cdot \nabla w_l$$
 
     Where the trust ratio is:
+
     $$\phi_l = \frac{||w_l||}{||\nabla w_l||}$$
 
     (ignoring weight decay for simplicity)
@@ -540,12 +546,15 @@ When noise scale drops, safe to increase batch size.
     **Dynamic batch size:**
 
     - First half ($N/2$ tokens) at 1M tokens/step:
+
     $$\text{Updates}_1 = \frac{N/2}{1\text{M}} = \frac{N}{2\text{M}}$$
 
     - Second half ($N/2$ tokens) at 4M tokens/step:
+
     $$\text{Updates}_2 = \frac{N/2}{4\text{M}} = \frac{N}{8\text{M}}$$
 
     - Total dynamic updates:
+
     $$\text{Updates}_{\text{dynamic}} = \frac{N}{2\text{M}} + \frac{N}{8\text{M}} = \frac{4N + N}{8\text{M}} = \frac{5N}{8\text{M}}$$
 
     **Reduction:**

@@ -133,7 +133,6 @@ from dataclasses import dataclass
 import numpy as np
 from functools import cached_property
 
-
 @dataclass(frozen=True)
 class MeshCoordinate:
     """Immutable coordinate in a device mesh."""
@@ -147,7 +146,6 @@ class MeshCoordinate:
         coords = list(self.coords)
         coords[axis] = value
         return MeshCoordinate(tuple(coords))
-
 
 class DeviceMesh:
     """
@@ -299,7 +297,6 @@ class DeviceMesh:
 
     def __repr__(self) -> str:
         return f"DeviceMesh(shape={self._shape}, axes={self._axis_names})"
-
 
 def create_device_mesh(
     shape: Tuple[int, ...],
@@ -477,7 +474,6 @@ def create_hierarchical_mesh(
     devices = np.arange(num_nodes * gpus_per_node).reshape(num_nodes, gpus_per_node)
     return DeviceMesh(devices, axis_names=axis_names)
 
-
 # Example: 64 nodes × 8 GPUs
 mesh = create_hierarchical_mesh(
     num_nodes=64,
@@ -513,7 +509,6 @@ def reshape_mesh(
     devices = mesh._devices.reshape(new_shape)
     return DeviceMesh(devices, axis_names=new_axis_names)
 
-
 # Example: Convert 2D to 3D
 mesh_2d = create_device_mesh((4, 8), ["a", "b"])  # 32 devices
 mesh_3d = reshape_mesh(mesh_2d, (2, 4, 4), ["dp", "pp", "tp"])
@@ -537,7 +532,6 @@ def transpose_mesh(
     devices = np.transpose(mesh._devices, axes)
     new_names = [mesh.axis_names[i] for i in axes]
     return DeviceMesh(devices, axis_names=new_names)
-
 
 # Example: Swap DP and TP axes
 mesh = create_device_mesh((4, 8), ["dp", "tp"])
@@ -574,7 +568,6 @@ def get_submesh(
 
     return DeviceMesh(devices, axis_names=new_names)
 
-
 # Example: Get the TP mesh for a specific DP rank
 mesh = create_device_mesh((4, 8), ["dp", "tp"])
 tp_mesh_dp0 = get_submesh(mesh, "dp", 0)  # Shape (8,), devices [0..7]
@@ -590,11 +583,9 @@ The mesh abstraction enables declarative sharding specifications.
 from enum import Enum
 from typing import Dict, List, Sequence
 
-
 class PlacementType(Enum):
     SHARD = "shard"      # Tensor is sharded along this axis
     REPLICATE = "replicate"  # Tensor is replicated along this axis
-
 
 @dataclass
 class Placement:
@@ -602,7 +593,6 @@ class Placement:
     type: PlacementType
     mesh_dim: str
     tensor_dim: Optional[int] = None  # For SHARD: which tensor dim to shard
-
 
 class ShardingSpec:
     """
@@ -665,7 +655,6 @@ class ShardingSpec:
 
         return local_tensor.contiguous()
 
-
 # Example usage
 mesh = create_device_mesh((4, 2), ["dp", "tp"])
 spec = ShardingSpec(mesh, [
@@ -723,7 +712,6 @@ def redistribute(
 
     return result
 
-
 def _allgather_tensor(
     tensor: torch.Tensor,
     dim: int,
@@ -734,7 +722,6 @@ def _allgather_tensor(
     gather_list = [torch.empty_like(tensor) for _ in range(world_size)]
     dist.all_gather(gather_list, tensor, group=group)
     return torch.cat(gather_list, dim=dim)
-
 
 def _reshard_alltoall(
     tensor: torch.Tensor,
@@ -888,7 +875,6 @@ Given hardware topology, construct optimal mesh automatically.
 from dataclasses import dataclass
 from typing import Optional
 
-
 @dataclass
 class HardwareTopology:
     """Description of cluster hardware."""
@@ -896,7 +882,6 @@ class HardwareTopology:
     gpus_per_node: int
     intra_node_bandwidth: float  # GB/s (NVLink)
     inter_node_bandwidth: float  # GB/s (Network)
-
 
 def auto_mesh(
     topology: HardwareTopology,
@@ -957,7 +942,6 @@ def auto_mesh(
     devices = np.arange(total_gpus).reshape(shape)
 
     return DeviceMesh(devices, axis_names=["dp", "pp", "tp"])
-
 
 # Example
 topology = HardwareTopology(

@@ -383,6 +383,7 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     **From the 50B data point (50% accuracy):**
 
     At 50% accuracy, the sigmoid argument is 0:
+
     $$\sigma(0) = 0.5 \implies \frac{L_c - L_{50B}}{\tau} = 0$$
 
     $$\boxed{L_c = L_{50B}}$$
@@ -392,6 +393,7 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     $$0.05 = \frac{1}{1 + e^{-(L_c - L_{10B})/\tau}}$$
 
     Solving for the exponent:
+
     $$1 + e^{-(L_c - L_{10B})/0.1} = 20$$
     $$e^{-(L_c - L_{10B})/0.1} = 19$$
     $$-(L_c - L_{10B})/0.1 = \ln(19) = 2.94$$
@@ -449,9 +451,11 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     **Mathematical justification:**
 
     At interpolation threshold:
+
     $$N \approx D_{\text{train}}$$
 
     Scaling to $2N$ while keeping $D$ fixed:
+
     $$\frac{N_{\text{new}}}{D} = 2 \gg 1$$
 
     This moves firmly into the overparameterized regime where implicit regularization helps generalization.
@@ -462,6 +466,7 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     **Compute required for 60B Chinchilla-optimal:**
 
     Using $D^* = 20N$ and $C = 6ND$:
+
     $$C_{\text{needed}} = 6 \times N \times 20N = 120N^2$$
     $$C_{\text{needed}} = 120 \times (60 \times 10^9)^2 = 120 \times 3.6 \times 10^{21}$$
     $$C_{\text{needed}} = 4.32 \times 10^{23} \text{ FLOPs}$$

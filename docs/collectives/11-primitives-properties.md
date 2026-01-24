@@ -531,9 +531,11 @@ gradients = handle.wait()  # Eventually complete
     **Proof that Gather(Scatter(x)) = x on root:**
 
     **Scatter operation:** Root sends chunk $i$ to process $i$:
+
     $$\text{Scatter}([x_0, x_1, ..., x_{P-1}]) \to (P_0: x_0, P_1: x_1, ..., P_{P-1}: x_{P-1})$$
 
     **Gather operation:** Root receives chunk from each process and concatenates:
+
     $$\text{Gather}(P_0: y_0, P_1: y_1, ..., P_{P-1}: y_{P-1}) \to [y_0, y_1, ..., y_{P-1}]$$
 
     **Composition:**

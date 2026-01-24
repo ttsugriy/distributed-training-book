@@ -1036,6 +1036,7 @@ Training Mixtral with 8 experts:
     | **Total static** | **17.5 GB** |
 
     With ZeRO-1 across DP=8:
+
     $$M_{opt}^{ZeRO1} = 13.1 / 8 = 1.64 \text{ GB}$$
 
     **Total static with ZeRO-1:** 5.96 GB
@@ -1045,6 +1046,7 @@ Training Mixtral with 8 experts:
     Sequence per GPU: $256K / CP = 32K$ tokens
 
     Per layer (with TP=8):
+
     $$M_{act}^{layer} = B \times \frac{S}{CP} \times H \times 34 / TP$$
 
     Assuming B=2, H=8192, 80 layers, 10 layers/stage:
@@ -1052,6 +1054,7 @@ Training Mixtral with 8 experts:
     $$M_{act} = 10 \times 2 \times 32768 \times 8192 \times 34 / 8 = 18.2 \text{ GB (no ckpt)}$$
 
     With activation checkpointing (√10 ≈ 3 interval):
+
     $$M_{act}^{ckpt} \approx 6 \text{ GB}$$
 
     **KV cache for ring attention:**
@@ -1088,6 +1091,7 @@ Training Mixtral with 8 experts:
     **Token dispatch calculation:**
 
     With uniform routing, each expert receives:
+
     $$\text{tokens per expert} = \frac{\text{total tokens} \times k}{\text{num experts}} = \frac{16384 \times 2}{64} = 512$$
 
     **Tokens each EP rank sends:**
@@ -1108,6 +1112,7 @@ Training Mixtral with 8 experts:
     **AlltoAll volume:**
 
     Assuming hidden dimension H=4096 and fp16:
+
     $$\text{bytes per token} = H \times 2 = 8192 \text{ bytes}$$
 
     **Send volume per rank:**
@@ -1159,6 +1164,7 @@ Training Mixtral with 8 experts:
     $$M_{KV}^{layer} = 2 \times B \times S_{local} \times H \times 2 \text{ bytes}$$
 
     For B=2:
+
     $$M_{KV}^{layer} = 2 \times 2 \times 16384 \times 8192 \times 2 = 1.07 \text{ GB}$$
 
     **With double buffering for overlap:**
@@ -1216,9 +1222,11 @@ Training Mixtral with 8 experts:
     **Capacity calculation:**
 
     With 8 experts and uniform routing, each expert would receive:
+
     $$\text{expected tokens} = \frac{\text{total tokens}}{8} = 12.5\%$$
 
     Expert capacity with capacity_factor=1.25:
+
     $$\text{capacity} = \text{capacity\_factor} \times \frac{\text{total}}{8} = 1.25 \times 12.5\% = 15.625\%$$
 
     For 1000 tokens: capacity = 156 tokens per expert
@@ -1331,6 +1339,7 @@ Training Mixtral with 8 experts:
     **Pessimistic estimate (ring-based at scale):**
 
     If latency dominates at 64K scale:
+
     $$MFU_{new} \approx 30-35\%$$
 
     **Predicted MFU:**

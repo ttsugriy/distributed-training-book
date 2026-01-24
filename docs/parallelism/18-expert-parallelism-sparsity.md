@@ -1045,7 +1045,6 @@ class MoETransformerBlock(nn.Module):
 
         return x, aux_loss
 
-
 class MoETransformer(nn.Module):
     """
     Full MoE Transformer with alternating dense and MoE layers.
@@ -1124,6 +1123,7 @@ class MoETransformer(nn.Module):
     $$V_{\text{dispatch}} = 896 \times 4096 \times 2 = \boxed{7.34 \text{ MB per GPU}}$$
 
     For the full forward (dispatch + combine):
+
     $$V_{\text{total}} = 2 \times V_{\text{dispatch}} = \boxed{14.68 \text{ MB per GPU}}$$
 
     **(b) 50% tokens to expert 0:**
@@ -1137,16 +1137,19 @@ class MoETransformer(nn.Module):
     **Volume from GPU 0 (hosts expert 0):**
 
     GPU 0 sends 512 tokens to itself (no network), sends $7 \times 73 = 511$ to others:
+
     $$V_{\text{GPU0 send}} = 511 \times 4096 \times 2 = 4.19 \text{ MB}$$
 
     **Volume from GPU $i \neq 0$:**
 
     Sends 512 tokens to GPU 0, sends 73 tokens to each of 6 other GPUs (excluding self):
+
     $$V_{\text{GPUi send}} = (512 + 6 \times 73) \times 4096 \times 2 = 950 \times 4096 \times 2 = 7.78 \text{ MB}$$
 
     **GPU 0 receives:**
 
     Receives 512 tokens from each of 7 other GPUs:
+
     $$V_{\text{GPU0 recv}} = 7 \times 512 \times 4096 \times 2 = 29.4 \text{ MB}$$
 
     **Comparison:**
@@ -1406,7 +1409,6 @@ class MoETransformer(nn.Module):
 
             return dispatch_mask, combine_weights, top_indices
 
-
     class ExpertChoiceMoE(nn.Module):
         """MoE layer using Expert Choice routing."""
         def __init__(
@@ -1469,6 +1471,7 @@ class MoETransformer(nn.Module):
     1. **By construction**: Each expert selects exactly $C = \lceil \frac{T \cdot c}{E} \rceil$ tokens using top-k.
 
     2. **Capacity allocation**: With $T$ total tokens and $E$ experts:
+
        $$\text{Tokens per expert} = C = \frac{T \cdot c}{E}$$
 
     3. **Total capacity**: $E \times C = T \cdot c$ slots available.
@@ -1616,7 +1619,6 @@ class MoETransformer(nn.Module):
 
             return x, next_routing
 
-
     class OverlappedMoEModel(nn.Module):
         """Model with pipelined AlltoAll overlap."""
         def __init__(self, num_layers, hidden_dim, num_heads, ffn_dim, num_experts):
@@ -1662,9 +1664,11 @@ class MoETransformer(nn.Module):
     $$\text{Overlap fraction} = \min\left(1, \frac{T_{\text{attention}}}{T_{\text{AlltoAll}}}\right)$$
 
     If attention takes 10ms and AlltoAll takes 5ms:
+
     $$\text{Overlap} = 100\% \text{ (fully hidden)}$$
 
     If attention takes 5ms and AlltoAll takes 10ms:
+
     $$\text{Overlap} = 50\% \text{ (5ms exposed)}$$
 
     $$\boxed{\text{Overlap requires: } T_{\text{compute}} > T_{\text{comm}} \text{ and no data dependencies}}$$
@@ -1988,6 +1992,7 @@ class MoETransformer(nn.Module):
     **Auxiliary Loss Formulation:**
 
     The load balancing auxiliary loss is:
+
     $$\mathcal{L}_{aux} = \alpha \cdot E \cdot \sum_{i=1}^{E} f_i \cdot p_i$$
 
     Where:
@@ -2006,6 +2011,7 @@ class MoETransformer(nn.Module):
     For softmax: $p_i = \text{softmax}(z_i) = \frac{e^{z_i}}{\sum_j e^{z_j}}$
 
     The derivative:
+
     $$\frac{\partial p_j}{\partial z_{t,i}} = p_i(\delta_{ij} - p_j) / T$$
 
     Where $T$ = number of tokens and $\delta_{ij}$ is Kronecker delta.
@@ -2029,9 +2035,11 @@ class MoETransformer(nn.Module):
     **Gradients:**
 
     For expert 0 (overloaded):
+
     $$\frac{\partial \mathcal{L}_{aux}}{\partial z_0} \propto p_0 (f_0 - \bar{f}) = 0.60 \times (0.60 - 0.52) = 0.60 \times 0.08 = \boxed{+0.048}$$
 
     For expert 1 (underloaded):
+
     $$\frac{\partial \mathcal{L}_{aux}}{\partial z_1} \propto p_1 (f_1 - \bar{f}) = 0.40 \times (0.40 - 0.52) = 0.40 \times (-0.12) = \boxed{-0.048}$$
 
     **Interpretation:**
@@ -2053,6 +2061,7 @@ class MoETransformer(nn.Module):
     $$\bar{f} = 0.50 \times 0.50 + 0.50 \times 0.50 = 0.50$$
 
     Gradients become:
+
     $$\frac{\partial \mathcal{L}_{aux}}{\partial z_i} \propto 0.50 \times (0.50 - 0.50) = 0$$
 
     **No gradient at perfect balance** - the equilibrium is stable.
@@ -2102,6 +2111,7 @@ class MoETransformer(nn.Module):
     **Summary:**
 
     The auxiliary loss gradient for an expert is proportional to:
+
     $$\nabla_{z_i} \mathcal{L}_{aux} \propto p_i \cdot (f_i - \bar{f})$$
 
     - **Overloaded experts** ($f_i > \bar{f}$): Positive gradient → probability decreases

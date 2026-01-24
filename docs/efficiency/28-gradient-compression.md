@@ -73,7 +73,6 @@ class QuantizedTensor:
         """Reconstruct float tensor."""
         return self.scale * (self.data.astype(np.float32) - self.zero_point)
 
-
 class NaiveQuantizer:
     """Simple min-max quantization."""
 
@@ -230,7 +229,6 @@ class TernGradQuantizer:
         """2 bits per element (can encode 3 values)."""
         return 2 / 32  # 16x compression
 
-
 class PackedTernaryGradient:
     """Pack ternary gradients efficiently."""
 
@@ -332,7 +330,6 @@ class TopKSparsifier:
         """Approximate compression ratio."""
         # Index (4 bytes) + value (4 bytes) per selected element
         return self.k_ratio * (32 + 32) / 32
-
 
 class RandomKSparsifier:
     """Random-K sparsification with unbiased estimation."""
@@ -676,7 +673,6 @@ class PowerSGD:
         original = self.m * self.n
         compressed = self.rank * (self.m + self.n)
         return compressed / original
-
 
 class PowerSGDOptimizer:
     """Optimizer wrapper with PowerSGD compression."""
@@ -1025,7 +1021,6 @@ class CompressionMethod(Enum):
     LOW_RANK = "low_rank"
     HYBRID = "hybrid"
 
-
 @dataclass
 class ClusterSpec:
     """Cluster hardware specification."""
@@ -1033,7 +1028,6 @@ class ClusterSpec:
     inter_node_bandwidth_gbps: float  # Network bandwidth
     gpus_per_node: int
     num_nodes: int
-
 
 class CompressionAdvisor:
     """Recommend compression strategy based on hardware and workload."""
@@ -1150,6 +1144,7 @@ class CompressionAdvisor:
     $$= \frac{|g_i|}{||g||}$$
 
     Therefore:
+
     $$\mathbb{E}[Q_s(g_i)] = ||g|| \cdot \text{sign}(g_i) \cdot \frac{|g_i|}{||g||} = g_i$$
 
     $$\boxed{\mathbb{E}[Q_s(g)] = g}$$
@@ -1161,6 +1156,7 @@ class CompressionAdvisor:
     $$\mathbb{E}[\xi_i^2] = \left(\frac{\ell + 1}{s}\right)^2 p + \left(\frac{\ell}{s}\right)^2 (1-p)$$
 
     After algebra:
+
     $$\text{Var}(\xi_i) = \frac{p(1-p)}{s^2}$$
 
     Since $p \leq 1$ and $p(1-p) \leq 1/4$:
@@ -1242,9 +1238,11 @@ class CompressionAdvisor:
     **Why errors stay bounded:**
 
     Error feedback ensures:
+
     $$e_{t+1} = e_t + g_t - \text{TopK}(e_t + g_t)$$
 
     The key insight: TopK always removes the largest values, so:
+
     $$||e_{t+1}||_\infty \leq ||e_t + g_t||_\infty \cdot (1 - k/d)$$
 
     With typical gradient decay during training, errors remain bounded.
@@ -1274,6 +1272,7 @@ class CompressionAdvisor:
     For hierarchical AllReduce (reduce within node, AllReduce across nodes, broadcast within node):
 
     Inter-node AllReduce dominates (64 nodes, ring algorithm):
+
     $$T_{inter} = \frac{2 \times 2 \text{ GB}}{12.5 \text{ GB/s}} \times \frac{63}{64} \approx 315 \text{ ms}$$
 
     **Communication-to-compute ratio:**
@@ -1284,9 +1283,11 @@ class CompressionAdvisor:
     **Required compression ratio:**
 
     To make communication ≤ compute:
+
     $$\text{Compression ratio} \geq \frac{315}{100} \approx 3.2×$$
 
     To overlap fully with compute:
+
     $$\text{Compression ratio} \geq \frac{315}{100} \approx 3.2×$$
 
     For safety margin, target **10× compression**.
@@ -1327,6 +1328,7 @@ class CompressionAdvisor:
     **PowerSGD compression ratio:**
 
     For a matrix $M \in \mathbb{R}^{m \times n}$, PowerSGD approximates:
+
     $$M \approx P Q^T$$
     where $P \in \mathbb{R}^{m \times r}$ and $Q \in \mathbb{R}^{n \times r}$.
 
@@ -1343,6 +1345,7 @@ class CompressionAdvisor:
     $$\text{Compression ratio} = \frac{4096 \times 4096}{r(4096 + 4096)} = \frac{16,777,216}{8192r}$$
 
     For 100× compression:
+
     $$100 = \frac{16,777,216}{8192r}$$
     $$r = \frac{16,777,216}{8192 \times 100} = \frac{16,777,216}{819,200} \approx 20.48$$
 
@@ -1357,11 +1360,13 @@ class CompressionAdvisor:
     For a matrix $G$ with singular values $\sigma_1 \geq \sigma_2 \geq ... \geq \sigma_n$:
 
     Best rank-$r$ approximation error (Eckart-Young theorem):
+
     $$||G - G_r||_F = \sqrt{\sum_{i=r+1}^{n} \sigma_i^2}$$
 
     **Typical gradient matrix spectrum:**
 
     Empirically, gradient matrices exhibit rapid singular value decay:
+
     $$\sigma_i \approx \sigma_1 \cdot i^{-\alpha}$$
 
     where $\alpha \approx 0.5$ to $1.0$ for typical training gradients.
@@ -1502,7 +1507,6 @@ class CompressionAdvisor:
             else:
                 _, sparse_values, mask, shape = compressed
                 return self.desparsify(sparse_values, mask, shape)
-
 
     def benchmark_hybrid():
         compressor = HybridCompressor()
@@ -1652,7 +1656,6 @@ class CompressionAdvisor:
 
             # Reconstruct
             return (P @ (P.T @ g @ Q) @ Q.T).reshape(grad.shape)
-
 
     def train_with_compression(compressor, compressor_name, epochs=100):
         # Data

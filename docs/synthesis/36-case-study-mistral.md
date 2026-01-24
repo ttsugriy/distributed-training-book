@@ -154,7 +154,6 @@ def sliding_window_mask(seq_len: int, window_size: int) -> torch.Tensor:
 
     return causal & window
 
-
 def sliding_window_attention_forward(
     q: torch.Tensor,  # [batch, heads, seq, dim]
     k: torch.Tensor,
@@ -483,7 +482,6 @@ class MixtralMoEBlock(nn.Module):
                 output[mask] += weights * expert_output
 
         return output, aux_loss
-
 
 class SwiGLUFFN(nn.Module):
     """SwiGLU FFN as used in Mistral/Mixtral."""
@@ -992,7 +990,6 @@ def compute_active_ratio(
 
     return active / total
 
-
 # Mixtral 8x7B
 ratio = compute_active_ratio(
     n_experts=8, top_k=2,
@@ -1041,6 +1038,7 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     $$w = \frac{C_{eff}}{L} = \frac{100,000}{32} = 3,125$$
 
     Round to power of 2 for efficiency:
+
     $$\boxed{w = 4096 \text{ tokens}}$$
 
     This gives effective context of $32 \times 4096 = 131K$ tokens.
@@ -1112,9 +1110,11 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     **Effective FLOPs per token:**
 
     For dense model with FFN FLOPs $F_{FFN}$:
+
     $$F_{MoE} = \frac{k}{E} \times E \times F_{FFN} = k \times F_{FFN}$$
 
     Wait—each token uses $k$ full experts, so:
+
     $$F_{MoE} = k \times F_{FFN} = 2 \times F_{FFN}$$
 
     But total model has $E$ experts worth of parameters.
@@ -1127,6 +1127,7 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     Chinchilla: $D_{opt} = 20N$ (optimal tokens = 20× parameters)
 
     For MoE, effective parameters for quality ≈ active parameters × scaling factor:
+
     $$N_{eff} \approx N_{active} \times \alpha$$
 
     Where $\alpha \approx 2-3$ (MoE quality multiplier from routing specialization).
@@ -1322,13 +1323,16 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     **Expected accepted tokens per iteration:**
 
     With acceptance probability $p$ per token:
+
     $$E[\text{accepted}] = \sum_{i=0}^{K} i \cdot p^i \cdot (1-p) + K \cdot p^K$$
 
     For $K=4$, $p=0.7$:
+
     $$E[\text{accepted}] = 0 \cdot 0.3 + 1 \cdot 0.7 \cdot 0.3 + 2 \cdot 0.49 \cdot 0.3 + 3 \cdot 0.343 \cdot 0.3 + 4 \cdot 0.2401$$
     $$= 0 + 0.21 + 0.294 + 0.309 + 0.960 = 1.77 \text{ tokens}$$
 
     Actually, simpler formula:
+
     $$E[\text{accepted}] = \frac{1 - p^{K+1}}{1-p} - 1 = \frac{1 - 0.7^5}{0.3} - 1 = \frac{1 - 0.168}{0.3} - 1 = 1.77$$
 
     **Time analysis:**

@@ -455,7 +455,6 @@ class ZeROParameter:
         """Get gradient shard after reduce-scatter."""
         return self.shard.grad
 
-
 class ZeROLinear(nn.Module):
     """Linear layer with ZeRO-3 parameter sharding."""
 
@@ -966,6 +965,7 @@ Each stage has its own ZeRO group for sharding.
     **Standard Data Parallel (AllReduce):**
 
     AllReduce uses ring algorithm with volume:
+
     $$V_{\text{AllReduce}} = 2\Psi \times \frac{P-1}{P} \approx 2\Psi \text{ (for large } P \text{)}$$
 
     This is for gradient synchronization in fp16.
@@ -1028,6 +1028,7 @@ Each stage has its own ZeRO group for sharding.
     $$T_{\text{comm}} = L \times \left(3\alpha + \frac{6\Psi_L}{\beta}\right)$$
 
     For a model with $L$ layers and $\Psi = L \times \Psi_L$:
+
     $$T_{\text{comm}} = 3L\alpha + \frac{6\Psi}{\beta}$$
 
     **Compute time:**
@@ -1040,6 +1041,7 @@ Each stage has its own ZeRO group for sharding.
     $$\text{Overhead} = \frac{T_{\text{comm}}}{T_{\text{compute}}}$$
 
     For negligible overhead (< 5%):
+
     $$\frac{3L\alpha + \frac{6\Psi}{\beta}}{\frac{6\Psi \cdot B \cdot S}{150 \times 10^{12}}} < 0.05$$
 
     **Example calculation (7B model, L=32, S=2048):**
@@ -1050,9 +1052,11 @@ Each stage has its own ZeRO group for sharding.
     - Total comm: $\approx 421$ ms
 
     Compute time for batch $B$:
+
     $$T_{\text{compute}} = \frac{6 \times 7 \times 10^9 \times B \times 2048}{150 \times 10^{12}} = 0.574B \text{ seconds}$$
 
     For 5% overhead:
+
     $$\frac{0.421}{0.574B} < 0.05$$
     $$B > \frac{0.421}{0.05 \times 0.574} = 14.7$$
 
@@ -1203,7 +1207,6 @@ Each stage has its own ZeRO group for sharding.
                 self.partition_activations(k),
                 self.partition_activations(v)
             )
-
 
     class ZeROR_Attention(torch.nn.Module):
         """

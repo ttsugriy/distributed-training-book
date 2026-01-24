@@ -201,9 +201,11 @@ This hierarchy emerges directly from the bandwidth hierarchy of the cluster.
     **Time calculations:**
 
     (a) **NVLink** (900 GB/s):
+
     $$T_{NVLink} = \frac{4.28 \text{ GB}}{900 \text{ GB/s}} = 4.8 \text{ ms}$$
 
     (b) **InfiniBand** (50 GB/s):
+
     $$T_{IB} = \frac{4.28 \text{ GB}}{50 \text{ GB/s}} = 86 \text{ ms}$$
 
     **Conclusion:** Tensor parallelism over InfiniBand is 18× slower than NVLink. This is why TP stays within NVLink domains.

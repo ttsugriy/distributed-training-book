@@ -682,17 +682,21 @@ model = DDP(
     **Proof:**
 
     Starting from the definition:
+
     $$\nabla_\theta L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x, \theta)$$
 
     Since $B = \bigcup_{i=1}^{P} B_i$ with disjoint $B_i$:
+
     $$= \frac{1}{|B|} \sum_{i=1}^{P} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
 
     Multiplying and dividing by $|B_i|$:
+
     $$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \frac{1}{|B_i|} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
 
     $$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \nabla_\theta L_{B_i}(\theta)$$
 
     Substituting $|B_i| = w_i \cdot |B|$:
+
     $$= \frac{1}{|B|} \sum_{i=1}^{P} w_i \cdot |B| \cdot \nabla_\theta L_{B_i}(\theta)$$
 
     $$= \boxed{\sum_{i=1}^{P} w_i \cdot \nabla_\theta L_{B_i}(\theta)} \quad \square$$
@@ -824,6 +828,7 @@ model = DDP(
     $$\text{Overlap time} = T_{\text{bwd}}^{\text{total}} - T_{\text{bwd}}^{\text{first layer}} = 80 - 0.8 = 79.2 \text{ ms}$$
 
     Since total AR time is 100 ms and backward (after first layer) is 79.2 ms:
+
     $$\text{Overlapped communication} = \min(79.2, 100) = 79.2 \text{ ms}$$
 
     **Fraction overlapped:**
@@ -834,6 +839,7 @@ model = DDP(
     $$T_{\text{step}} = T_{\text{bwd}}^{\text{first layer}} + \max(T_{\text{bwd}}^{\text{remaining}}, T_{\text{AR}}^{\text{total}})$$
 
     Since AR (100 ms) > remaining backward (79.2 ms):
+
     $$T_{\text{step}} = 0.8 + 100 = \boxed{100.8 \text{ ms}}$$
 
     **Comparison:**
@@ -924,9 +930,11 @@ model = DDP(
     **Case 2: Direct Batch 128 (no accumulation)**
 
     Compute time scales linearly with batch size:
+
     $$T_{\text{compute}}^{\text{direct}} = \frac{128}{32} \times 100 = 400 \text{ ms}$$
 
     Total:
+
     $$T_{\text{direct}} = T_{\text{compute}}^{\text{direct}} + T_{\text{AR}} = 400 + 40 = \boxed{440 \text{ ms}}$$
 
     **Comparison:**
@@ -1002,6 +1010,7 @@ model = DDP(
     $$\mathbb{E}[f(\tau)] = \frac{1}{\tau_{\max} + 1} \sum_{\tau=0}^{\tau_{\max}} e^{-0.1\tau}$$
 
     This is a geometric series:
+
     $$= \frac{1}{16} \cdot \frac{1 - e^{-0.1 \times 16}}{1 - e^{-0.1}} = \frac{1}{16} \cdot \frac{1 - e^{-1.6}}{1 - e^{-0.1}}$$
 
     $$= \frac{1}{16} \cdot \frac{1 - 0.202}{1 - 0.905} = \frac{1}{16} \cdot \frac{0.798}{0.095} = \frac{8.4}{16} = 0.525$$
@@ -1032,9 +1041,11 @@ model = DDP(
     **Single reduction error:**
 
     For a single floating-point addition of two numbers $a$ and $b$:
+
     $$\text{fl}(a + b) = (a + b)(1 + \delta), \quad |\delta| \leq \epsilon$$
 
     The absolute error is:
+
     $$|error| \leq \epsilon \cdot |a + b|$$
 
     **Error accumulation in AllReduce:**
@@ -1057,6 +1068,7 @@ model = DDP(
     **Different reduction orders:**
 
     Two orderings can differ by at most:
+
     $$|\text{difference}| \leq 2 \cdot (P-1) \cdot \epsilon \cdot |g_{\text{sum}}|$$
 
     (Factor of 2 because each ordering can err in opposite directions)

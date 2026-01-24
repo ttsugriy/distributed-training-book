@@ -596,7 +596,6 @@ class LLaMA3Analyzer:
 
         return {'seconds': seconds, 'days': days}
 
-
 def analyze_llama3():
     """Run the analysis."""
     analyzer = LLaMA3Analyzer()
@@ -636,7 +635,6 @@ def analyze_llama3():
 
     return analyzer
 
-
 if __name__ == "__main__":
     analyze_llama3()
 ```
@@ -671,6 +669,7 @@ if __name__ == "__main__":
     **Pipeline Bubble Calculation:**
 
     Using 1F1B schedule with $m$ microbatches and $p$ stages:
+
     $$\text{Bubble fraction} = \frac{p-1}{m+p-1}$$
 
     Assuming $m = 64$ microbatches:
@@ -722,9 +721,11 @@ if __name__ == "__main__":
     $$\frac{T_{compute}}{2} + T_{comm,16} < T_{compute} + T_{comm,8}$$
 
     Solving for typical transformer layer with H=16384:
+
     $$M = 2 \times B \times S \times H = 2 \times 1 \times 8192 \times 16384 = 268 \text{ MB}$$
 
     At this size, NVLink advantage dominates. TP=16 only wins when:
+
     $$\boxed{M > 2 \text{ GB (rarely practical for single AllReduce)}}$$
 
     **Conclusion:** TP=8 (node-local) is almost always better than TP=16 due to NVLink's 18× bandwidth advantage.
@@ -739,6 +740,7 @@ if __name__ == "__main__":
     **Overlap requirement:**
 
     To fully hide communication, compute must take at least as long:
+
     $$T_{compute} \geq T_{comm} = 4 \text{ seconds}$$
 
     **LLaMA 3 405B compute per forward pass:**
@@ -746,9 +748,11 @@ if __name__ == "__main__":
     FLOPs per token: $2\Psi = 2 \times 405 \times 10^9 = 810$ GFLOPs
 
     For batch of 1M tokens:
+
     $$F_{fwd} = 810 \times 10^9 \times 10^6 = 8.1 \times 10^{17} \text{ FLOPs}$$
 
     At 50% MFU on H100 (990 TFLOP/s effective):
+
     $$T_{compute} = \frac{8.1 \times 10^{17}}{990 \times 10^{12}} = 818 \text{ seconds (per GPU)}$$
 
     Wait—this is for full model. Per DP shard with FSDP, compute is distributed.
@@ -770,6 +774,7 @@ if __name__ == "__main__":
     KV cache per layer: $2 \times B \times S \times H$ (K and V, in FP16)
 
     For S=128K, H=16384, B=1:
+
     $$M_{KV} = 2 \times 2 \times 1 \times 128000 \times 16384 = 8.4 \text{ GB per layer}$$
 
     Total for 126 layers: $8.4 \times 126 = 1,058$ GB (impossible on single GPU!)
@@ -788,9 +793,11 @@ if __name__ == "__main__":
     - Number of sends per layer: $CP - 1 = 7$
 
     Total KV communication per layer:
+
     $$\text{Comm} = 7 \times 1.05 \text{ GB} = 7.35 \text{ GB}$$
 
     At 50 GB/s (IB between nodes):
+
     $$T_{KV} = \frac{7.35}{50} = 147 \text{ ms per layer}$$
 
     **Comparison:**
@@ -842,9 +849,11 @@ if __name__ == "__main__":
     **Critical batch size theory:**
 
     Compute efficiency when $B < B_{crit}$:
+
     $$\eta = \frac{B}{B + B_{crit}}$$
 
     When $B > B_{crit}$:
+
     $$\eta \approx 1 - \frac{B_{crit}}{2B}$$
 
     **Phase 1: Early training (B=4M, B_crit=2M)**
@@ -868,6 +877,7 @@ if __name__ == "__main__":
     **What if batch size stayed at 4M?**
 
     Late training with B=4M, B_crit=10M:
+
     $$\eta_{fixed} = \frac{4M}{4M + 10M} = 28.6\%$$
 
     **Summary:**

@@ -128,7 +128,6 @@ class OffloadConfig:
     num_threads: int = 4  # CPU threads for optimizer step
     overlap_comm: bool = True  # Overlap CPU-GPU transfers
 
-
 class CPUOffloadOptimizer:
     """
     Optimizer that offloads states to CPU memory.
@@ -374,7 +373,6 @@ from dataclasses import dataclass
 import numpy as np
 import torch
 
-
 @dataclass
 class NVMeConfig:
     """Configuration for NVMe offloading."""
@@ -383,7 +381,6 @@ class NVMeConfig:
     aio_queue_depth: int = 8  # Concurrent I/O operations
     prefetch_depth: int = 2  # Layers to prefetch
     pin_memory: bool = True
-
 
 class NVMeOffloadManager:
     """
@@ -763,12 +760,10 @@ from collections import OrderedDict
 import threading
 import queue
 
-
 class OffloadTier(Enum):
     GPU = "gpu"
     CPU = "cpu"
     NVME = "nvme"
-
 
 @dataclass
 class TensorLocation:
@@ -778,7 +773,6 @@ class TensorLocation:
     size: int = 0
     is_loading: bool = False
     is_saving: bool = False
-
 
 @dataclass
 class OffloadSystemConfig:
@@ -801,7 +795,6 @@ class OffloadSystemConfig:
     # NVMe settings
     nvme_path: str = "/mnt/nvme/offload"
     use_compression: bool = False
-
 
 class UnifiedOffloadManager:
     """
@@ -1414,15 +1407,19 @@ PP naturally stages memory across time. Combine with offloading:
     **With compression:**
 
     Compressed size:
+
     $$M_{compressed} = \frac{10 \text{ GB}}{1.5} = 6.67 \text{ GB}$$
 
     Compression time (on CPU):
+
     $$T_{compress} = \frac{10 \text{ GB}}{2 \text{ GB/s}} = 5.0 \text{ seconds}$$
 
     Transfer time:
+
     $$T_{transfer} = \frac{6.67 \text{ GB}}{7 \text{ GB/s}} = 0.95 \text{ seconds}$$
 
     Total with compression:
+
     $$T_{with\_compress} = T_{compress} + T_{transfer} = 5.0 + 0.95 = 5.95 \text{ seconds}$$
 
     **Comparison:**

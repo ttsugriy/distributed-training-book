@@ -277,6 +277,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio.
     **Using the Chinchilla 20:1 rule:**
 
     From $C = 6ND$ and $D^* = 20N^*$:
+
     $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
 
     **Solving for optimal model size:**
@@ -365,6 +366,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio.
     | > 5.6 quadrillion | 7B overtrained |
 
     For context, ChatGPT reportedly serves ~100T tokens/day. At that rate:
+
     $$\text{Break-even time} = \frac{5.6 \times 10^{15}}{100 \times 10^{12}} \approx 56 \text{ days}$$
 
     For high-volume inference, overtraining pays off quickly.
@@ -419,6 +421,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio.
     $$L_{\text{MoE}} \propto \frac{1}{(N_{\text{active}})^\alpha \cdot (N_{\text{total}}/N_{\text{active}})^{\alpha/2}}$$
 
     The effective parameter count for loss scaling:
+
     $$N_{\text{eff}} = N_{\text{active}} \cdot \left(\frac{N_{\text{total}}}{N_{\text{active}}}\right)^{0.5} = 70\text{B} \cdot \left(\frac{1000\text{B}}{70\text{B}}\right)^{0.5}$$
 
     $$N_{\text{eff}} = 70\text{B} \cdot 3.78 = 265\text{B}$$

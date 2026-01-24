@@ -233,6 +233,7 @@ def measure_bandwidth(size_bytes, warmup=10, trials=100):
     **(a) Individual AllReduce per tensor (1 MB each):**
 
     Per tensor:
+
     $$T = 2(P-1)\alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
 
     $$= 2 \times 63 \times 2 \times 10^{-6} + \frac{126}{64} \times \frac{10^6}{50 \times 10^9}$$
@@ -240,6 +241,7 @@ def measure_bandwidth(size_bytes, warmup=10, trials=100):
     $$= 252 \text{ μs} + 1.97 \times 20 \text{ μs} = 252 \text{ μs} + 39.4 \text{ μs} = 291.4 \text{ μs}$$
 
     Total for 1000 tensors:
+
     $$T_{total}^{(a)} = 1000 \times 291.4 \text{ μs} = \boxed{291.4 \text{ ms}}$$
 
     **(b) One AllReduce of concatenated 1 GB tensor:**

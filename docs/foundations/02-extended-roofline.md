@@ -187,9 +187,11 @@ The extended roofline is our primary tool for analyzing distributed training bot
     **For H100 (1979 TFLOP/s peak):**
 
     NVLink (900 GB/s):
+
     $$I_{ridge}^{NVLink} = \frac{1979 \times 10^{12}}{900 \times 10^9} = 2,199 \text{ FLOPs/byte}$$
 
     InfiniBand (400 Gbps = 50 GB/s):
+
     $$I_{ridge}^{IB} = \frac{1979 \times 10^{12}}{50 \times 10^9} = 39,580 \text{ FLOPs/byte}$$
 
     **Ratio:**

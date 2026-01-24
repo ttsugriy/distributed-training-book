@@ -197,6 +197,7 @@ Key cost optimizations:
     **Spot effective time:**
 
     With checkpoint overhead and preemption losses:
+
     $$T_{eff} = T \times (1 + \text{checkpoint overhead} + \text{preemption overhead})$$
 
     **Preemption model:**
@@ -208,6 +209,7 @@ Key cost optimizations:
     - Total lost time: $\frac{c}{2} \times p \times T_{eff}$
 
     For hourly checkpoints ($c = 1$) with 5% overhead:
+
     $$T_{eff} = T(1.05 + 0.5p \times T_{eff})$$
 
     Solving: $T_{eff} = \frac{1.05T}{1 - 0.5p}$ (for small $pT$)
@@ -217,6 +219,7 @@ Key cost optimizations:
     $$T_{eff} = 2.67T$$
 
     Substituting:
+
     $$\frac{1.05}{1 - 0.5p} = 2.67$$
     $$1.05 = 2.67(1 - 0.5p)$$
     $$1.05 = 2.67 - 1.33p$$

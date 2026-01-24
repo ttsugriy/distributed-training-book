@@ -1097,12 +1097,15 @@ prof.export_chrome_trace("overlap_trace.json")
     We want to minimize per-bucket time $T(B) = L + B/\beta$ subject to effective throughput.
 
     Effective throughput:
+
     $$\text{Throughput} = \frac{B}{T(B)} = \frac{B}{L + B/\beta}$$
 
     To achieve 90% of peak throughput:
+
     $$\frac{B}{L + B/\beta} \geq 0.9\beta$$
 
     Solving:
+
     $$B \geq 0.9\beta L + 0.9B$$
     $$0.1B \geq 0.9\beta L$$
     $$B \geq 9\beta L = 9 \times 12.5 \times 10^9 \times 10^{-4} = 11.25\text{ MB}$$
@@ -1371,6 +1374,7 @@ prof.export_chrome_trace("overlap_trace.json")
     If we prefetch $k$ layers ahead, we have $k \times T_{\text{compute}}$ time to complete the all-gather.
 
     For full overlap:
+
     $$k \times T_{\text{compute}} \geq T_{\text{gather}}$$
     $$k \geq \frac{T_{\text{gather}}}{T_{\text{compute}}} = \frac{2\text{ms}}{8\text{ms}} = 0.25$$
 
@@ -1399,9 +1403,11 @@ prof.export_chrome_trace("overlap_trace.json")
     **Memory overhead:**
 
     Prefetching $k$ layers requires memory for:
+
     $$M_{\text{prefetch}} = k \times \frac{\text{Model size}}{L} = 1 \times \frac{\text{Model size}}{24}$$
 
     For a 70B model:
+
     $$M_{\text{prefetch}} = \frac{70\text{B} \times 2\text{ bytes}}{24} \approx 5.8\text{ GB}$$
 
     **What if compute were faster?**
@@ -1444,9 +1450,11 @@ prof.export_chrome_trace("overlap_trace.json")
     Time saved by overlap: $T_{\text{saved}} = T_{\text{sequential}} - T_{\text{total}} = 200 - 140 = 60\text{ms}$
 
     Overlap fraction:
+
     $$\text{Overlap} = \frac{T_{\text{saved}}}{\min(T_c, T_m)} = \frac{60}{80} = 75\%$$
 
     Alternatively, as fraction of communication hidden:
+
     $$\text{Comm hidden} = \frac{T_{\text{saved}}}{T_m} = \frac{60}{120} = 50\%$$
 
     **Analysis:**
@@ -1708,6 +1716,7 @@ prof.export_chrome_trace("overlap_trace.json")
     - Overhead: $4\Psi$ bytes (one extra gradient buffer)
 
     For 350M parameter model:
+
     $$\text{Overhead} = 350 \times 10^6 \times 4 = 1.4\text{ GB}$$
 
     **Trade-off summary:**

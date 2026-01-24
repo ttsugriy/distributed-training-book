@@ -137,7 +137,6 @@ class ShardedTensor:
         """Compute where this shard fits in global tensor."""
         return self.sharding_spec.offset_for_rank(self.rank)
 
-
 @dataclass
 class ShardingSpec:
     """How a tensor is sharded across ranks."""
@@ -1304,6 +1303,7 @@ class FaultTolerantTrainer:
     **System MTBF formula:**
 
     For independent components, failure rates add:
+
     $$\lambda_{system} = \sum_i n_i \cdot \lambda_i = \sum_i \frac{n_i}{MTBF_i}$$
 
     $$MTBF_{system} = \frac{1}{\lambda_{system}}$$
@@ -1470,11 +1470,13 @@ class FaultTolerantTrainer:
     For a parameter with shape $[D_0, D_1, ...]$:
 
     Each rank $r \in [0,7]$ holds:
+
     $$\text{shard}_r = \text{param}\left[\frac{r \cdot D_0}{8} : \frac{(r+1) \cdot D_0}{8}, :, ...\right]$$
 
     **Target sharding (TP=4):**
 
     Each rank $r' \in [0,3]$ needs:
+
     $$\text{shard}_{r'} = \text{param}\left[\frac{r' \cdot D_0}{4} : \frac{(r'+1) \cdot D_0}{4}, :, ...\right]$$
 
     **Resharding formula:**
@@ -1613,6 +1615,7 @@ class FaultTolerantTrainer:
     **Option 1: Keep per-GPU batch constant**
 
     New global batch:
+
     $$B_{new} = 32 \times 48 = \boxed{1536}$$
 
     **Linear scaling rule for LR:**
