@@ -156,6 +156,72 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
 1. Calculate the communication intensity of training a 7B parameter model with batch size 1M tokens across 64 GPUs using data parallelism.
 
+??? success "Solution"
+    **Given:**
+
+    - Parameters: $P = 7 \times 10^9$
+    - Tokens per step: $N = 1 \times 10^6$
+    - GPUs: 64 (data parallel)
+
+    **FLOPs per step:**
+
+    $$\text{FLOPs} = 6 \times P \times N = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
+
+    **Bytes communicated (AllReduce gradients in FP16):**
+
+    $$\text{Bytes} = 2 \times \frac{P-1}{P} \times \Psi \times 2 \approx 2 \times 7 \times 10^9 \times 2 = 2.8 \times 10^{10}$$
+
+    **Communication intensity:**
+
+    $$I_{net} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
+
+    This is far above the ridge point (~40,000 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
+
 2. An H100 DGX system has 900 GB/s NVLink bandwidth within the node and 400 Gbps InfiniBand across nodes. What's the ratio of ridge points for intra-node vs inter-node communication?
 
+??? success "Solution"
+    **Ridge point formula:**
+
+    $$I_{ridge} = \frac{\text{Peak FLOPs}}{\text{Bandwidth}}$$
+
+    **For H100 (1979 TFLOP/s peak):**
+
+    NVLink (900 GB/s):
+    $$I_{ridge}^{NVLink} = \frac{1979 \times 10^{12}}{900 \times 10^9} = 2,199 \text{ FLOPs/byte}$$
+
+    InfiniBand (400 Gbps = 50 GB/s):
+    $$I_{ridge}^{IB} = \frac{1979 \times 10^{12}}{50 \times 10^9} = 39,580 \text{ FLOPs/byte}$$
+
+    **Ratio:**
+    $$\frac{I_{ridge}^{IB}}{I_{ridge}^{NVLink}} = \frac{39,580}{2,199} \approx 18\times$$
+
+    **Implication:** Operations need 18× higher arithmetic intensity to be compute-bound over InfiniBand vs NVLink. This is why tensor parallelism (low intensity) uses NVLink, while data parallelism (high intensity) can use InfiniBand.
+
 3. You observe 35% MFU (Model FLOP Utilization) on a training run. Using the extended roofline, what are the possible bottlenecks and how would you diagnose which one dominates?
+
+??? success "Solution"
+    **Possible bottlenecks (65% of potential is lost):**
+
+    1. **Network-bound**: Communication not overlapped with compute
+    2. **Memory-bound**: Low arithmetic intensity operations (attention, LayerNorm)
+    3. **Pipeline bubbles**: Idle time at stage boundaries
+    4. **Load imbalance**: Some GPUs finishing before others
+    5. **Kernel inefficiency**: Suboptimal GPU kernels
+
+    **Diagnostic approach:**
+
+    | Symptom | Likely Cause | How to Check |
+    |---------|--------------|--------------|
+    | High NCCL time in profile | Network-bound | Profile shows exposed AllReduce |
+    | Low SM occupancy | Memory-bound | NSight shows memory stalls |
+    | Periodic idle gaps | Pipeline bubbles | Timeline shows stage gaps |
+    | Uneven GPU utilization | Load imbalance | Per-GPU profiling |
+
+    **Steps:**
+
+    1. Run profiler (PyTorch Profiler, NSight)
+    2. Check communication/compute overlap in timeline
+    3. Measure achieved bandwidth vs theoretical
+    4. Check arithmetic intensity of dominant operations
+    5. If pipeline parallel, calculate bubble fraction: $\frac{P-1}{P+M-1}$
+

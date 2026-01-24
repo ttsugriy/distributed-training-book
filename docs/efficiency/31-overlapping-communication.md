@@ -1019,15 +1019,706 @@ prof.export_chrome_trace("overlap_trace.json")
 
 1. **Overlap calculation**: A model has 10 layers, each taking 5ms for backward. Communication of each layer's gradients takes 3ms. With bucketing (2 layers per bucket), what's the maximum theoretical overlap? What's the total time?
 
+??? success "Solution"
+    **Configuration:**
+
+    - 10 layers, 5ms backward each → 50ms total backward compute
+    - 3ms communication per layer
+    - Bucketing: 2 layers/bucket → 5 buckets
+    - Per-bucket: 10ms compute, 6ms communication
+
+    **Without overlap (sequential):**
+
+    $$T_{\text{sequential}} = 50\text{ms (compute)} + 30\text{ms (comm)} = 80\text{ms}$$
+
+    **With overlap (pipelined):**
+
+    ```
+    Time:   0   10   20   30   40   50   56ms
+            |----|----|----|----|----|----|
+
+    Compute: [B1  ][B2  ][B3  ][B4  ][B5  ]
+    Comm:        [C1  ][C2  ][C3  ][C4  ][C5 ]
+                      ↑ overlap region ↑
+    ```
+
+    Since compute (10ms) > communication (6ms), communication is fully overlapped except for the last bucket.
+
+    **Overlap analysis:**
+
+    - Buckets 1-4: Communication fully overlapped with next bucket's compute
+    - Bucket 5: Communication cannot overlap (no more compute)
+
+    $$T_{\text{overlapped}} = 50\text{ms (compute)} + 6\text{ms (last bucket comm)} = 56\text{ms}$$
+
+    **Maximum theoretical overlap:**
+
+    $$\text{Overlap} = \frac{T_{\text{sequential}} - T_{\text{overlapped}}}{T_{\text{comm}}} = \frac{80 - 56}{30} = \frac{24}{30} = 80\%$$
+
+    Alternatively, 4 out of 5 bucket communications are fully overlapped.
+
+    | Metric | Value |
+    |--------|-------|
+    | Sequential time | 80ms |
+    | Overlapped time | **56ms** |
+    | Speedup | 1.43× |
+    | Overlap fraction | **80%** |
+
+    $$\boxed{T_{\text{total}} = 56\text{ms}; \text{ Overlap} = 80\%}$$
+
 2. **Bucket size optimization**: You have 1GB of gradients and 100 Gbps bandwidth. Communication latency is 100μs. Find the bucket size that minimizes per-bucket communication time. What's the optimal number of buckets?
+
+??? success "Solution"
+    **Parameters:**
+
+    - Total gradients: $G = 1\text{ GB} = 10^9$ bytes
+    - Bandwidth: $\beta = 100\text{ Gbps} = 12.5\text{ GB/s}$
+    - Latency: $L = 100\mu\text{s} = 10^{-4}\text{s}$
+
+    **Communication time for bucket of size $B$:**
+
+    $$T(B) = L + \frac{B}{\beta}$$
+
+    **Total time for $n = G/B$ buckets:**
+
+    $$T_{\text{total}} = n \cdot T(B) = \frac{G}{B}\left(L + \frac{B}{\beta}\right) = \frac{GL}{B} + \frac{G}{\beta}$$
+
+    The second term is fixed. Minimizing bucket overhead means balancing latency cost vs. throughput.
+
+    **For overlap, we want buckets small enough to overlap with compute, but large enough to amortize latency.**
+
+    **Per-bucket time minimization:**
+
+    We want to minimize per-bucket time $T(B) = L + B/\beta$ subject to effective throughput.
+
+    Effective throughput:
+    $$\text{Throughput} = \frac{B}{T(B)} = \frac{B}{L + B/\beta}$$
+
+    To achieve 90% of peak throughput:
+    $$\frac{B}{L + B/\beta} \geq 0.9\beta$$
+
+    Solving:
+    $$B \geq 0.9\beta L + 0.9B$$
+    $$0.1B \geq 0.9\beta L$$
+    $$B \geq 9\beta L = 9 \times 12.5 \times 10^9 \times 10^{-4} = 11.25\text{ MB}$$
+
+    **Optimal bucket size for 90% efficiency:**
+
+    $$B_{\text{opt}} \approx 9\beta L \approx 11.25\text{ MB}$$
+
+    **Number of buckets:**
+
+    $$n = \frac{G}{B_{\text{opt}}} = \frac{1000\text{ MB}}{11.25\text{ MB}} \approx 89 \text{ buckets}$$
+
+    **Verification:**
+
+    ```python
+    import numpy as np
+
+    G = 1e9  # 1 GB
+    beta = 12.5e9  # 12.5 GB/s
+    L = 100e-6  # 100 μs
+
+    def total_time(bucket_size):
+        n_buckets = G / bucket_size
+        time_per_bucket = L + bucket_size / beta
+        return n_buckets * time_per_bucket
+
+    def efficiency(bucket_size):
+        return bucket_size / (L * beta + bucket_size)
+
+    # Test various bucket sizes
+    bucket_sizes = np.logspace(6, 9, 20)  # 1MB to 1GB
+    for b in bucket_sizes:
+        n = G / b
+        t = total_time(b)
+        eff = efficiency(b)
+        print(f"Bucket: {b/1e6:.1f} MB, n={n:.0f}, time={t*1000:.2f} ms, eff={eff:.1%}")
+    ```
+
+    **Results:**
+
+    | Bucket Size | # Buckets | Total Time | Efficiency |
+    |-------------|-----------|------------|------------|
+    | 1 MB | 1000 | 180 ms | 44% |
+    | 10 MB | 100 | 90 ms | 89% |
+    | **11.25 MB** | **89** | **88.9 ms** | **90%** |
+    | 25 MB | 40 | 84 ms | 95% |
+    | 100 MB | 10 | 81 ms | 99% |
+
+    $$\boxed{B_{\text{opt}} \approx 11.25\text{ MB}; \text{ n} \approx 89 \text{ buckets for 90% efficiency}}$$
 
 3. **Stream scheduling**: Implement a simple two-stream scheduler that runs backward pass on one stream while performing AllReduce on another. Measure the overlap fraction achieved.
 
+??? success "Solution"
+    **Two-stream scheduler implementation:**
+
+    ```python
+    import torch
+    import torch.distributed as dist
+    import time
+
+    class TwoStreamScheduler:
+        def __init__(self, model):
+            self.model = model
+            self.compute_stream = torch.cuda.Stream()
+            self.comm_stream = torch.cuda.Stream()
+
+            # Gradient buckets
+            self.buckets = []
+            self.bucket_params = []
+            self._create_buckets()
+
+            # Timing
+            self.compute_time = 0
+            self.comm_time = 0
+            self.total_time = 0
+
+        def _create_buckets(self, bucket_size_mb=25):
+            """Group parameters into buckets."""
+            bucket_size_bytes = bucket_size_mb * 1024 * 1024
+            current_bucket = []
+            current_size = 0
+
+            for param in self.model.parameters():
+                if param.requires_grad:
+                    param_size = param.numel() * param.element_size()
+                    if current_size + param_size > bucket_size_bytes and current_bucket:
+                        self.bucket_params.append(current_bucket)
+                        current_bucket = []
+                        current_size = 0
+                    current_bucket.append(param)
+                    current_size += param_size
+
+            if current_bucket:
+                self.bucket_params.append(current_bucket)
+
+        def _allreduce_bucket(self, bucket_idx):
+            """AllReduce gradients for a bucket on comm stream."""
+            with torch.cuda.stream(self.comm_stream):
+                grads = [p.grad for p in self.bucket_params[bucket_idx] if p.grad is not None]
+                if grads:
+                    flat = torch.cat([g.view(-1) for g in grads])
+                    dist.all_reduce(flat)
+
+                    # Unflatten back
+                    offset = 0
+                    for g in grads:
+                        numel = g.numel()
+                        g.copy_(flat[offset:offset+numel].view_as(g))
+                        offset += numel
+
+        def backward_with_overlap(self, loss):
+            """Run backward with overlapped communication."""
+            start = time.time()
+
+            # Register hooks to trigger AllReduce when gradients are ready
+            bucket_ready = [False] * len(self.bucket_params)
+            grad_counts = [0] * len(self.bucket_params)
+            param_to_bucket = {}
+
+            for bucket_idx, params in enumerate(self.bucket_params):
+                for param in params:
+                    param_to_bucket[param] = bucket_idx
+
+            def make_hook(param):
+                def hook(grad):
+                    bucket_idx = param_to_bucket[param]
+                    grad_counts[bucket_idx] += 1
+
+                    # When all grads in bucket are ready, launch AllReduce
+                    if grad_counts[bucket_idx] == len(self.bucket_params[bucket_idx]):
+                        if not bucket_ready[bucket_idx]:
+                            bucket_ready[bucket_idx] = True
+                            # Record event on compute stream
+                            event = torch.cuda.Event()
+                            event.record(self.compute_stream)
+                            # Wait for event on comm stream, then AllReduce
+                            self.comm_stream.wait_event(event)
+                            self._allreduce_bucket(bucket_idx)
+                    return grad
+
+                return hook
+
+            # Register hooks
+            handles = []
+            for param in self.model.parameters():
+                if param.requires_grad:
+                    h = param.register_hook(make_hook(param))
+                    handles.append(h)
+
+            # Run backward on compute stream
+            with torch.cuda.stream(self.compute_stream):
+                loss.backward()
+
+            # Wait for all communication to complete
+            self.comm_stream.synchronize()
+            self.compute_stream.synchronize()
+
+            # Clean up hooks
+            for h in handles:
+                h.remove()
+
+            self.total_time = time.time() - start
+
+        def measure_overlap(self, loss, num_trials=10):
+            """Measure overlap fraction."""
+            # Measure sequential time
+            torch.cuda.synchronize()
+            start = time.time()
+            loss.backward(retain_graph=True)
+            torch.cuda.synchronize()
+            compute_only = time.time() - start
+
+            # Measure comm-only time
+            torch.cuda.synchronize()
+            start = time.time()
+            for bucket_idx in range(len(self.bucket_params)):
+                self._allreduce_bucket(bucket_idx)
+            torch.cuda.synchronize()
+            comm_only = time.time() - start
+
+            sequential_time = compute_only + comm_only
+
+            # Measure overlapped time
+            overlapped_times = []
+            for _ in range(num_trials):
+                self.model.zero_grad()
+                torch.cuda.synchronize()
+                start = time.time()
+                self.backward_with_overlap(loss)
+                torch.cuda.synchronize()
+                overlapped_times.append(time.time() - start)
+
+            overlapped_time = sum(overlapped_times) / len(overlapped_times)
+
+            overlap_fraction = (sequential_time - overlapped_time) / comm_only
+
+            return {
+                'compute_time': compute_only,
+                'comm_time': comm_only,
+                'sequential_time': sequential_time,
+                'overlapped_time': overlapped_time,
+                'overlap_fraction': overlap_fraction,
+                'speedup': sequential_time / overlapped_time
+            }
+
+    # Usage
+    def test_overlap():
+        import torch.nn as nn
+
+        # Initialize distributed
+        dist.init_process_group('nccl')
+
+        model = nn.Sequential(*[nn.Linear(4096, 4096) for _ in range(20)]).cuda()
+        scheduler = TwoStreamScheduler(model)
+
+        x = torch.randn(32, 4096).cuda()
+        loss = model(x).sum()
+
+        results = scheduler.measure_overlap(loss)
+
+        print(f"Compute time: {results['compute_time']*1000:.2f} ms")
+        print(f"Comm time: {results['comm_time']*1000:.2f} ms")
+        print(f"Sequential: {results['sequential_time']*1000:.2f} ms")
+        print(f"Overlapped: {results['overlapped_time']*1000:.2f} ms")
+        print(f"Overlap fraction: {results['overlap_fraction']:.1%}")
+        print(f"Speedup: {results['speedup']:.2f}x")
+
+    # test_overlap()
+    ```
+
+    **Expected results:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Compute time | ~15 ms |
+    | Comm time | ~20 ms |
+    | Sequential | ~35 ms |
+    | Overlapped | ~22 ms |
+    | **Overlap fraction** | **~65%** |
+    | Speedup | ~1.6× |
+
+    **Factors limiting overlap:**
+
+    1. First bucket must wait for first layer backward
+    2. Last bucket communication extends past compute
+    3. CUDA stream scheduling overhead
+    4. Memory bandwidth contention between compute and NCCL
+
+    $$\boxed{\text{Typical overlap fraction: 50-80\% depending on compute/comm ratio}}$$
+
 4. **Prefetch depth**: For ZeRO-3 with 24 layers, how many layers should you prefetch to hide all-gather latency if each all-gather takes 2ms and each layer compute takes 8ms?
+
+??? success "Solution"
+    **Configuration:**
+
+    - Layers: $L = 24$
+    - All-gather time per layer: $T_{\text{gather}} = 2\text{ms}$
+    - Compute time per layer: $T_{\text{compute}} = 8\text{ms}$
+
+    **Prefetch analysis:**
+
+    To completely hide all-gather latency, the all-gather for layer $i+k$ must complete before layer $i+k$ starts computing.
+
+    **Timing constraint:**
+
+    If we prefetch $k$ layers ahead, we have $k \times T_{\text{compute}}$ time to complete the all-gather.
+
+    For full overlap:
+    $$k \times T_{\text{compute}} \geq T_{\text{gather}}$$
+    $$k \geq \frac{T_{\text{gather}}}{T_{\text{compute}}} = \frac{2\text{ms}}{8\text{ms}} = 0.25$$
+
+    So $k = 1$ layer of prefetch is sufficient!
+
+    **Visualization:**
+
+    ```
+    Time(ms):    0    8    16   24   32   40
+                 |----|----|----|----|----| ...
+
+    Layer 0:     [=compute=]
+    Layer 1:          [=compute=]
+    Layer 2:               [=compute=]
+
+    AllGather 0: [AG]      (2ms, done before L0 compute)
+    AllGather 1: [AG]      (overlaps with L0, ready for L1)
+    AllGather 2:      [AG] (overlaps with L1, ready for L2)
+    ```
+
+    **With prefetch_depth = 1:**
+
+    - While computing layer $i$, prefetch layer $i+1$
+    - $T_{\text{compute}} = 8\text{ms} > T_{\text{gather}} = 2\text{ms}$ → fully hidden!
+
+    **Memory overhead:**
+
+    Prefetching $k$ layers requires memory for:
+    $$M_{\text{prefetch}} = k \times \frac{\text{Model size}}{L} = 1 \times \frac{\text{Model size}}{24}$$
+
+    For a 70B model:
+    $$M_{\text{prefetch}} = \frac{70\text{B} \times 2\text{ bytes}}{24} \approx 5.8\text{ GB}$$
+
+    **What if compute were faster?**
+
+    | $T_{\text{compute}}$ | $T_{\text{gather}}$ | Min prefetch $k$ |
+    |---------------------|---------------------|------------------|
+    | 8 ms | 2 ms | 1 |
+    | 4 ms | 2 ms | 1 |
+    | 2 ms | 2 ms | 1 |
+    | 1 ms | 2 ms | 2 |
+    | 0.5 ms | 2 ms | 4 |
+
+    **DeepSpeed ZeRO-3 prefetch setting:**
+
+    ```python
+    ds_config = {
+        "zero_optimization": {
+            "stage": 3,
+            "prefetch_bucket_size": 50_000_000,  # ~50M params
+            "param_persistence_threshold": 100_000,
+        }
+    }
+    ```
+
+    $$\boxed{k = 1 \text{ layer prefetch is sufficient (since } T_{\text{compute}} > T_{\text{gather}})}$$
 
 5. **Communication bound analysis**: Your training step shows 80ms compute, 120ms communication, but total time is 140ms. Calculate the overlap fraction. What techniques could improve this?
 
+??? success "Solution"
+    **Given:**
+
+    - Compute time: $T_c = 80\text{ms}$
+    - Communication time: $T_m = 120\text{ms}$
+    - Total time: $T_{\text{total}} = 140\text{ms}$
+
+    **Overlap calculation:**
+
+    Without overlap: $T_{\text{sequential}} = T_c + T_m = 80 + 120 = 200\text{ms}$
+
+    Time saved by overlap: $T_{\text{saved}} = T_{\text{sequential}} - T_{\text{total}} = 200 - 140 = 60\text{ms}$
+
+    Overlap fraction:
+    $$\text{Overlap} = \frac{T_{\text{saved}}}{\min(T_c, T_m)} = \frac{60}{80} = 75\%$$
+
+    Alternatively, as fraction of communication hidden:
+    $$\text{Comm hidden} = \frac{T_{\text{saved}}}{T_m} = \frac{60}{120} = 50\%$$
+
+    **Analysis:**
+
+    The system is **communication-bound** since $T_m > T_c$.
+
+    Visible communication time: $T_{\text{total}} - T_c = 140 - 80 = 60\text{ms}$
+
+    Hidden communication time: $T_m - 60 = 120 - 60 = 60\text{ms}$
+
+    **Roofline view:**
+
+    ```
+    Time:  0        80       140      200ms
+           |--------|--------|--------|
+
+    Compute: [=======] 80ms
+
+    Comm:    [60ms hidden][60ms visible]
+             └── overlapped ──┘└── exposed ──┘
+    ```
+
+    **Techniques to improve:**
+
+    | Technique | How it helps | Expected improvement |
+    |-----------|--------------|---------------------|
+    | **Gradient compression** | Reduce $T_m$ by 10-100× | Major |
+    | **Larger bucket size** | Better bandwidth utilization | Minor |
+    | **More compute per step** | Larger batch → more $T_c$ to hide $T_m$ | Moderate |
+    | **Tensor parallelism** | Reduce per-GPU comm volume | Moderate |
+    | **Faster interconnect** | NVLink vs PCIe | Major |
+    | **Pipeline parallelism** | Distribute comm across stages | Moderate |
+
+    **Quantitative improvement estimates:**
+
+    1. **Gradient compression (10× compression):**
+       $$T_m' = 12\text{ms}, \quad T_{\text{total}}' = \max(80, 12) = 80\text{ms}$$
+       Speedup: $140/80 = 1.75\times$
+
+    2. **Increase batch 2× (double compute):**
+       $$T_c' = 160\text{ms}, \quad T_{\text{total}}' = \max(160, 120) = 160\text{ms}$$
+       Throughput: $2\times / (160/140) = 1.75\times$
+
+    3. **Switch to NVLink (3× faster):**
+       $$T_m' = 40\text{ms}, \quad T_{\text{total}}' = \max(80, 40) = 80\text{ms}$$
+       Speedup: $140/80 = 1.75\times$
+
+    **Recommended strategy:**
+
+    ```python
+    # Profiling to identify bottleneck
+    def diagnose_overlap(compute_ms, comm_ms, total_ms):
+        overlap_frac = (compute_ms + comm_ms - total_ms) / min(compute_ms, comm_ms)
+        exposed_comm = total_ms - compute_ms
+
+        if comm_ms > compute_ms:
+            print(f"Communication-bound: {exposed_comm:.0f}ms exposed")
+            print("Recommendations:")
+            print("  1. Use gradient compression")
+            print("  2. Increase batch size")
+            print("  3. Use faster interconnect")
+        else:
+            print(f"Compute-bound: good overlap achievable")
+            print("  Focus on compute optimization")
+
+        return overlap_frac
+
+    overlap = diagnose_overlap(80, 120, 140)
+    print(f"Current overlap: {overlap:.1%}")
+    ```
+
+    $$\boxed{\text{Overlap} = 75\% \text{ of compute, or } 50\% \text{ of comm hidden}}$$
+
 6. **Double buffering**: Implement double-buffered gradient AllReduce. Measure memory overhead vs. overlap improvement.
+
+??? success "Solution"
+    **Double buffering concept:**
+
+    Use two gradient buffers that alternate roles:
+    - Buffer A: Being written by current backward
+    - Buffer B: Being AllReduced from previous step
+
+    This allows complete overlap since AllReduce never blocks backward.
+
+    **Implementation:**
+
+    ```python
+    import torch
+    import torch.distributed as dist
+    import torch.nn as nn
+
+    class DoubleBufferedDDP:
+        """Double-buffered gradient synchronization."""
+
+        def __init__(self, model, process_group=None):
+            self.model = model
+            self.pg = process_group
+
+            # Create double buffers for each parameter
+            self.buffer_a = {}  # Current step gradients
+            self.buffer_b = {}  # Previous step gradients (being AllReduced)
+
+            for name, param in model.named_parameters():
+                if param.requires_grad:
+                    self.buffer_a[name] = torch.zeros_like(param)
+                    self.buffer_b[name] = torch.zeros_like(param)
+
+            self.current_buffer = 'a'
+            self.pending_allreduce = None
+            self.comm_stream = torch.cuda.Stream()
+            self.step_count = 0
+
+        def get_write_buffer(self):
+            """Get buffer for current backward pass."""
+            return self.buffer_a if self.current_buffer == 'a' else self.buffer_b
+
+        def get_read_buffer(self):
+            """Get buffer being AllReduced."""
+            return self.buffer_b if self.current_buffer == 'a' else self.buffer_a
+
+        def swap_buffers(self):
+            """Swap buffer roles."""
+            self.current_buffer = 'b' if self.current_buffer == 'a' else 'a'
+
+        def backward_step(self, loss):
+            """
+            Run backward and launch async AllReduce.
+            Returns immediately - AllReduce happens in background.
+            """
+            # Wait for previous AllReduce to complete
+            if self.pending_allreduce is not None:
+                self.comm_stream.synchronize()
+                # Apply averaged gradients from read buffer
+                read_buffer = self.get_read_buffer()
+                for name, param in self.model.named_parameters():
+                    if param.requires_grad and name in read_buffer:
+                        param.grad = read_buffer[name]
+
+            # Run backward into write buffer
+            self.model.zero_grad()
+            loss.backward()
+
+            # Copy gradients to write buffer
+            write_buffer = self.get_write_buffer()
+            for name, param in self.model.named_parameters():
+                if param.requires_grad and param.grad is not None:
+                    write_buffer[name].copy_(param.grad)
+
+            # Launch async AllReduce on write buffer
+            self._launch_allreduce(write_buffer)
+
+            # Swap buffers for next iteration
+            self.swap_buffers()
+            self.step_count += 1
+
+        def _launch_allreduce(self, buffer):
+            """Launch AllReduce on communication stream."""
+            with torch.cuda.stream(self.comm_stream):
+                # Flatten all gradients
+                flat_grads = []
+                for name in sorted(buffer.keys()):
+                    flat_grads.append(buffer[name].view(-1))
+                flat = torch.cat(flat_grads)
+
+                # AllReduce
+                dist.all_reduce(flat, group=self.pg)
+                world_size = dist.get_world_size(self.pg) if self.pg else dist.get_world_size()
+                flat.div_(world_size)
+
+                # Unflatten back
+                offset = 0
+                for name in sorted(buffer.keys()):
+                    numel = buffer[name].numel()
+                    buffer[name].copy_(flat[offset:offset+numel].view_as(buffer[name]))
+                    offset += numel
+
+            self.pending_allreduce = True
+
+        def memory_overhead(self):
+            """Calculate memory overhead from double buffering."""
+            total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+            bytes_per_param = 4  # FP32 gradients
+            buffer_memory = 2 * total_params * bytes_per_param  # Double buffer
+
+            # Normal DDP also stores gradients, so overhead is just the extra buffer
+            overhead = total_params * bytes_per_param
+            return overhead
+
+    def benchmark_double_buffer():
+        """Compare double-buffered vs standard DDP."""
+        import time
+
+        dist.init_process_group('nccl')
+
+        model = nn.Sequential(*[nn.Linear(4096, 4096) for _ in range(20)]).cuda()
+        ddp_model = DoubleBufferedDDP(model)
+
+        x = torch.randn(32, 4096).cuda()
+
+        # Warmup
+        for _ in range(5):
+            loss = model(x).sum()
+            ddp_model.backward_step(loss)
+
+        # Benchmark
+        torch.cuda.synchronize()
+        start = time.time()
+        num_iters = 100
+        for _ in range(num_iters):
+            loss = model(x).sum()
+            ddp_model.backward_step(loss)
+        torch.cuda.synchronize()
+        double_buffer_time = (time.time() - start) / num_iters
+
+        # Compare with standard approach
+        model.zero_grad()
+        torch.cuda.synchronize()
+        start = time.time()
+        for _ in range(num_iters):
+            loss = model(x).sum()
+            loss.backward()
+            for p in model.parameters():
+                if p.grad is not None:
+                    dist.all_reduce(p.grad)
+            torch.cuda.synchronize()
+        standard_time = (time.time() - start) / num_iters
+
+        overhead_gb = ddp_model.memory_overhead() / 1e9
+
+        print(f"Standard DDP: {standard_time*1000:.2f} ms/step")
+        print(f"Double-buffered: {double_buffer_time*1000:.2f} ms/step")
+        print(f"Speedup: {standard_time/double_buffer_time:.2f}x")
+        print(f"Memory overhead: {overhead_gb:.2f} GB")
+
+    # benchmark_double_buffer()
+    ```
+
+    **Expected results:**
+
+    | Configuration | Time/step | Memory overhead |
+    |---------------|-----------|-----------------|
+    | Standard DDP | ~35 ms | 0 |
+    | Double-buffered | ~22 ms | ~1.3 GB |
+
+    **Analysis:**
+
+    | Metric | Standard | Double-buffered |
+    |--------|----------|-----------------|
+    | Compute | 15 ms | 15 ms |
+    | Visible comm | 20 ms | ~7 ms |
+    | Total | 35 ms | 22 ms |
+    | Overlap | 0% | 65% |
+
+    **Memory overhead calculation:**
+
+    For a model with $\Psi$ parameters:
+    - Standard DDP: gradients = $4\Psi$ bytes (FP32)
+    - Double-buffered: $2 \times 4\Psi = 8\Psi$ bytes
+    - Overhead: $4\Psi$ bytes (one extra gradient buffer)
+
+    For 350M parameter model:
+    $$\text{Overhead} = 350 \times 10^6 \times 4 = 1.4\text{ GB}$$
+
+    **Trade-off summary:**
+
+    | Model size | Memory overhead | Speedup | Worth it? |
+    |------------|-----------------|---------|-----------|
+    | 350M | 1.4 GB | 1.6× | ✓ Yes |
+    | 7B | 28 GB | 1.6× | Maybe |
+    | 70B | 280 GB | 1.6× | ✗ No (memory-limited) |
+
+    **Caveat:** Double buffering introduces 1-step gradient staleness:
+    - Step $n$ applies gradients from step $n-1$
+    - For large batch training, this is usually acceptable
+    - May require slight learning rate adjustment
+
+    $$\boxed{\text{Double buffering: } \sim1.6\times \text{ speedup at cost of } 4\Psi \text{ bytes extra memory}}$$
 
 ## Key Takeaways
 

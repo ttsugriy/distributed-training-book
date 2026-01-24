@@ -1004,10 +1004,130 @@ Training Mixtral with 8 experts:
 
 1. **4D design**: You have 4,096 GPUs and need to train a 70B model with 256K context. Design a 4D configuration. What's the memory per GPU?
 
+??? success "Solution"
+    **Requirements:**
+
+    - Model: 70B parameters
+    - Context: 256K tokens
+    - GPUs: 4,096
+
+    **4D Configuration design:**
+
+    | Dimension | Value | Rationale |
+    |-----------|-------|-----------|
+    | TP | 8 | Intra-node (NVLink) |
+    | CP | 8 | 256K / 8 = 32K per CP rank |
+    | PP | 8 | ~8.75B params per stage |
+    | DP | 8 | 4096 / (8×8×8) = 8 replicas |
+
+    **Verify:** $8 \times 8 \times 8 \times 8 = 4096$ ✓
+
+    **Memory analysis:**
+
+    **Static memory per GPU:**
+
+    $$\Psi_{GPU} = \frac{70B}{PP \times TP} = \frac{70B}{64} = 1.09B \text{ params}$$
+
+    | Component | Memory |
+    |-----------|--------|
+    | Parameters (fp16) | 2.18 GB |
+    | Gradients (fp16) | 2.18 GB |
+    | Optimizer (fp32) | 13.1 GB |
+    | **Total static** | **17.5 GB** |
+
+    With ZeRO-1 across DP=8:
+    $$M_{opt}^{ZeRO1} = 13.1 / 8 = 1.64 \text{ GB}$$
+
+    **Total static with ZeRO-1:** 5.96 GB
+
+    **Activation memory:**
+
+    Sequence per GPU: $256K / CP = 32K$ tokens
+
+    Per layer (with TP=8):
+    $$M_{act}^{layer} = B \times \frac{S}{CP} \times H \times 34 / TP$$
+
+    Assuming B=2, H=8192, 80 layers, 10 layers/stage:
+
+    $$M_{act} = 10 \times 2 \times 32768 \times 8192 \times 34 / 8 = 18.2 \text{ GB (no ckpt)}$$
+
+    With activation checkpointing (√10 ≈ 3 interval):
+    $$M_{act}^{ckpt} \approx 6 \text{ GB}$$
+
+    **KV cache for ring attention:**
+
+    $$M_{KV} = 2 \times 2 \times B \times \frac{S}{CP} \times H / TP = 2 \times 2 \times 2 \times 32768 \times 8192 / 8$$
+    $$M_{KV} = 268 \text{ MB per peer}$$
+
+    With double buffering: 536 MB
+
+    **Total per GPU:**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Static (ZeRO-1) | 5.96 GB |
+    | Activations (ckpt) | ~6 GB |
+    | KV ring buffers | ~0.5 GB |
+    | Working memory | ~2 GB |
+    | **Total** | $\boxed{\sim 15 \text{ GB}}$ |
+
+    Fits easily on H100 80GB.
+
 2. **EP communication**: For a MoE with 64 experts, EP=8, and batch×seq=16384 tokens with top-2 routing:
 
    - How many tokens does each EP rank send in AlltoAll?
    - What's the AlltoAll volume?
+
+??? success "Solution"
+    **Setup:**
+
+    - 64 experts distributed across EP=8 ranks → 8 experts per rank
+    - Total tokens: 16,384
+    - Top-2 routing: each token is sent to 2 experts
+
+    **Token dispatch calculation:**
+
+    With uniform routing, each expert receives:
+    $$\text{tokens per expert} = \frac{\text{total tokens} \times k}{\text{num experts}} = \frac{16384 \times 2}{64} = 512$$
+
+    **Tokens each EP rank sends:**
+
+    Each EP rank starts with $16384 / 8 = 2048$ tokens.
+
+    With top-2 routing, each token generates 2 copies → 4096 routed tokens per rank.
+
+    With uniform distribution across 8 EP ranks:
+    - Keep locally: $4096 / 8 = 512$ tokens (to local experts)
+    - Send to each remote rank: $512$ tokens
+
+    **Total tokens sent per rank in AlltoAll:**
+    $$\boxed{4096 - 512 = 3584 \text{ tokens}}$$
+
+    Or equivalently, 512 tokens to each of 7 remote ranks.
+
+    **AlltoAll volume:**
+
+    Assuming hidden dimension H=4096 and fp16:
+    $$\text{bytes per token} = H \times 2 = 8192 \text{ bytes}$$
+
+    **Send volume per rank:**
+    $$V_{send} = 3584 \times 8192 = 29.4 \text{ MB}$$
+
+    **Total AlltoAll volume (all ranks sending):**
+    $$V_{total} = 8 \times 29.4 = \boxed{235 \text{ MB}}$$
+
+    **With receive (bidirectional):**
+
+    AlltoAll is symmetric, so each rank also receives ~29.4 MB.
+
+    | Metric | Value |
+    |--------|-------|
+    | Tokens per rank (input) | 2,048 |
+    | Tokens routed per rank (top-2) | 4,096 |
+    | Tokens sent (non-local) | 3,584 |
+    | Bytes per token | 8 KB |
+    | AlltoAll volume per rank | 29.4 MB |
+    | Total AlltoAll volume | 235 MB |
 
 3. **Ring attention analysis**: For CP=8 and sequence length 128K:
 
@@ -1015,11 +1135,331 @@ Training Mixtral with 8 experts:
    - What's the memory for K,V buffers?
    - Compare to AllGather memory requirement
 
+??? success "Solution"
+    **Configuration:**
+
+    - CP = 8 (Context Parallel degree)
+    - S = 128K tokens total
+    - Sequence per CP rank: $S_{local} = 128K / 8 = 16K$ tokens
+
+    **Ring steps needed:**
+
+    In ring attention, each rank computes attention between its local Q and K,V from all ranks (including its own). This requires passing K,V around the ring.
+
+    $$\text{Ring steps} = CP - 1 = \boxed{7 \text{ steps}}$$
+
+    (Plus 1 local step = 8 total attention computations)
+
+    **Memory for K,V buffers:**
+
+    Assuming H=8192 hidden dimension, 80 layers, fp16:
+
+    Per layer, K and V each have shape: [batch, seq_local, hidden]
+
+    $$M_{KV}^{layer} = 2 \times B \times S_{local} \times H \times 2 \text{ bytes}$$
+
+    For B=2:
+    $$M_{KV}^{layer} = 2 \times 2 \times 16384 \times 8192 \times 2 = 1.07 \text{ GB}$$
+
+    **With double buffering for overlap:**
+
+    Ring attention overlaps communication with computation, requiring 2 buffers:
+
+    $$M_{KV}^{ring} = 2 \times 1.07 = \boxed{2.14 \text{ GB per layer}}$$
+
+    **Comparison to AllGather memory:**
+
+    AllGather would materialize the FULL sequence K,V:
+
+    $$M_{AllGather}^{layer} = 2 \times B \times S_{full} \times H \times 2$$
+    $$M_{AllGather}^{layer} = 2 \times 2 \times 131072 \times 8192 \times 2 = 8.59 \text{ GB per layer}$$
+
+    **Memory comparison:**
+
+    | Approach | Memory per Layer | For 80 Layers | Scaling |
+    |----------|------------------|---------------|---------|
+    | Ring Attention | 2.14 GB | 171 GB | O(S/CP) |
+    | AllGather | 8.59 GB | 687 GB | O(S) |
+    | **Savings** | **4×** | **4×** | **CP×** |
+
+    **Summary:**
+
+    Ring attention with CP=8 uses $\boxed{4\times}$ less memory than AllGather:
+
+    - Ring: Only holds 2 chunks (current + next) at a time
+    - AllGather: Materializes all 8 chunks simultaneously
+
+    The trade-off is latency: ring attention has $CP-1$ sequential communication steps, but each step overlaps with compute.
+
+    **Memory scaling:**
+
+    $$M_{ring} = O\left(\frac{S}{CP}\right) \quad \text{vs} \quad M_{AllGather} = O(S)$$
+
+    For very long contexts, ring attention is essential—AllGather would OOM.
+
 4. **Load imbalance**: An MoE with 8 experts shows routing: [30%, 5%, 25%, 10%, 5%, 10%, 10%, 5%]. With capacity_factor=1.25, which experts will drop tokens?
+
+??? success "Solution"
+    **Given routing distribution:**
+
+    | Expert | Routing % | Tokens (if 1000 total) |
+    |--------|-----------|------------------------|
+    | 0 | 30% | 300 |
+    | 1 | 5% | 50 |
+    | 2 | 25% | 250 |
+    | 3 | 10% | 100 |
+    | 4 | 5% | 50 |
+    | 5 | 10% | 100 |
+    | 6 | 10% | 100 |
+    | 7 | 5% | 50 |
+
+    **Capacity calculation:**
+
+    With 8 experts and uniform routing, each expert would receive:
+    $$\text{expected tokens} = \frac{\text{total tokens}}{8} = 12.5\%$$
+
+    Expert capacity with capacity_factor=1.25:
+    $$\text{capacity} = \text{capacity\_factor} \times \frac{\text{total}}{8} = 1.25 \times 12.5\% = 15.625\%$$
+
+    For 1000 tokens: capacity = 156 tokens per expert
+
+    **Identifying dropped tokens:**
+
+    | Expert | Tokens | Capacity | Dropped | Drop Rate |
+    |--------|--------|----------|---------|-----------|
+    | 0 | 300 | 156 | 144 | 48% |
+    | 1 | 50 | 156 | 0 | 0% |
+    | 2 | 250 | 156 | 94 | 38% |
+    | 3 | 100 | 156 | 0 | 0% |
+    | 4 | 50 | 156 | 0 | 0% |
+    | 5 | 100 | 156 | 0 | 0% |
+    | 6 | 100 | 156 | 0 | 0% |
+    | 7 | 50 | 156 | 0 | 0% |
+
+    **Answer:**
+
+    $$\boxed{\text{Experts 0 and 2 will drop tokens}}$$
+
+    - Expert 0: Drops 144 tokens (48% of its routed tokens)
+    - Expert 2: Drops 94 tokens (38% of its routed tokens)
+    - Total dropped: 238 tokens (23.8% of all tokens!)
+
+    **Impact analysis:**
+
+    This is a severe imbalance:
+
+    - 2 experts handle 55% of traffic but can only process 31.25%
+    - 23.8% token drop rate significantly impacts model quality
+    - Experts 1, 4, 7 are underutilized (only 32% of capacity used)
+
+    **Mitigation strategies:**
+
+    1. **Increase capacity_factor**: 2.0 would allow Expert 0 to process 250 tokens
+    2. **Load balancing loss**: Add auxiliary loss to encourage uniform routing
+    3. **Expert choice routing**: Let experts choose tokens instead of tokens choosing experts
+    4. **Top-k > 2**: More experts per token spreads load
+
+    **Required capacity_factor to avoid drops:**
+
+    $$\text{capacity\_factor}_{min} = \frac{\max(\text{routing})}{1/E} = \frac{30\%}{12.5\%} = \boxed{2.4}$$
 
 5. **5D scaling**: A 5D configuration achieves 40% MFU on 16K GPUs. When scaling to 64K GPUs (4× DP), predict the new MFU and identify bottlenecks.
 
+??? success "Solution"
+    **Baseline configuration (16K GPUs, 40% MFU):**
+
+    Assume 5D configuration: (DP=16, PP=8, TP=8, CP=4, EP=4)
+    - Total: 16 × 8 × 8 × 4 × 4 = 16,384 GPUs ✓
+
+    **Scaled configuration (64K GPUs, 4× DP):**
+
+    New: (DP=64, PP=8, TP=8, CP=4, EP=4)
+    - Total: 64 × 8 × 8 × 4 × 4 = 65,536 GPUs ✓
+
+    **Impact analysis:**
+
+    Increasing DP affects:
+
+    1. **AllReduce communication cost scales with DP:**
+
+    Ring AllReduce time: $T_{AR} = \frac{2M}{\beta} \cdot \frac{DP-1}{DP}$
+
+    For large DP, this approaches $\frac{2M}{\beta}$ (constant), but latency increases.
+
+    | DP | $\frac{DP-1}{DP}$ | Relative AR time |
+    |----|-------------------|------------------|
+    | 16 | 0.9375 | 1.0× |
+    | 64 | 0.9844 | 1.05× |
+
+    Bandwidth portion: ~5% increase (negligible)
+
+    2. **AllReduce latency scales with ring steps:**
+
+    Tree-based: $O(\log DP)$ → $\log_2(64)/\log_2(16) = 6/4 = 1.5\times$ more latency
+    Ring-based: $2(DP-1)$ steps → $126/30 = 4.2\times$ more latency
+
+    3. **ZeRO-sharded memory improves:**
+
+    With DP=64, optimizer states are sharded 4× more → memory pressure relieved
+
+    **MFU prediction:**
+
+    Original breakdown (40% MFU at 16K GPUs):
+
+    | Component | Fraction of Time | Efficiency |
+    |-----------|------------------|------------|
+    | Compute | 60% | 67% |
+    | DP AllReduce | 15% | - |
+    | PP communication | 10% | - |
+    | Other overhead | 15% | - |
+
+    After 4× DP scaling:
+
+    | Component | Old | New | Change |
+    |-----------|-----|-----|--------|
+    | Compute | 60% | 60% | Same |
+    | DP AllReduce (latency) | 15% | ~22% | +50% (tree) to +4× (ring) |
+    | PP communication | 10% | 10% | Same |
+    | Other overhead | 15% | 15% | Same |
+
+    **Conservative estimate (tree-based AllReduce):**
+
+    New total time: 60% + 22% + 10% + 15% = 107% of original
+
+    $$MFU_{new} = \frac{40\%}{1.07} \approx 37\%$$
+
+    **Pessimistic estimate (ring-based at scale):**
+
+    If latency dominates at 64K scale:
+    $$MFU_{new} \approx 30-35\%$$
+
+    **Predicted MFU:**
+
+    $$\boxed{MFU \approx 35-38\%}$$
+
+    **Identified bottlenecks:**
+
+    1. **DP AllReduce latency**: Primary bottleneck
+       - More GPUs in reduction group
+       - Cross-datacenter links if distributed
+       - Solution: Hierarchical AllReduce, gradient compression
+
+    2. **Network congestion**: 4× more traffic on spine
+       - Solution: Better network topology, traffic shaping
+
+    3. **Stragglers**: More GPUs → higher variance in completion time
+       - Solution: Backup workers, asynchronous SGD
+
+    4. **Gradient staleness**: If using async/local SGD to mitigate
+       - Solution: Learning rate tuning, momentum correction
+
+    **Recommendations for 64K scaling:**
+
+    | Strategy | Impact |
+    |----------|--------|
+    | Hierarchical AllReduce | Reduce latency 2-3× |
+    | Gradient compression | Reduce bandwidth 4-10× |
+    | Local SGD (K steps) | Reduce AllReduce frequency |
+    | Increase PP or CP instead | Better scaling than DP |
+
 6. **Dimension ordering**: Propose an alternative ordering to (DP, PP, TP, CP, EP). Justify when it would be better.
+
+??? success "Solution"
+    **Standard ordering: (DP, PP, TP, CP, EP)**
+
+    This means:
+    - Innermost (consecutive ranks): EP groups
+    - Then: CP groups
+    - Then: TP groups
+    - Then: PP groups
+    - Outermost: DP groups
+
+    **Proposed alternative: (DP, EP, PP, CP, TP)**
+
+    **Key changes:**
+
+    | Dimension | Standard | Alternative | Change |
+    |-----------|----------|-------------|--------|
+    | TP | Middle | Innermost | ↑ priority |
+    | EP | Innermost | After DP | ↓ priority |
+    | CP | After TP | Before TP | Minor shift |
+
+    **Justification: When alternative ordering is better:**
+
+    **1. When TP communication dominates:**
+
+    If attention layers are the bottleneck (large hidden dimension, many heads):
+
+    - TP: 4 AllReduce/layer × $O(BSH)$ each
+    - EP: 2 AlltoAll per MoE layer only
+
+    Making TP innermost ensures TP ranks are on same node (NVLink).
+
+    **Standard ordering with 8-GPU nodes:**
+
+    ```
+    Node 0: EP=0-7 (expert parallel)
+    Node 1: EP=0-7 for next CP rank
+    ```
+
+    TP communication crosses nodes → slow!
+
+    **Alternative ordering:**
+
+    ```
+    Node 0: TP=0-7 (tensor parallel)
+    Node 1: TP=0-7 for next CP rank
+    ```
+
+    TP communication stays intra-node → fast!
+
+    **2. When using sparse MoE with few layers:**
+
+    If MoE only every 4th layer:
+    - EP AlltoAll: 25% of layers
+    - TP AllReduce: 100% of layers
+
+    EP can tolerate slower inter-node links.
+
+    **3. When EP can use hierarchical AlltoAll:**
+
+    With (DP, EP, ...) ordering:
+    - EP spans across nodes intentionally
+    - Enables 2-level AlltoAll: intra-node + inter-node
+    - Better bandwidth utilization at scale
+
+    **Analysis of communication placement:**
+
+    | Ordering | TP Placement | EP Placement | Best When |
+    |----------|--------------|--------------|-----------|
+    | (DP,PP,TP,CP,EP) | Mid-node | Intra-node | Dense MoE, small hidden |
+    | (DP,EP,PP,CP,TP) | Intra-node | Cross-node | Sparse MoE, large hidden |
+    | (DP,PP,CP,TP,EP) | Near-inner | Innermost | Balance of both |
+
+    **Quantitative example:**
+
+    Configuration: 512 GPUs, 8/node, H=12288, 16 experts, MoE every 4 layers
+
+    | Ordering | TP BW | EP BW | Step Time |
+    |----------|-------|-------|-----------|
+    | Standard (EP inner) | 50 GB/s (IB) | 900 GB/s (NVLink) | 1.2s |
+    | Alternative (TP inner) | 900 GB/s (NVLink) | 50 GB/s (IB) | 0.9s |
+
+    **Speedup:** $\boxed{1.33\times}$ for alternative ordering
+
+    **General principle:**
+
+    $$\text{Innermost dimension} = \arg\max(\text{comm volume} \times \text{frequency})$$
+
+    Place the highest-bandwidth-demanding communication on the fastest interconnect.
+
+    **Other alternative orderings:**
+
+    | Ordering | Use Case |
+    |----------|----------|
+    | (PP, DP, TP, CP, EP) | Pipeline first for memory locality |
+    | (DP, CP, PP, TP, EP) | Long context with cheap PP |
+    | (EP, DP, PP, TP, CP) | Expert-specialized nodes |
 
 ## Key Takeaways
 

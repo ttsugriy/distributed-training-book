@@ -1035,13 +1035,264 @@ loss.backward()
 
 1. **Bubble calculation**: A pipeline has 8 stages and 48 micro-batches. Calculate the bubble fraction for (a) GPipe scheduling, (b) interleaved scheduling with 2 virtual stages per device.
 
+??? success "Solution"
+    **Given:**
+
+    - $P = 8$ pipeline stages
+    - $m = 48$ micro-batches
+    - $v = 2$ virtual stages per device (for interleaved)
+
+    **(a) GPipe scheduling:**
+
+    The bubble fraction formula is:
+    $$\text{Bubble} = \frac{P-1}{P-1+m}$$
+
+    Substituting:
+    $$\text{Bubble}_{\text{GPipe}} = \frac{8-1}{8-1+48} = \frac{7}{55} = \boxed{12.7\%}$$
+
+    **(b) Interleaved scheduling with $v = 2$:**
+
+    The interleaved bubble fraction is:
+    $$\text{Bubble}_{\text{interleaved}} = \frac{P-1}{m \cdot v}$$
+
+    Substituting:
+    $$\text{Bubble}_{\text{interleaved}} = \frac{8-1}{48 \times 2} = \frac{7}{96} = \boxed{7.3\%}$$
+
+    **Comparison:**
+
+    | Schedule | Bubble Fraction | Improvement |
+    |----------|-----------------|-------------|
+    | GPipe | 12.7% | Baseline |
+    | Interleaved ($v=2$) | 7.3% | 1.74× better |
+
+    **Trade-off:** Interleaving reduces bubbles by factor $v$, but increases communication by factor $v$ (2× more cross-device transfers per micro-batch).
+
 2. **Memory comparison**: Compare peak activation memory between GPipe and 1F1B for 4 stages, 16 micro-batches, where each activation is 32 MB.
+
+??? success "Solution"
+    **Given:**
+
+    - $P = 4$ pipeline stages
+    - $m = 16$ micro-batches
+    - Activation size per micro-batch: 32 MB
+
+    **GPipe peak memory:**
+
+    In GPipe, all forward passes complete before any backward pass. Each stage must store activations for all $m$ micro-batches:
+
+    $$M_{\text{GPipe}} = m \times \text{activation size} = 16 \times 32 \text{ MB} = \boxed{512 \text{ MB}}$$
+
+    **1F1B peak memory:**
+
+    In 1F1B, we interleave forwards and backwards. The key insight is that each stage stores at most $P$ activations at any time:
+
+    - Stage 0 stores at most 4 activations (warmup of $P$ forwards)
+    - Then we do 1 backward (freeing 1) before each forward
+
+    $$M_{\text{1F1B}} = P \times \text{activation size} = 4 \times 32 \text{ MB} = \boxed{128 \text{ MB}}$$
+
+    **Comparison:**
+
+    | Schedule | Peak Activations | Peak Memory | Ratio |
+    |----------|------------------|-------------|-------|
+    | GPipe | $m = 16$ | 512 MB | 4× |
+    | 1F1B | $P = 4$ | 128 MB | 1× |
+
+    **Memory reduction:**
+    $$\text{Savings} = \frac{m - P}{m} = \frac{16 - 4}{16} = \boxed{75\%}$$
+
+    **Key insight:** 1F1B achieves memory reduction by immediately performing backward passes as soon as gradients become available, freeing activation storage. The memory bound is $O(P)$ instead of $O(m)$.
+
+    **When this matters:** For large models with many micro-batches ($m \gg P$), GPipe would require $m/P = 4\times$ more activation memory, potentially causing OOM.
 
 3. **Load balancing**: Given layer times [10, 10, 10, 10, 20, 20, 20, 20] ms for 8 layers across 4 stages, find the optimal assignment. What is the bubble overhead compared to equal distribution?
 
+??? success "Solution"
+    **Given:**
+
+    - 8 layers with times: [10, 10, 10, 10, 20, 20, 20, 20] ms
+    - 4 pipeline stages
+    - Total time: $10 \times 4 + 20 \times 4 = 120$ ms
+
+    **Equal distribution (naive):**
+
+    Assign 2 layers per stage:
+
+    | Stage | Layers | Time |
+    |-------|--------|------|
+    | 0 | [0, 1] | 10 + 10 = 20 ms |
+    | 1 | [2, 3] | 10 + 10 = 20 ms |
+    | 2 | [4, 5] | 20 + 20 = 40 ms |
+    | 3 | [6, 7] | 20 + 20 = 40 ms |
+
+    - $t_{\max} = 40$ ms
+    - Target (perfect balance): $120/4 = 30$ ms
+
+    $$\text{Bubble}_{\text{naive}} = \frac{t_{\max} - t_{\text{avg}}}{t_{\max}} = \frac{40 - 30}{40} = 25\%$$
+
+    **Optimal assignment:**
+
+    Balance by mixing fast and slow layers:
+
+    | Stage | Layers | Time |
+    |-------|--------|------|
+    | 0 | [0, 4] | 10 + 20 = 30 ms |
+    | 1 | [1, 5] | 10 + 20 = 30 ms |
+    | 2 | [2, 6] | 10 + 20 = 30 ms |
+    | 3 | [3, 7] | 10 + 20 = 30 ms |
+
+    - $t_{\max} = 30$ ms
+    - All stages perfectly balanced!
+
+    $$\text{Bubble}_{\text{optimal}} = \frac{30 - 30}{30} = \boxed{0\%}$$
+
+    **Improvement:**
+
+    | Assignment | $t_{\max}$ | Bubble Overhead | Efficiency |
+    |------------|------------|-----------------|------------|
+    | Equal (naive) | 40 ms | 25% | 75% |
+    | Optimal (mixed) | 30 ms | 0% | 100% |
+
+    **Speedup from optimal assignment:**
+    $$\text{Speedup} = \frac{40}{30} = \boxed{1.33\times}$$
+
+    **Algorithm insight:** This is a variant of the multiprocessor scheduling problem. For this specific case, pairing the fastest layer with the slowest achieves perfect balance. In general, a greedy or dynamic programming approach is needed.
+
+    **Note:** The optimal assignment may not preserve layer ordering, which could increase communication if non-adjacent layers end up on the same stage. In practice, we often constrain assignments to contiguous layer ranges and accept some imbalance.
+
 4. **Communication volume**: For a transformer with $H = 8192$, $S = 4096$, $b = 2$, bf16, calculate the activation tensor size. Compare to the gradient size for a 70B parameter model.
 
+??? success "Solution"
+    **Given:**
+
+    - Hidden dimension: $H = 8192$
+    - Sequence length: $S = 4096$
+    - Micro-batch size: $b = 2$
+    - Data type: bf16 (2 bytes per element)
+    - Model parameters: $\Psi = 70 \times 10^9$
+
+    **Activation tensor size (per micro-batch, per stage boundary):**
+
+    $$\text{Activation size} = b \times S \times H \times \text{sizeof(bf16)}$$
+
+    $$= 2 \times 4096 \times 8192 \times 2 \text{ bytes}$$
+
+    $$= 134,217,728 \text{ bytes} = \boxed{128 \text{ MB}}$$
+
+    **Gradient size (for AllReduce in data parallelism):**
+
+    $$\text{Gradient size} = \Psi \times \text{sizeof(bf16)}$$
+
+    $$= 70 \times 10^9 \times 2 \text{ bytes}$$
+
+    $$= 140 \times 10^9 \text{ bytes} = \boxed{140 \text{ GB}}$$
+
+    **Comparison:**
+
+    | Quantity | Size | Ratio |
+    |----------|------|-------|
+    | Activation (PP) | 128 MB | 1× |
+    | Gradient (DP) | 140 GB | 1,094× |
+
+    $$\text{Ratio} = \frac{140 \text{ GB}}{128 \text{ MB}} = \frac{140,000}{128} \approx \boxed{1,094\times}$$
+
+    **Communication pattern comparison:**
+
+    | Parallelism | Volume per step | Pattern | Bandwidth efficiency |
+    |-------------|-----------------|---------|----------------------|
+    | Pipeline (PP) | $2(P-1) \cdot m \cdot 128$ MB | Point-to-point | High (~95%) |
+    | Data (DP) | $2 \cdot \frac{P-1}{P} \cdot 140$ GB | AllReduce (ring) | Medium (~85%) |
+
+    For $P = 8$ stages, $m = 32$ micro-batches:
+
+    - PP volume: $2 \times 7 \times 32 \times 128 \text{ MB} = 57.3 \text{ GB}$
+    - DP volume: $2 \times 0.875 \times 140 \text{ GB} = 245 \text{ GB}$
+
+    **Conclusion:** Pipeline parallelism has ~4.3× less communication volume than data parallelism for this configuration, and uses more efficient point-to-point transfers.
+
 5. **Zero-bubble analysis**: In the ZB-H1 schedule, weight gradients are computed last. If each $B_W$ takes 30% as long as $B_h$, what is the actual bubble fraction?
+
+??? success "Solution"
+    **Given:**
+
+    - ZB-H1 schedule: weight gradients ($B_W$) computed at the end
+    - $t_{B_W} = 0.3 \times t_{B_h}$
+    - Assume $t_F = t_{B_h} = 1$ unit (normalized)
+
+    **Standard 1F1B bubble analysis (for reference):**
+
+    With $P$ stages and $m$ micro-batches:
+    $$\text{Bubble}_{1F1B} = \frac{P-1}{P-1+m}$$
+
+    **ZB-H1 schedule structure:**
+
+    In ZB-H1, the backward pass is split:
+
+    - $B_h$: compute input gradient (sequential dependency)
+    - $B_W$: compute weight gradient (can be delayed)
+
+    The $B_W$ operations fill what would otherwise be bubble time.
+
+    **Time analysis per stage:**
+
+    For $m$ micro-batches:
+
+    - Forward passes: $m \times t_F = m$ units
+    - Input gradient passes: $m \times t_{B_h} = m$ units
+    - Weight gradient passes: $m \times t_{B_W} = 0.3m$ units
+
+    **Total useful work:** $m + m + 0.3m = 2.3m$ units
+
+    **Schedule duration:**
+
+    The schedule consists of:
+
+    1. **Warmup phase:** $(P-1)$ forward passes
+    2. **Steady phase:** $m - (P-1)$ interleaved F and $B_h$
+    3. **Drain phase:** $(P-1)$ remaining $B_h$ passes
+    4. **$B_W$ phase:** $m$ weight gradient computations (fills bubbles)
+
+    The key insight: $B_W$ operations can overlap with bubbles.
+
+    **Bubble slots available:** $(P-1)$ time units (in standard 1F1B)
+
+    **$B_W$ time needed:** $0.3m$ units
+
+    **Case analysis:**
+
+    If $0.3m \leq P - 1$ (plenty of bubble time):
+    - All $B_W$ fit in bubbles → **Zero bubble**
+
+    If $0.3m > P - 1$ (more $B_W$ than bubbles):
+    - Excess time = $0.3m - (P-1)$
+    - This becomes the new bubble
+
+    **For concrete example ($P = 8$, $m = 32$):**
+
+    - Bubble slots: $P - 1 = 7$ units
+    - $B_W$ time: $0.3 \times 32 = 9.6$ units
+    - Excess: $9.6 - 7 = 2.6$ units
+
+    **Actual bubble fraction:**
+
+    $$\text{Bubble}_{ZB-H1} = \frac{\max(0, 0.3m - (P-1))}{2m + 0.3m} = \frac{2.6}{73.6} = \boxed{3.5\%}$$
+
+    **Comparison with standard 1F1B:**
+
+    $$\text{Bubble}_{1F1B} = \frac{7}{7 + 32} = 17.9\%$$
+
+    **Improvement:**
+
+    | Schedule | Bubble | Reduction |
+    |----------|--------|-----------|
+    | 1F1B | 17.9% | Baseline |
+    | ZB-H1 | 3.5% | 5.1× better |
+
+    **General formula:**
+
+    $$\text{Bubble}_{ZB-H1} = \frac{\max(0, \alpha \cdot m - (P-1))}{(2 + \alpha) \cdot m}$$
+
+    where $\alpha = t_{B_W}/t_{B_h}$.
 
 6. **Throughput optimization**: You have a 32-layer model across 8 GPUs. Each forward pass takes 10ms, backward takes 20ms per stage. With 64 micro-batches, calculate:
 
@@ -1049,7 +1300,223 @@ loss.backward()
    - Pipeline efficiency
    - Throughput in micro-batches per second
 
+??? success "Solution"
+    **Given:**
+
+    - 32 layers across 8 GPUs → 4 layers per stage
+    - $P = 8$ pipeline stages
+    - $m = 64$ micro-batches
+    - $t_F = 10$ ms (forward pass per stage)
+    - $t_B = 20$ ms (backward pass per stage)
+
+    **Total batch time:**
+
+    Using the 1F1B/GPipe formula:
+
+    $$T_{\text{batch}} = (P - 1)(t_F + t_B) + m(t_F + t_B)$$
+
+    The first term is pipeline fill/drain overhead, the second is steady-state.
+
+    $$T_{\text{batch}} = (P - 1 + m)(t_F + t_B)$$
+
+    $$= (8 - 1 + 64)(10 + 20)$$
+
+    $$= 71 \times 30 \text{ ms}$$
+
+    $$= \boxed{2130 \text{ ms} = 2.13 \text{ seconds}}$$
+
+    **Pipeline efficiency:**
+
+    The efficiency measures useful work vs total time:
+
+    $$E = \frac{m}{m + P - 1} = \frac{64}{64 + 7} = \frac{64}{71} = \boxed{90.1\%}$$
+
+    Alternatively, bubble fraction:
+    $$\text{Bubble} = \frac{P - 1}{m + P - 1} = \frac{7}{71} = 9.9\%$$
+
+    **Throughput in micro-batches per second:**
+
+    $$\text{Throughput} = \frac{m}{T_{\text{batch}}} = \frac{64}{2.13 \text{ s}} = \boxed{30.0 \text{ micro-batches/s}}$$
+
+    **Tokens per second (if each micro-batch has $b \cdot S$ tokens):**
+
+    For $b = 4$, $S = 2048$:
+    $$\text{Tokens/s} = 30.0 \times 4 \times 2048 = 245,760 \text{ tokens/s}$$
+
+    **Summary:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Total batch time | 2.13 seconds |
+    | Pipeline efficiency | 90.1% |
+    | Bubble fraction | 9.9% |
+    | Throughput | 30.0 micro-batches/s |
+
+    **Optimization insight:** The high efficiency (90.1%) is achieved because $m = 64 \gg P = 8$, following the rule of thumb $m \geq 4P$ for <20% bubble. With $m/P = 8$, we're well within the efficient regime.
+
 7. **Implementation**: Implement a pipeline stage that supports gradient checkpointing to reduce activation memory. How does this interact with 1F1B scheduling?
+
+??? success "Solution"
+    **Gradient Checkpointing with Pipeline Parallelism:**
+
+    Gradient checkpointing reduces activation memory by recomputing activations during the backward pass instead of storing them.
+
+    **Implementation:**
+
+    ```python
+    import torch
+    import torch.nn as nn
+    from torch.utils.checkpoint import checkpoint_sequential
+
+    class CheckpointedPipelineStage(nn.Module):
+        """Pipeline stage with gradient checkpointing support."""
+
+        def __init__(self, layers: nn.ModuleList, checkpoint_segments: int = 2):
+            super().__init__()
+            self.layers = layers
+            self.checkpoint_segments = checkpoint_segments
+            # Only store boundary activations, not intermediate
+            self.boundary_activations = {}
+
+        def forward(self, x: torch.Tensor, micro_batch_idx: int) -> torch.Tensor:
+            """Forward pass with checkpointing."""
+            # Store input for backward (boundary activation)
+            self.boundary_activations[micro_batch_idx] = x.detach().requires_grad_()
+
+            # Use gradient checkpointing for internal layers
+            if self.training and self.checkpoint_segments > 1:
+                # checkpoint_sequential handles recomputation
+                y = checkpoint_sequential(
+                    self.layers,
+                    self.checkpoint_segments,
+                    x
+                )
+            else:
+                y = x
+                for layer in self.layers:
+                    y = layer(y)
+
+            return y
+
+        def backward_recompute(self, micro_batch_idx: int, grad_output: torch.Tensor):
+            """Backward pass with activation recomputation."""
+            x = self.boundary_activations.pop(micro_batch_idx)
+
+            # Recompute forward pass to get intermediate activations
+            with torch.enable_grad():
+                y = checkpoint_sequential(
+                    self.layers,
+                    self.checkpoint_segments,
+                    x
+                )
+                y.backward(grad_output)
+
+            return x.grad
+
+    class OneFOneBWithCheckpointing:
+        """1F1B scheduler with gradient checkpointing."""
+
+        def __init__(self, stage: CheckpointedPipelineStage, config):
+            self.stage = stage
+            self.num_stages = config.num_stages
+            self.stage_id = config.stage_id
+            self.num_micro_batches = config.num_micro_batches
+
+        def run_batch(self, inputs=None):
+            P = self.num_stages
+            m = self.num_micro_batches
+            s = self.stage_id
+
+            outputs = {}
+            num_warmup = min(s + 1, m)
+
+            # Warmup: only forward passes
+            for i in range(num_warmup):
+                outputs[i] = self._forward_step(i, inputs)
+
+            # Steady state: 1F1B
+            for i in range(num_warmup, m):
+                bwd_idx = i - num_warmup
+                # Backward with recomputation (frees memory immediately)
+                self._backward_step(bwd_idx, outputs)
+                # Forward (uses freed memory)
+                outputs[i] = self._forward_step(i, inputs)
+
+            # Cooldown: remaining backwards
+            for i in range(m - num_warmup, m):
+                self._backward_step(i, outputs)
+
+            return outputs
+
+        def _forward_step(self, idx, inputs):
+            if self.stage_id == 0:
+                x = inputs[idx]
+            else:
+                x = recv_forward()
+            y = self.stage(x, micro_batch_idx=idx)
+            send_forward(y)
+            return y
+
+        def _backward_step(self, idx, outputs):
+            if self.stage_id == self.num_stages - 1:
+                grad = compute_loss_grad(outputs[idx])
+            else:
+                grad = recv_backward()
+
+            # Recompute activations and compute gradients
+            input_grad = self.stage.backward_recompute(idx, grad)
+            send_backward(input_grad)
+
+            # Free output memory
+            del outputs[idx]
+    ```
+
+    **Memory analysis with checkpointing:**
+
+    | Component | Without Checkpointing | With Checkpointing |
+    |-----------|----------------------|-------------------|
+    | Stored activations per micro-batch | All layer outputs | Boundary only |
+    | Memory per stage (1F1B) | $P \times L \times M_{act}$ | $P \times M_{boundary}$ |
+    | Recomputation overhead | None | ~33% more compute |
+
+    Where:
+    - $L$ = layers per stage
+    - $M_{act}$ = activation size per layer
+    - $M_{boundary}$ = boundary activation size
+
+    **Memory savings:**
+
+    For a stage with 8 layers, checkpoint segments = 2:
+    $$\text{Savings} = 1 - \frac{2}{8} = \boxed{75\%}$$
+
+    **Interaction with 1F1B scheduling:**
+
+    1. **Timing:** Backward passes take longer (recomputation overhead), but memory is freed immediately after each backward.
+
+    2. **Peak memory:** Still bounded by $P$ micro-batches (1F1B property), but each micro-batch uses less memory.
+
+    3. **Combined savings:**
+       - 1F1B: Reduces from $m$ to $P$ activations
+       - Checkpointing: Reduces each activation by $(1 - 1/\text{segments})$
+       - Total: $P \times \frac{1}{\text{segments}} \times M_{act}$
+
+    **Example:** $m = 32$, $P = 4$, 4 checkpoint segments:
+
+    | Schedule | Peak Memory |
+    |----------|-------------|
+    | GPipe (no ckpt) | $32 \times M_{full}$ |
+    | GPipe (ckpt) | $32 \times \frac{M_{full}}{4}$ |
+    | 1F1B (no ckpt) | $4 \times M_{full}$ |
+    | 1F1B (ckpt) | $4 \times \frac{M_{full}}{4} = M_{full}$ |
+
+    **Trade-off summary:**
+
+    | Aspect | Effect |
+    |--------|--------|
+    | Memory | Reduced by factor of checkpoint segments |
+    | Compute | Increased by ~33% (one extra forward per backward) |
+    | Bubble fraction | Unchanged (same scheduling) |
+    | Implementation complexity | Higher (must handle recomputation) |
 
 ## Key Takeaways
 

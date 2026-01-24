@@ -1079,15 +1079,498 @@ PP naturally stages memory across time. Combine with offloading:
 
 1. **Bandwidth calculation**: A model has 70B parameters (fp16). Your system has PCIe Gen4 (32 GB/s). The forward pass takes 2 seconds. Can you fully overlap parameter loading? What batch size is needed?
 
+??? success "Solution"
+    **Parameter size:**
+
+    $$M_{params} = 70 \times 10^9 \times 2 \text{ bytes} = 140 \text{ GB}$$
+
+    **Time to transfer all parameters:**
+
+    $$T_{transfer} = \frac{140 \text{ GB}}{32 \text{ GB/s}} = 4.375 \text{ seconds}$$
+
+    **Can we fully overlap?**
+
+    No! Transfer time (4.375s) > Forward pass time (2s).
+
+    $$\text{Overlap ratio} = \frac{T_{transfer}}{T_{compute}} = \frac{4.375}{2} = 2.19$$
+
+    We need 2.19× more compute time to hide the transfer.
+
+    **Required batch size:**
+
+    Compute scales linearly with batch size, so:
+
+    $$B_{required} = B_{current} \times \frac{T_{transfer}}{T_{compute}} = B_{current} \times 2.19$$
+
+    If the current forward pass (2s) is with batch size $B$, we need:
+
+    $$B_{new} \geq 2.19 \times B$$
+
+    **Alternative: Per-layer streaming**
+
+    If we stream layer-by-layer (with ~80 layers for 70B):
+
+    $$M_{layer} = \frac{140 \text{ GB}}{80} = 1.75 \text{ GB}$$
+
+    $$T_{layer\_transfer} = \frac{1.75 \text{ GB}}{32 \text{ GB/s}} = 54.7 \text{ ms}$$
+
+    $$T_{layer\_compute} = \frac{2000 \text{ ms}}{80} = 25 \text{ ms}$$
+
+    Still transfer-bound per layer. Need double buffering + 2× batch size.
+
+    | Configuration | Batch Multiplier | Fully Overlapped? |
+    |---------------|------------------|-------------------|
+    | Current | 1× | No |
+    | 2× batch | 2× | Almost (80ms vs 55ms/layer) |
+    | 2.5× batch | 2.5× | $\boxed{\text{Yes}}$ |
+
 2. **Memory tiering**: Design an offloading strategy for a 500B parameter model on a node with 8× 80GB GPUs, 2TB CPU RAM, and 20TB NVMe. Calculate memory requirements for each tier.
+
+??? success "Solution"
+    **System capacity:**
+
+    | Tier | Capacity | Bandwidth | Latency |
+    |------|----------|-----------|---------|
+    | GPU | 8 × 80 = 640 GB | 3.35 TB/s (HBM3) | ~ns |
+    | CPU | 2 TB | ~200 GB/s (DDR5) | ~100ns |
+    | NVMe | 20 TB | ~28 GB/s (4× Gen4) | ~μs |
+
+    **Model memory requirements (training with AdamW):**
+
+    $$M_{total} = 16\Psi = 16 \times 500 \times 10^9 = 8 \text{ TB}$$
+
+    | Component | Size | Formula |
+    |-----------|------|---------|
+    | Parameters (fp16) | 1 TB | $2\Psi$ |
+    | Gradients (fp16) | 1 TB | $2\Psi$ |
+    | Optimizer (fp32) | 6 TB | $12\Psi$ |
+    | **Total** | **8 TB** | $16\Psi$ |
+
+    **Tiering Strategy:**
+
+    ```
+    ┌─────────────────────────────────────────────────────────┐
+    │  GPU (640 GB total, ~80 GB per GPU)                     │
+    │  ├── Active layer parameters: ~12 GB (2 layers)         │
+    │  ├── Active gradients: ~12 GB                           │
+    │  ├── Activation memory: ~40 GB                          │
+    │  └── Working buffers: ~16 GB                            │
+    ├─────────────────────────────────────────────────────────┤
+    │  CPU RAM (2 TB)                                         │
+    │  ├── Full parameters (prefetch buffer): 1 TB            │
+    │  ├── Full gradients (accumulation buffer): 1 TB         │
+    │  └── Reserved for OS/framework: 200 GB                  │
+    ├─────────────────────────────────────────────────────────┤
+    │  NVMe (20 TB)                                           │
+    │  ├── Optimizer states: 6 TB                             │
+    │  ├── Checkpoint storage: ~10 TB                         │
+    │  └── Spare capacity: ~4 TB                              │
+    └─────────────────────────────────────────────────────────┘
+    ```
+
+    **Data flow during training:**
+
+    1. **Forward pass**: Stream parameters GPU ← CPU ← NVMe
+    2. **Backward pass**: Compute gradients, accumulate in CPU
+    3. **Optimizer step**: Update on NVMe (chunked), apply to parameters
+
+    **Timing analysis (per step):**
+
+    | Operation | Data Size | Bandwidth | Time |
+    |-----------|-----------|-----------|------|
+    | Params: NVMe → CPU | 1 TB | 28 GB/s | 36s |
+    | Params: CPU → GPU | 1 TB | 32 GB/s | 31s |
+    | Grads: GPU → CPU | 1 TB | 32 GB/s | 31s |
+    | Opt update (NVMe) | 6 TB | 28 GB/s | 214s |
+
+    **Optimization: Overlap everything**
+
+    With proper prefetching and streaming:
+
+    $$T_{step} \approx \max(T_{compute}, T_{transfer})$$
+
+    | Configuration | Practical? |
+    |---------------|------------|
+    | All on GPU | No (need 8 TB, have 640 GB) |
+    | GPU + CPU only | No (need 8 TB, have 2.6 TB) |
+    | GPU + CPU + NVMe | $\boxed{\text{Yes}}$ |
 
 3. **Overlap efficiency**: If compute time is 100ms and transfer time is 80ms with 5ms sync overhead, what is the offload efficiency? How would you improve it?
 
+??? success "Solution"
+    **Offload efficiency definition:**
+
+    $$\eta_{offload} = \frac{T_{compute}}{T_{total}}$$
+
+    Where $T_{total}$ is the actual wall-clock time per step.
+
+    **Case 1: No overlap (sequential)**
+
+    $$T_{total}^{seq} = T_{compute} + T_{transfer} + T_{sync} = 100 + 80 + 5 = 185 \text{ ms}$$
+
+    $$\eta_{offload}^{seq} = \frac{100}{185} = 54\%$$
+
+    **Case 2: Full overlap (pipelined)**
+
+    With perfect overlap, transfer happens during compute:
+
+    $$T_{total}^{overlap} = \max(T_{compute}, T_{transfer}) + T_{sync}$$
+
+    $$T_{total}^{overlap} = \max(100, 80) + 5 = 105 \text{ ms}$$
+
+    $$\eta_{offload}^{overlap} = \frac{100}{105} = \boxed{95.2\%}$$
+
+    **Improvement strategies:**
+
+    | Strategy | Effect | New Efficiency |
+    |----------|--------|----------------|
+    | Async transfers | Hide 80ms behind 100ms | 95.2% |
+    | Reduce sync overhead | 5ms → 1ms | 99.0% |
+    | Larger batches | Increase $T_{compute}$ | Higher |
+    | Pinned memory | Reduce sync overhead | ~98% |
+    | Double buffering | Enable full overlap | 95.2% |
+
+    **Implementation for maximum overlap:**
+
+    ```python
+    class OverlappedOffloader:
+        def __init__(self, model, device):
+            self.stream_compute = torch.cuda.Stream()
+            self.stream_transfer = torch.cuda.Stream()
+            self.buffers = [None, None]  # Double buffer
+
+        def step(self, layer_idx, input_tensor):
+            current_buf = layer_idx % 2
+            next_buf = (layer_idx + 1) % 2
+
+            # Prefetch next layer (overlapped with compute)
+            with torch.cuda.stream(self.stream_transfer):
+                self.buffers[next_buf] = self.load_layer(layer_idx + 1)
+
+            # Compute on current layer
+            with torch.cuda.stream(self.stream_compute):
+                output = self.forward_layer(layer_idx, input_tensor,
+                                           self.buffers[current_buf])
+
+            # Minimal sync point
+            self.stream_compute.synchronize()
+            return output
+    ```
+
+    **Sync overhead reduction:**
+
+    The 5ms sync overhead can be reduced by:
+
+    1. **CUDA events** instead of stream sync: ~0.1ms
+    2. **Pinned memory**: Eliminates page fault overhead
+    3. **Fewer sync points**: Sync every N layers instead of every layer
+
 4. **Double buffering**: Implement triple buffering for parameter loading. When would this be beneficial over double buffering?
+
+??? success "Solution"
+    **Triple buffering implementation:**
+
+    ```python
+    import torch
+    from collections import deque
+    from typing import Optional, List, Callable
+
+    class TripleBufferedLoader:
+        """
+        Triple buffering for parameter loading.
+
+        Maintains 3 GPU buffers:
+        - Buffer 0: Currently being used for compute
+        - Buffer 1: Next layer (ready for compute)
+        - Buffer 2: Being filled from CPU/NVMe
+        """
+
+        def __init__(
+            self,
+            layer_size: int,
+            dtype: torch.dtype = torch.float16,
+            device: str = "cuda"
+        ):
+            # Allocate 3 GPU buffers
+            self.buffers = [
+                torch.empty(layer_size, dtype=dtype, device=device)
+                for _ in range(3)
+            ]
+
+            # Transfer streams
+            self.transfer_streams = [
+                torch.cuda.Stream() for _ in range(2)
+            ]
+            self.compute_stream = torch.cuda.Stream()
+
+            # Buffer state tracking
+            self.buffer_ready = [False, False, False]
+            self.current_transfer_stream = 0
+
+        def prefetch_layer(
+            self,
+            layer_idx: int,
+            buffer_idx: int,
+            source_tensor: torch.Tensor
+        ):
+            """Async prefetch a layer into buffer."""
+            stream = self.transfer_streams[self.current_transfer_stream]
+            self.current_transfer_stream = 1 - self.current_transfer_stream
+
+            with torch.cuda.stream(stream):
+                self.buffers[buffer_idx].copy_(source_tensor, non_blocking=True)
+
+            self.buffer_ready[buffer_idx] = True
+            return stream
+
+        def forward_with_triple_buffer(
+            self,
+            layers: List[Callable],
+            cpu_params: List[torch.Tensor],
+            input_tensor: torch.Tensor
+        ) -> torch.Tensor:
+            """
+            Execute forward pass with triple buffering.
+            """
+            num_layers = len(layers)
+            x = input_tensor
+
+            # Initial prefetch: load first 2 layers
+            events = [None, None]
+            events[0] = self.prefetch_layer(0, 0, cpu_params[0])
+            if num_layers > 1:
+                events[1] = self.prefetch_layer(1, 1, cpu_params[1])
+
+            for i in range(num_layers):
+                compute_buf = i % 3
+                prefetch_buf = (i + 2) % 3
+
+                # Wait for current layer's transfer
+                if events[i % 2] is not None:
+                    events[i % 2].synchronize()
+
+                # Start prefetching layer i+2
+                if i + 2 < num_layers:
+                    events[i % 2] = self.prefetch_layer(
+                        i + 2, prefetch_buf, cpu_params[i + 2]
+                    )
+
+                # Compute layer i
+                with torch.cuda.stream(self.compute_stream):
+                    x = layers[i](x, self.buffers[compute_buf])
+
+            self.compute_stream.synchronize()
+            return x
+    ```
+
+    **When is triple buffering beneficial?**
+
+    | Scenario | Double Buffer | Triple Buffer | Winner |
+    |----------|---------------|---------------|--------|
+    | $T_{transfer} < T_{compute}$ | Full overlap | No benefit | Draw |
+    | $T_{transfer} = T_{compute}$ | Full overlap | No benefit | Draw |
+    | $T_{transfer} > T_{compute}$ | Compute-bound gaps | Smoother pipeline | Triple |
+    | Variable transfer times | May stall | Extra buffer absorbs variance | Triple |
+    | High jitter/contention | Stalls on delays | Tolerates delays | Triple |
+
+    **Mathematical analysis:**
+
+    Let $T_c$ = compute time, $T_t$ = transfer time.
+
+    **Double buffering:**
+
+    $$T_{step}^{double} = \max(T_c, T_t)$$
+
+    Stalls when transfer for layer $i+1$ isn't complete when layer $i$ finishes.
+
+    **Triple buffering:**
+
+    $$T_{step}^{triple} = \max(T_c, \frac{T_t}{2})$$
+
+    With 2 transfers in flight, we effectively have twice the transfer bandwidth.
+
+    **When triple buffering helps:**
+
+    $$T_t > T_c \text{ (transfer-bound scenario)}$$
+
+    **Example:**
+
+    | Metric | Double Buffer | Triple Buffer |
+    |--------|---------------|---------------|
+    | $T_c = 50$ ms | | |
+    | $T_t = 80$ ms | | |
+    | Per-layer time | 80 ms | 50 ms |
+    | Speedup | 1× | $\boxed{1.6\times}$ |
+
+    Triple buffering is most beneficial when transfer time exceeds compute time, allowing the pipeline to stay compute-bound rather than transfer-bound.
 
 5. **Compression trade-off**: LZ4 achieves 1.5× compression with 2GB/s compression throughput. For a 10GB tensor on NVMe (7GB/s), is compression worth it? Calculate total time with and without compression.
 
+??? success "Solution"
+    **Without compression:**
+
+    $$T_{no\_compress} = \frac{10 \text{ GB}}{7 \text{ GB/s}} = 1.43 \text{ seconds}$$
+
+    **With compression:**
+
+    Compressed size:
+    $$M_{compressed} = \frac{10 \text{ GB}}{1.5} = 6.67 \text{ GB}$$
+
+    Compression time (on CPU):
+    $$T_{compress} = \frac{10 \text{ GB}}{2 \text{ GB/s}} = 5.0 \text{ seconds}$$
+
+    Transfer time:
+    $$T_{transfer} = \frac{6.67 \text{ GB}}{7 \text{ GB/s}} = 0.95 \text{ seconds}$$
+
+    Total with compression:
+    $$T_{with\_compress} = T_{compress} + T_{transfer} = 5.0 + 0.95 = 5.95 \text{ seconds}$$
+
+    **Comparison:**
+
+    | Approach | Time | Speedup |
+    |----------|------|---------|
+    | No compression | 1.43s | 1× |
+    | With compression | 5.95s | 0.24× (slower!) |
+
+    $$\boxed{\text{Compression is NOT worth it}}$$
+
+    **Break-even analysis:**
+
+    Compression is beneficial when:
+
+    $$T_{compress} + T_{transfer}^{compressed} < T_{transfer}^{uncompressed}$$
+
+    $$\frac{M}{C_{throughput}} + \frac{M/R}{B_{NVMe}} < \frac{M}{B_{NVMe}}$$
+
+    Where $R$ = compression ratio, $C$ = compression throughput.
+
+    Solving for when compression helps:
+
+    $$\frac{1}{C_{throughput}} < \frac{1}{B_{NVMe}} \times (1 - \frac{1}{R})$$
+
+    $$C_{throughput} > \frac{B_{NVMe}}{1 - 1/R}$$
+
+    For our case ($R = 1.5$, $B = 7$ GB/s):
+
+    $$C_{required} > \frac{7}{1 - 1/1.5} = \frac{7}{0.33} = 21 \text{ GB/s}$$
+
+    We need compression throughput > 21 GB/s, but LZ4 only provides 2 GB/s.
+
+    **When compression IS beneficial:**
+
+    | Scenario | Why |
+    |----------|-----|
+    | Very slow storage (HDD ~200 MB/s) | Transfer dominates |
+    | High compression ratio (>10×) | Significant size reduction |
+    | GPU-accelerated compression | Fast enough to overlap |
+    | Sparse tensors | Extreme compression possible |
+
+    **GPU-accelerated compression example:**
+
+    With nvCOMP (GPU LZ4, ~50 GB/s):
+
+    $$T_{compress}^{GPU} = \frac{10}{50} = 0.2 \text{s}$$
+
+    $$T_{total}^{GPU} = 0.2 + 0.95 = 1.15 \text{s} < 1.43\text{s}$$
+
+    GPU compression would provide $\boxed{1.24\times}$ speedup.
+
 6. **Prefetch depth**: Derive the optimal prefetch depth given layer compute time $T_c$, transfer bandwidth $B$, and layer size $S$. When does increasing prefetch depth not help?
+
+??? success "Solution"
+    **Definitions:**
+
+    - $T_c$ = compute time per layer
+    - $B$ = transfer bandwidth (bytes/second)
+    - $S$ = layer size (bytes)
+    - $k$ = prefetch depth (number of layers prefetched ahead)
+
+    **Transfer time per layer:**
+
+    $$T_t = \frac{S}{B}$$
+
+    **Optimal prefetch depth derivation:**
+
+    For no stalls, we need enough time to transfer the next layer before we need it:
+
+    $$k \times T_c \geq T_t$$
+
+    Solving for minimum $k$:
+
+    $$k^* = \left\lceil \frac{T_t}{T_c} \right\rceil = \left\lceil \frac{S}{B \times T_c} \right\rceil$$
+
+    $$\boxed{k^* = \left\lceil \frac{S}{B \cdot T_c} \right\rceil}$$
+
+    **Example calculation:**
+
+    | Parameter | Value |
+    |-----------|-------|
+    | Layer size $S$ | 2 GB |
+    | PCIe bandwidth $B$ | 32 GB/s |
+    | Compute time $T_c$ | 50 ms |
+
+    $$T_t = \frac{2}{32} = 62.5 \text{ ms}$$
+
+    $$k^* = \left\lceil \frac{62.5}{50} \right\rceil = \left\lceil 1.25 \right\rceil = 2$$
+
+    Need prefetch depth of 2 to avoid stalls.
+
+    **When increasing prefetch depth does NOT help:**
+
+    | Scenario | Why |
+    |----------|-----|
+    | Already compute-bound ($T_t < T_c$) | $k=1$ is sufficient |
+    | Memory-limited | Can't allocate more buffers |
+    | Diminishing returns | Beyond $k^*$, no improvement |
+    | Variable layer sizes | May need adaptive $k$ |
+
+    **Mathematical analysis of diminishing returns:**
+
+    Effective throughput as function of $k$:
+
+    $$\text{Throughput}(k) = \begin{cases}
+    \frac{1}{T_t / k} & \text{if } k < k^* \text{ (transfer-bound)} \\
+    \frac{1}{T_c} & \text{if } k \geq k^* \text{ (compute-bound)}
+    \end{cases}$$
+
+    Once $k \geq k^*$, we're compute-bound and more prefetching doesn't help.
+
+    **Memory cost:**
+
+    $$M_{prefetch} = (k + 1) \times S$$
+
+    Extra memory for $k$ prefetched buffers plus one compute buffer.
+
+    | Prefetch Depth | Throughput | Memory Cost |
+    |----------------|------------|-------------|
+    | $k = 0$ | $\frac{1}{T_c + T_t}$ | $S$ |
+    | $k = 1$ | $\frac{1}{\max(T_c, T_t)}$ | $2S$ |
+    | $k = k^*$ | $\frac{1}{T_c}$ | $(k^*+1)S$ |
+    | $k > k^*$ | $\frac{1}{T_c}$ (no gain) | Wasted memory |
+
+    **Adaptive prefetch strategy:**
+
+    ```python
+    def compute_optimal_prefetch(
+        layer_sizes: List[int],
+        bandwidth: float,
+        compute_times: List[float]
+    ) -> List[int]:
+        """
+        Compute per-layer optimal prefetch depth.
+        Handles variable layer sizes and compute times.
+        """
+        prefetch_depths = []
+
+        for size, t_compute in zip(layer_sizes, compute_times):
+            t_transfer = size / bandwidth
+            k_optimal = max(1, int(np.ceil(t_transfer / t_compute)))
+            prefetch_depths.append(k_optimal)
+
+        return prefetch_depths
+    ```
+
+    **Key insight:** Optimal prefetch is just enough to hide transfer latency—more wastes memory without improving throughput.
 
 ## Key Takeaways
 

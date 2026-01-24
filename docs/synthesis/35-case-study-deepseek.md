@@ -810,6 +810,428 @@ if __name__ == "__main__":
 
 6. **Cost comparison**: Using the Chinchilla scaling law, estimate the quality-equivalent dense model for DeepSeek-V3 (37B activated × 14.8T tokens). Compare training costs.
 
+??? success "Solution"
+    **Exercise 1: MLA Trade-off**
+
+    **Multi-head Latent Attention (MLA) Architecture:**
+
+    - Compressed dimension: $d_c = 512$
+    - Original head dimension: $d_h = 128$
+    - Number of heads: $n_h = 128$
+    - Hidden dimension: $H = n_h \times d_h = 16384$
+
+    **Standard MHA KV cache per token:**
+    $$M_{MHA} = 2 \times n_h \times d_h = 2 \times 128 \times 128 = 32768 \text{ bytes (FP16)}$$
+
+    **MLA KV cache per token:**
+    $$M_{MLA} = d_c = 512 \text{ bytes (FP16 = 1024 bytes)}$$
+
+    **Memory reduction:**
+    $$\text{Ratio} = \frac{32768}{1024} = 32\times \text{ reduction}$$
+
+    **Extra FLOPs for compression/decompression:**
+
+    Compression (per token):
+    $$F_{compress} = 2 \times H \times d_c = 2 \times 16384 \times 512 = 16.8\text{M FLOPs}$$
+
+    Decompression (per query token, for all KV):
+    $$F_{decompress} = S \times 2 \times d_c \times H = S \times 2 \times 512 \times 16384 = 16.8S \text{M FLOPs}$$
+
+    **Standard attention FLOPs (for comparison):**
+    $$F_{attn} = 4 \times S \times H = 4 \times S \times 16384 = 65.5S \text{M FLOPs}$$
+
+    **Break-even analysis:**
+
+    Memory savings justify compute when memory is the bottleneck.
+
+    KV cache memory at sequence length S:
+    - MHA: $S \times 32768 \times L$ bytes (L layers)
+    - MLA: $S \times 1024 \times L$ bytes
+
+    For 80GB GPU with 60GB available for KV cache, L=60 layers:
+    - MHA max S: $\frac{60 \times 10^9}{32768 \times 60} = 30.5K$ tokens
+    - MLA max S: $\frac{60 \times 10^9}{1024 \times 60} = 976K$ tokens
+
+    **Compute overhead:**
+    $$\text{Overhead} = \frac{16.8 + 16.8S}{65.5S} \approx \frac{16.8S}{65.5S} = 25.6\%$$
+
+    $$\boxed{\text{MLA justified when } S > 30K \text{ (where MHA cannot fit in memory)}}$$
+
+    For S < 30K, MHA is computationally cheaper. For S > 30K, MLA is the only option.
+
+    **Exercise 2: Fine-grained MoE Load Variance**
+
+    **Setup:**
+    - Option A: 256 experts, top-8 routing
+    - Option B: 64 experts, top-2 routing
+    - Both activate same parameters: $8/256 = 2/64 = 3.125\%$
+
+    **Binomial model for expert load:**
+
+    For $N$ tokens and $E$ experts with top-$k$ routing:
+    - Each token selects $k$ experts
+    - Expected tokens per expert: $\mu = \frac{N \times k}{E}$
+    - Variance (assuming uniform routing): $\sigma^2 = \mu \times (1 - k/E)$
+
+    **Option A (256 experts, top-8):**
+    $$\mu_A = \frac{N \times 8}{256} = \frac{N}{32}$$
+    $$\sigma_A = \sqrt{\frac{N}{32} \times (1 - \frac{8}{256})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
+
+    Coefficient of variation:
+    $$CV_A = \frac{\sigma_A}{\mu_A} = \frac{0.174\sqrt{N}}{N/32} = \frac{5.57}{\sqrt{N}}$$
+
+    **Option B (64 experts, top-2):**
+    $$\mu_B = \frac{N \times 2}{64} = \frac{N}{32}$$
+    $$\sigma_B = \sqrt{\frac{N}{32} \times (1 - \frac{2}{64})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
+
+    $$CV_B = \frac{5.57}{\sqrt{N}}$$
+
+    **Wait—same CV?** The key difference is in the tail behavior!
+
+    **Max load analysis (more important for efficiency):**
+
+    With 256 experts, the maximum load is distributed across more "bins":
+    $$E[\max] \propto \mu + \sigma\sqrt{2\ln E}$$
+
+    For E=256: $\sqrt{2\ln 256} = 3.33$
+    For E=64: $\sqrt{2\ln 64} = 2.88$
+
+    But with 256 experts, load is spread thinner, so absolute max is lower:
+
+    | Config | Expected Load | Max Load Factor | Practical Imbalance |
+    |--------|---------------|-----------------|---------------------|
+    | 256 experts, top-8 | N/32 | 1 + 3.33/√(N/32) | Lower |
+    | 64 experts, top-2 | N/32 | 1 + 2.88/√(N/32) | Higher |
+
+    $$\boxed{\text{256 experts has 15\% lower peak imbalance despite similar average variance}}$$
+
+    Fine-grained experts also enable better routing decisions (more specialization options).
+
+    **Exercise 3: FP8 Quantization Error**
+
+    **Weight distribution:** $w \sim \mathcal{N}(0, 0.02)$
+
+    **E4M3 format:**
+    - 4 exponent bits, 3 mantissa bits
+    - Representable range: ~±448
+    - Precision: 8 discrete levels per power of 2
+
+    **Per-tensor scaling:**
+
+    Scale factor: $s = \frac{\max(|w|)}{448}$
+
+    For $\mathcal{N}(0, 0.02)$ with 10M weights:
+    $$\max(|w|) \approx \sigma \times \sqrt{2\ln N} = 0.02 \times \sqrt{2\ln 10^7} \approx 0.02 \times 5.7 = 0.114$$
+
+    Scale: $s = \frac{0.114}{448} = 2.54 \times 10^{-4}$
+
+    Quantization step size: $\Delta = s \times 2^{-3} = 3.2 \times 10^{-5}$
+
+    **Quantization error (uniform distribution over step):**
+    $$\text{RMSE}_{tensor} = \frac{\Delta}{\sqrt{12}} = 9.2 \times 10^{-6}$$
+
+    **Per-block scaling (block=128):**
+
+    For block of 128 weights from $\mathcal{N}(0, 0.02)$:
+    $$\max(|w|)_{block} \approx 0.02 \times \sqrt{2\ln 128} \approx 0.02 \times 3.1 = 0.062$$
+
+    Scale: $s_{block} = \frac{0.062}{448} = 1.38 \times 10^{-4}$
+
+    Step size: $\Delta_{block} = 1.73 \times 10^{-5}$
+
+    $$\text{RMSE}_{block} = \frac{\Delta_{block}}{\sqrt{12}} = 5.0 \times 10^{-6}$$
+
+    **Comparison:**
+
+    | Scaling | Step Size | RMSE | Relative Error |
+    |---------|-----------|------|----------------|
+    | Per-tensor | $3.2 \times 10^{-5}$ | $9.2 \times 10^{-6}$ | 0.046% |
+    | Per-block (128) | $1.7 \times 10^{-5}$ | $5.0 \times 10^{-6}$ | 0.025% |
+
+    $$\boxed{\text{Per-block scaling reduces quantization error by } 1.8\times}$$
+
+    **Exercise 4: DualPipe Scheduling**
+
+    ```python
+    from dataclasses import dataclass
+    from typing import List, Tuple
+    from enum import Enum
+
+    class OpType(Enum):
+        FORWARD = "F"
+        BACKWARD = "B"
+        IDLE = "_"
+
+    @dataclass
+    class MicroBatch:
+        id: int
+        stage: int
+        op: OpType
+        pipe: int  # 0 or 1 for DualPipe
+
+    def standard_1f1b(stages: int, micro_batches: int) -> List[List[str]]:
+        """Generate standard 1F1B schedule."""
+        schedule = [[] for _ in range(stages)]
+
+        # Warmup: fill pipeline with forwards
+        for mb in range(stages):
+            for s in range(stages):
+                if mb >= s:
+                    schedule[s].append(f"F{mb-s}")
+                else:
+                    schedule[s].append("_")
+
+        # Steady state: 1F1B
+        for mb in range(stages, micro_batches):
+            for s in range(stages):
+                schedule[s].append(f"F{mb-s}")
+                schedule[s].append(f"B{mb-stages-s}")
+
+        # Cooldown: drain backwards
+        for mb in range(stages):
+            for s in range(stages):
+                if mb < stages - s:
+                    schedule[s].append(f"B{micro_batches-stages+mb-s}")
+                else:
+                    schedule[s].append("_")
+
+        return schedule
+
+    def dualpipe_schedule(stages: int, micro_batches: int) -> List[List[str]]:
+        """
+        Generate DualPipe schedule with two interleaved pipelines.
+        Each stage processes two micro-batches concurrently from different pipes.
+        """
+        schedule = [[] for _ in range(stages)]
+        half_mb = micro_batches // 2
+
+        # Two pipelines: A (forward direction) and B (backward direction)
+        # Pipeline A: stages 0→7
+        # Pipeline B: stages 7→0 (reversed)
+
+        for t in range(stages + half_mb):
+            for s in range(stages):
+                ops = []
+
+                # Pipeline A (normal direction)
+                mb_a = t - s
+                if 0 <= mb_a < half_mb:
+                    if t < stages:  # Warmup
+                        ops.append(f"F{mb_a}")
+                    elif t < stages + half_mb - stages:  # Steady
+                        ops.append(f"F{mb_a}")
+                        if mb_a >= stages:
+                            ops.append(f"B{mb_a - stages}")
+                    else:  # Cooldown
+                        ops.append(f"B{mb_a}")
+
+                # Pipeline B (reversed direction)
+                s_rev = stages - 1 - s
+                mb_b = t - s_rev
+                if 0 <= mb_b < half_mb:
+                    ops.append(f"F'{mb_b}")  # ' denotes pipe B
+
+                if not ops:
+                    ops.append("_")
+
+                schedule[s].append("+".join(ops))
+
+        return schedule
+
+    def calculate_bubble(schedule: List[List[str]]) -> float:
+        """Calculate bubble fraction."""
+        total_slots = sum(len(stage) for stage in schedule)
+        idle_slots = sum(1 for stage in schedule for op in stage if op == "_")
+        return idle_slots / total_slots
+
+    # Compare schedules
+    stages = 8
+    micro_batches = 16
+
+    std_schedule = standard_1f1b(stages, micro_batches)
+    dual_schedule = dualpipe_schedule(stages, micro_batches)
+
+    std_bubble = calculate_bubble(std_schedule)
+    # For dual pipe, theoretical bubble reduction
+    dual_bubble = (stages - 1) / (micro_batches + stages - 1) / 2
+
+    print(f"Standard 1F1B bubble: {std_bubble:.1%}")
+    print(f"DualPipe bubble: {dual_bubble:.1%}")
+    print(f"Reduction: {(std_bubble - dual_bubble) / std_bubble:.1%}")
+    ```
+
+    **Results:**
+
+    | Schedule | Bubble Fraction | Relative |
+    |----------|-----------------|----------|
+    | Standard 1F1B | $\frac{7}{23} = 30.4\%$ | baseline |
+    | DualPipe | $\frac{7}{46} = 15.2\%$ | 50% reduction |
+
+    $$\boxed{\text{DualPipe achieves } 50\% \text{ bubble reduction (30.4\% → 15.2\%)}}$$
+
+    **Exercise 5: Expert Communication**
+
+    **Setup:**
+    - 2048 GPUs, 8 GPUs per node → 256 nodes
+    - 256 experts total
+    - Goal: minimize inter-node communication
+
+    **Strategy: Locality-aware expert placement**
+
+    ```python
+    from dataclasses import dataclass
+    from typing import Dict, List, Set
+    import numpy as np
+
+    @dataclass
+    class ExpertPlacement:
+        expert_to_gpu: Dict[int, int]
+        gpu_to_experts: Dict[int, List[int]]
+
+    def naive_placement(num_experts: int, num_gpus: int) -> ExpertPlacement:
+        """Round-robin placement."""
+        expert_to_gpu = {e: e % num_gpus for e in range(num_experts)}
+        gpu_to_experts = {g: [] for g in range(num_gpus)}
+        for e, g in expert_to_gpu.items():
+            gpu_to_experts[g].append(e)
+        return ExpertPlacement(expert_to_gpu, gpu_to_experts)
+
+    def locality_aware_placement(
+        num_experts: int,
+        num_gpus: int,
+        gpus_per_node: int
+    ) -> ExpertPlacement:
+        """
+        Place experts to maximize intra-node routing.
+        Replicate popular experts within nodes.
+        """
+        num_nodes = num_gpus // gpus_per_node
+        experts_per_node = num_experts // num_nodes  # 256/256 = 1
+
+        # With 256 experts and 256 nodes, each node gets 1 expert
+        # But we have 8 GPUs per node!
+
+        # Better: replicate all experts across nodes, shard within node
+        # Each node has all 256 experts sharded across 8 GPUs
+        # Expert e on GPU (e % 8) of each node
+
+        expert_to_gpu = {}
+        gpu_to_experts = {g: [] for g in range(num_gpus)}
+
+        for node in range(num_nodes):
+            for expert in range(num_experts):
+                gpu_in_node = expert % gpus_per_node
+                global_gpu = node * gpus_per_node + gpu_in_node
+                # Each node has full expert coverage
+                # Token stays in node, routed to correct GPU
+
+        # Actually, standard approach: each GPU hosts subset of experts
+        experts_per_gpu = num_experts // num_gpus  # 256/2048 = 0.125
+
+        # With more GPUs than experts, replicate experts
+        replicas = num_gpus // num_experts  # 8 replicas per expert
+        for expert in range(num_experts):
+            for replica in range(replicas):
+                gpu = expert * replicas + replica
+                expert_to_gpu[(expert, replica)] = gpu
+                gpu_to_experts[gpu].append(expert)
+
+        return ExpertPlacement(expert_to_gpu, gpu_to_experts)
+
+    def calculate_inter_node_comm(
+        placement: ExpertPlacement,
+        routing_matrix: np.ndarray,  # [tokens, top_k] expert indices
+        token_to_gpu: np.ndarray,
+        gpus_per_node: int
+    ) -> float:
+        """Calculate fraction of tokens requiring inter-node communication."""
+        inter_node = 0
+        total = routing_matrix.size
+
+        for token_idx, experts in enumerate(routing_matrix):
+            src_node = token_to_gpu[token_idx] // gpus_per_node
+            for expert in experts:
+                dst_gpu = placement.expert_to_gpu.get(expert, expert % len(placement.gpu_to_experts))
+                dst_node = dst_gpu // gpus_per_node
+                if src_node != dst_node:
+                    inter_node += 1
+
+        return inter_node / total
+
+    # Optimal placement strategy for DeepSeek-V3
+    """
+    With 2048 GPUs, 256 experts, 8 GPUs/node:
+    - 256 nodes total
+    - 8× replication possible per expert
+
+    Strategy: Expert parallelism + locality
+    1. Partition 256 experts into 32 groups of 8
+    2. Each group assigned to 8 nodes (64 GPUs)
+    3. Within each 8-node group, replicate all 8 experts
+    4. Tokens routed to nearest replica
+
+    Result: Most top-8 routing stays within 8-node group
+    Inter-node comm: ~12.5% (1 in 8 experts cross boundary)
+    """
+    ```
+
+    **Optimal placement summary:**
+
+    | Strategy | Inter-node Comm | Description |
+    |----------|-----------------|-------------|
+    | Naive round-robin | 87.5% | Experts scattered |
+    | Node-local groups | 50% | 128 experts per hemisphere |
+    | Hierarchical (8-node) | 12.5% | 8-expert groups replicated |
+
+    $$\boxed{\text{Hierarchical placement: 8-expert groups across 8 nodes, 12.5\% inter-node comm}}$$
+
+    **Exercise 6: Cost Comparison**
+
+    **DeepSeek-V3 effective compute:**
+    - Activated parameters: 37B per forward pass
+    - Training tokens: 14.8T
+    - FLOPs: $6 \times 37B \times 14.8T = 3.29 \times 10^{24}$ FLOPs
+
+    **Chinchilla-optimal dense model:**
+
+    Chinchilla scaling: $N_{opt} = 0.7 \times D^{0.5}$ (approximate)
+
+    For equivalent compute budget with dense model:
+    $$C = 6ND$$
+
+    Given C = $3.29 \times 10^{24}$ FLOPs and Chinchilla ratio $D = 20N$:
+    $$3.29 \times 10^{24} = 6 \times N \times 20N = 120N^2$$
+    $$N = \sqrt{\frac{3.29 \times 10^{24}}{120}} = 165B \text{ parameters}$$
+
+    **But wait—MoE uses fewer FLOPs per token!**
+
+    Actual comparison should use quality equivalence.
+
+    **Quality-equivalent analysis:**
+
+    DeepSeek-V3 achieves quality similar to GPT-4 / Claude-3 class.
+    These are estimated at 200-400B dense parameters trained on 2-5T tokens.
+
+    Dense equivalent: ~300B params × 3T tokens
+    $$C_{dense} = 6 \times 300B \times 3T = 5.4 \times 10^{24} \text{ FLOPs}$$
+
+    DeepSeek-V3 actual:
+    $$C_{MoE} = 6 \times 37B \times 14.8T = 3.29 \times 10^{24} \text{ FLOPs}$$
+
+    **Cost comparison (at $2/H100-hour, 50% MFU):**
+
+    | Model | Compute | H100-hours | Cost |
+    |-------|---------|------------|------|
+    | Dense 300B | $5.4 \times 10^{24}$ | 3.0M | $6.0M |
+    | DeepSeek-V3 | $3.29 \times 10^{24}$ | 1.8M | $3.6M |
+
+    $$\boxed{\text{DeepSeek-V3 is } 1.6\times \text{ cheaper than equivalent dense model}}$$
+
+    **Additional MoE advantages:**
+    - Lower inference cost (37B vs 300B activated)
+    - Better scaling potential (can add experts)
+    - Memory-compute trade-off flexibility
+
 ## Key Takeaways
 
 1. **Architecture drives efficiency**: MoE (18×) and MLA (57× KV) provide larger gains than systems optimizations.

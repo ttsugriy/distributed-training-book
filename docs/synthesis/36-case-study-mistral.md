@@ -1015,6 +1015,348 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
 6. **Speculative decoding speedup**: If the draft model is 5× faster than the target and accepts 70% of proposed tokens on average with K=4 speculation depth, what is the expected speedup?
 
+??? success "Solution"
+    **Exercise 1: Window Size Selection**
+
+    **Sliding Window Attention (SWA) Properties:**
+
+    With window size $w$ and $L$ layers, information propagates through layers:
+    - Layer 1: Each token sees $w$ tokens
+    - Layer 2: Each token sees tokens that saw $w$ tokens each → effective $2w$
+    - Layer $L$: Effective context = $L \times w$
+
+    **Effective context length:**
+    $$C_{eff} = L \times w$$
+
+    **For 100K effective context with L=32 layers:**
+    $$w = \frac{C_{eff}}{L} = \frac{100,000}{32} = 3,125$$
+
+    Round to power of 2 for efficiency:
+    $$\boxed{w = 4096 \text{ tokens}}$$
+
+    This gives effective context of $32 \times 4096 = 131K$ tokens.
+
+    **Verification with Mistral's design:**
+    - Mistral 7B: $w = 4096$, $L = 32$ → 131K effective context
+    - Memory per position: $O(w)$ instead of $O(S)$
+
+    **Trade-off table:**
+
+    | Window Size | Layers | Effective Context | KV Cache (relative) |
+    |-------------|--------|-------------------|---------------------|
+    | 2048 | 32 | 65K | 1× |
+    | 4096 | 32 | 131K | 2× |
+    | 8192 | 32 | 262K | 4× |
+    | 4096 | 64 | 262K | 2× (more layers) |
+
+    **Exercise 2: GQA Memory Analysis**
+
+    **Setup:**
+    - Hidden dimension: H = 4096
+    - Head dimension: $d_h$ = 128
+    - Query heads: $n_q$ = 32
+    - Sequence length: S = 8192
+
+    **KV cache per token (FP16):**
+    $$M_{KV} = 2 \times n_{kv} \times d_h \times 2 \text{ bytes}$$
+
+    **(a) MHA (Multi-Head Attention): $n_{kv}$ = 32**
+    $$M_{MHA} = 2 \times 32 \times 128 \times 2 = 16,384 \text{ bytes/token}$$
+
+    For S=8192: $16,384 \times 8192 = 134$ MB per layer
+
+    **(b) MQA (Multi-Query Attention): $n_{kv}$ = 1**
+    $$M_{MQA} = 2 \times 1 \times 128 \times 2 = 512 \text{ bytes/token}$$
+
+    For S=8192: $512 \times 8192 = 4.2$ MB per layer
+
+    Reduction: 32×
+
+    **(c) GQA (Grouped-Query Attention): $n_{kv}$ = 8**
+    $$M_{GQA} = 2 \times 8 \times 128 \times 2 = 4,096 \text{ bytes/token}$$
+
+    For S=8192: $4,096 \times 8192 = 33.5$ MB per layer
+
+    Reduction: 4×
+
+    **Quality comparison (empirical):**
+
+    | Method | Memory | Quality (vs MHA) | Sweet Spot |
+    |--------|--------|------------------|------------|
+    | MHA | 100% | 100% | Small models |
+    | MQA | 3.1% | 95-97% | Extreme compression |
+    | GQA-8 | 25% | 99%+ | ✓ Best trade-off |
+    | GQA-4 | 12.5% | 98-99% | Good trade-off |
+
+    $$\boxed{\text{GQA with 8 groups: 4× memory reduction with <1\% quality loss}}$$
+
+    **Exercise 3: MoE Compute Efficiency**
+
+    **Mixtral configuration:**
+    - Total experts: $E = 16$
+    - Active experts per token: $k = 2$
+    - Expert size: Same as dense FFN
+
+    **Activated fraction:**
+    $$\text{Active fraction} = \frac{k}{E} = \frac{2}{16} = 12.5\%$$
+
+    **Effective FLOPs per token:**
+
+    For dense model with FFN FLOPs $F_{FFN}$:
+    $$F_{MoE} = \frac{k}{E} \times E \times F_{FFN} = k \times F_{FFN}$$
+
+    Wait—each token uses $k$ full experts, so:
+    $$F_{MoE} = k \times F_{FFN} = 2 \times F_{FFN}$$
+
+    But total model has $E$ experts worth of parameters.
+
+    **Parameter efficiency:**
+    $$\frac{\text{Active params}}{\text{Total params}} = \frac{k}{E} = 12.5\%$$
+
+    **Chinchilla scaling adjustment:**
+
+    Chinchilla: $D_{opt} = 20N$ (optimal tokens = 20× parameters)
+
+    For MoE, effective parameters for quality ≈ active parameters × scaling factor:
+    $$N_{eff} \approx N_{active} \times \alpha$$
+
+    Where $\alpha \approx 2-3$ (MoE quality multiplier from routing specialization).
+
+    For Mixtral 8x7B:
+    - Total params: $8 \times 7B + \text{shared} = 46.7B$
+    - Active params: $\approx 12.9B$
+    - Effective for quality: $\approx 25-40B$ equivalent
+
+    **Optimal training budget:**
+    $$D_{opt,MoE} = 20 \times N_{active} \times \alpha \approx 20 \times 12.9B \times 2.5 = 645B \text{ tokens}$$
+
+    Mistral trained on more tokens (estimated 1-2T) because:
+    1. Inference cost is low (12.9B active)
+    2. Additional tokens continue improving quality
+
+    $$\boxed{\text{12.5\% activation → can train on 8× more tokens at same FLOP budget}}$$
+
+    **Exercise 4: Expert Parallelism Strategy**
+
+    **Setup:**
+    - 64 GPUs (8 nodes × 8 GPUs)
+    - Mixtral 8x22B: 8 experts, ~22B params each
+    - Total params: ~141B
+
+    **Memory per expert:**
+    - Parameters: $22B \times 2 = 44$ GB (FP16)
+    - Optimizer (Adam): $22B \times 12 = 264$ GB (FP32)
+    - Total static per expert: ~308 GB
+
+    Can't fit one expert per GPU! Need sharding.
+
+    **Strategy 1: TP=4, EP=8, DP=2**
+
+    ```
+    - Tensor Parallel: 4 GPUs share each expert (within node)
+    - Expert Parallel: 8 expert groups (one per TP group)
+    - Data Parallel: 2 replicas
+
+    GPU Layout (8 nodes × 8 GPUs = 64):
+    Node 0: Expert 0 (TP=4) + Expert 0 replica (TP=4)
+    Node 1: Expert 1 (TP=4) + Expert 1 replica (TP=4)
+    ...
+    ```
+
+    Memory per GPU: $\frac{44}{4} + \frac{264}{4 \times 2} = 11 + 33 = 44$ GB ✓
+
+    **Strategy 2: TP=8, EP=8, DP=1**
+
+    ```
+    - Full node for each expert (TP=8)
+    - Each node handles one expert
+    - No DP (batch parallelism only)
+    ```
+
+    Memory per GPU: $\frac{44}{8} + \frac{264}{8} = 5.5 + 33 = 38.5$ GB ✓
+
+    **Trade-off analysis:**
+
+    | Strategy | TP | EP | DP | Comm Volume | Batch Size |
+    |----------|----|----|----|--------------| -----------|
+    | Strategy 1 | 4 | 8 | 2 | Lower TP comm | 2× larger |
+    | Strategy 2 | 8 | 8 | 1 | Higher TP comm | Limited |
+
+    **All-to-All communication for expert routing:**
+    $$V_{A2A} = 2 \times B \times S \times H = 2 \times B \times 4096 \times 6144$$
+
+    With DP=2, each replica handles half the batch → lower A2A volume.
+
+    $$\boxed{\text{Strategy 1 (TP=4, EP=8, DP=2) balances memory and throughput}}$$
+
+    **Exercise 5: Load Balancing Simulation**
+
+    ```python
+    import numpy as np
+    from dataclasses import dataclass
+    from typing import List, Tuple
+
+    @dataclass
+    class RouterState:
+        num_experts: int
+        logit_bias: np.ndarray  # Auxiliary bias for load balancing
+
+    class MoERouter:
+        def __init__(self, num_experts: int, hidden_dim: int, top_k: int = 2):
+            self.num_experts = num_experts
+            self.top_k = top_k
+            self.W_gate = np.random.randn(hidden_dim, num_experts) * 0.02
+            self.aux_loss_weight = 0.01
+            self.load_history = []
+
+        def route(self, x: np.ndarray, use_aux_loss: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+            """
+            Route tokens to experts.
+
+            Args:
+                x: [batch, hidden] input tokens
+                use_aux_loss: whether to apply load balancing
+
+            Returns:
+                expert_indices: [batch, top_k]
+                expert_weights: [batch, top_k]
+            """
+            # Compute routing logits
+            logits = x @ self.W_gate  # [batch, num_experts]
+
+            # Apply softmax
+            probs = self._softmax(logits)
+
+            # Select top-k experts
+            top_k_indices = np.argsort(probs, axis=-1)[:, -self.top_k:]
+            top_k_probs = np.take_along_axis(probs, top_k_indices, axis=-1)
+
+            # Normalize weights
+            top_k_weights = top_k_probs / top_k_probs.sum(axis=-1, keepdims=True)
+
+            # Record load
+            load = np.bincount(top_k_indices.flatten(), minlength=self.num_experts)
+            self.load_history.append(load)
+
+            # Compute and apply auxiliary loss gradient (simplified)
+            if use_aux_loss:
+                self._update_for_balance(load)
+
+            return top_k_indices, top_k_weights
+
+        def _softmax(self, x: np.ndarray) -> np.ndarray:
+            exp_x = np.exp(x - x.max(axis=-1, keepdims=True))
+            return exp_x / exp_x.sum(axis=-1, keepdims=True)
+
+        def _update_for_balance(self, load: np.ndarray):
+            """Adjust gate weights to balance load."""
+            # Penalize overloaded experts
+            avg_load = load.mean()
+            imbalance = (load - avg_load) / (avg_load + 1e-6)
+            # Push routing away from overloaded experts
+            self.W_gate -= self.aux_loss_weight * imbalance
+
+        def get_imbalance_ratio(self) -> float:
+            """Max/min load ratio from recent history."""
+            if not self.load_history:
+                return 1.0
+            recent = np.array(self.load_history[-100:])
+            avg_load = recent.mean(axis=0)
+            return avg_load.max() / (avg_load.min() + 1e-6)
+
+    def simulate_routing(num_steps: int = 1000, use_aux_loss: bool = True):
+        """Simulate token routing over many steps."""
+        router = MoERouter(num_experts=8, hidden_dim=512, top_k=2)
+
+        for step in range(num_steps):
+            # Random batch of tokens (in practice, comes from model)
+            batch = np.random.randn(256, 512)
+            router.route(batch, use_aux_loss=use_aux_loss)
+
+            if step % 200 == 0:
+                ratio = router.get_imbalance_ratio()
+                print(f"Step {step}: imbalance ratio = {ratio:.2f}")
+
+        return router.get_imbalance_ratio()
+
+    # Run simulations
+    print("With auxiliary loss:")
+    ratio_with = simulate_routing(1000, use_aux_loss=True)
+    print(f"Final imbalance: {ratio_with:.2f}x\n")
+
+    print("Without auxiliary loss:")
+    ratio_without = simulate_routing(1000, use_aux_loss=False)
+    print(f"Final imbalance: {ratio_without:.2f}x")
+    ```
+
+    **Expected results:**
+
+    | Condition | Max/Min Load Ratio | Efficiency |
+    |-----------|-------------------|------------|
+    | Without aux loss | 3-10× | 30-50% waste |
+    | With aux loss | 1.1-1.5× | <5% waste |
+
+    $$\boxed{\text{Auxiliary loss reduces imbalance from 5× to 1.3×}}$$
+
+    **Exercise 6: Speculative Decoding Speedup**
+
+    **Given:**
+    - Draft model: 5× faster than target
+    - Acceptance rate: $p = 70\%$ per token
+    - Speculation depth: $K = 4$
+
+    **Speculative decoding process:**
+    1. Draft model generates $K$ tokens
+    2. Target model verifies all $K$ in parallel
+    3. Accept prefix of tokens that match
+
+    **Expected accepted tokens per iteration:**
+
+    With acceptance probability $p$ per token:
+    $$E[\text{accepted}] = \sum_{i=0}^{K} i \cdot p^i \cdot (1-p) + K \cdot p^K$$
+
+    For $K=4$, $p=0.7$:
+    $$E[\text{accepted}] = 0 \cdot 0.3 + 1 \cdot 0.7 \cdot 0.3 + 2 \cdot 0.49 \cdot 0.3 + 3 \cdot 0.343 \cdot 0.3 + 4 \cdot 0.2401$$
+    $$= 0 + 0.21 + 0.294 + 0.309 + 0.960 = 1.77 \text{ tokens}$$
+
+    Actually, simpler formula:
+    $$E[\text{accepted}] = \frac{1 - p^{K+1}}{1-p} - 1 = \frac{1 - 0.7^5}{0.3} - 1 = \frac{1 - 0.168}{0.3} - 1 = 1.77$$
+
+    **Time analysis:**
+
+    Without speculation:
+    - 1 target forward per token
+    - Time per token: $T_{target}$
+
+    With speculation:
+    - $K$ draft forwards + 1 target forward (parallel verification)
+    - Time: $K \cdot T_{draft} + T_{target} = K \cdot \frac{T_{target}}{5} + T_{target} = T_{target}(1 + K/5)$
+    - Tokens generated: $E[\text{accepted}] + 1 = 2.77$ (including verified token)
+
+    **Speedup calculation:**
+
+    $$\text{Speedup} = \frac{E[\text{accepted}] + 1}{1 + K/5} = \frac{2.77}{1 + 4/5} = \frac{2.77}{1.8} = 1.54\times$$
+
+    **More detailed model:**
+
+    | Iteration | Draft Time | Target Time | Tokens | Amortized |
+    |-----------|------------|-------------|--------|-----------|
+    | 1 | 0.8T | 1.0T | 2.77 | 0.65T/token |
+    | Baseline | 0 | 1.0T | 1 | 1.0T/token |
+
+    $$\boxed{\text{Speedup} = \frac{1.0}{0.65} \approx 1.54\times}$$
+
+    **Sensitivity analysis:**
+
+    | Acceptance Rate | K | Expected Tokens | Speedup |
+    |-----------------|---|-----------------|---------|
+    | 60% | 4 | 2.13 | 1.18× |
+    | 70% | 4 | 2.77 | 1.54× |
+    | 80% | 4 | 3.59 | 2.00× |
+    | 70% | 6 | 3.02 | 1.37× |
+
+    Higher acceptance rates dramatically improve speedup. K=4 is near-optimal for p=70%.
+
 ## Key Takeaways
 
 1. **Sliding Window Attention enables long context**: Fixed memory regardless of sequence length, with effective context growing through layer stacking.

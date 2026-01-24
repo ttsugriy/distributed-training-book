@@ -1640,15 +1640,372 @@ config = TrainingConfig(
 
 1. **Configuration counting**: For 512 GPUs, with DP ∈ {1, 2, 4, ..., 512}, PP ∈ {1, 2, 4, 8}, TP ∈ {1, 2, 4, 8}, how many valid (DP, PP, TP) combinations exist?
 
+??? success "Solution"
+    **Constraint:**
+
+    $$DP \times PP \times TP = 512$$
+
+    **Available values:**
+
+    - DP ∈ {1, 2, 4, 8, 16, 32, 64, 128, 256, 512} (10 powers of 2)
+    - PP ∈ {1, 2, 4, 8}
+    - TP ∈ {1, 2, 4, 8}
+
+    **Enumerate valid combinations:**
+
+    For each (PP, TP) pair, find DP = 512 / (PP × TP):
+
+    | PP | TP | PP × TP | DP = 512/(PP×TP) | Valid? |
+    |----|----|---------|-----------------:|--------|
+    | 1 | 1 | 1 | 512 | ✓ |
+    | 1 | 2 | 2 | 256 | ✓ |
+    | 1 | 4 | 4 | 128 | ✓ |
+    | 1 | 8 | 8 | 64 | ✓ |
+    | 2 | 1 | 2 | 256 | ✓ |
+    | 2 | 2 | 4 | 128 | ✓ |
+    | 2 | 4 | 8 | 64 | ✓ |
+    | 2 | 8 | 16 | 32 | ✓ |
+    | 4 | 1 | 4 | 128 | ✓ |
+    | 4 | 2 | 8 | 64 | ✓ |
+    | 4 | 4 | 16 | 32 | ✓ |
+    | 4 | 8 | 32 | 16 | ✓ |
+    | 8 | 1 | 8 | 64 | ✓ |
+    | 8 | 2 | 16 | 32 | ✓ |
+    | 8 | 4 | 32 | 16 | ✓ |
+    | 8 | 8 | 64 | 8 | ✓ |
+
+    All 16 combinations yield valid DP values (all are powers of 2 ≤ 512).
+
+    **Answer:**
+
+    $$\boxed{16 \text{ valid configurations}}$$
+
+    **Verification:** $|PP| \times |TP| = 4 \times 4 = 16$
+
+    All combinations are valid because:
+    - PP × TP ∈ {1, 2, 4, 8, 16, 32, 64} ⊆ divisors of 512
+    - All resulting DP values are powers of 2 ≤ 512
+
 2. **Memory constraint**: A 30B parameter model with 40 layers, hidden dimension 7168. Using TP=4, PP=4, ZeRO-1 on a DP=16 cluster. Calculate memory per GPU (assume BF16 + FP32 optimizer).
+
+??? success "Solution"
+    **Given:**
+
+    - Ψ = 30B parameters
+    - L = 40 layers
+    - H = 7168 hidden dimension
+    - TP = 4, PP = 4, DP = 16
+    - Total GPUs = 4 × 4 × 16 = 256
+
+    **Parameter distribution:**
+
+    $$\Psi_{GPU} = \frac{\Psi}{TP \times PP} = \frac{30B}{4 \times 4} = 1.875B \text{ parameters/GPU}$$
+
+    **Static memory components:**
+
+    | Component | Formula | Per-GPU Memory |
+    |-----------|---------|----------------|
+    | Parameters (BF16) | $2 \times \Psi_{GPU}$ | 3.75 GB |
+    | Gradients (BF16) | $2 \times \Psi_{GPU}$ | 3.75 GB |
+    | Optimizer (FP32) | $12 \times \Psi_{GPU} / DP$ (ZeRO-1) | 1.41 GB |
+
+    **Optimizer memory with ZeRO-1:**
+
+    ZeRO-1 shards optimizer states across DP dimension:
+
+    $$M_{opt}^{ZeRO1} = \frac{12 \times 1.875B}{16} = 1.41 \text{ GB}$$
+
+    **Activation memory:**
+
+    Per-layer activation (with TP=4):
+    $$M_{act}^{layer} = \frac{BSH \times 34}{TP}$$
+
+    Assuming B=4, S=4096:
+    $$M_{act}^{layer} = \frac{4 \times 4096 \times 7168 \times 34}{4} = 997 \text{ MB/layer}$$
+
+    Layers per PP stage: $40/4 = 10$ layers
+
+    With activation checkpointing (every layer):
+    $$M_{act}^{total} \approx 2 \times 997 = 1.99 \text{ GB}$$
+
+    Without checkpointing:
+    $$M_{act}^{total} = 10 \times 997 = 9.97 \text{ GB}$$
+
+    **Total memory per GPU:**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Parameters (BF16) | 3.75 GB |
+    | Gradients (BF16) | 3.75 GB |
+    | Optimizer (ZeRO-1) | 1.41 GB |
+    | Activations (ckpt) | ~2 GB |
+    | Working buffers | ~2 GB |
+    | **Total** | $\boxed{\sim 13 \text{ GB}}$ |
+
+    Without checkpointing:
+
+    | Component | Memory |
+    |-----------|--------|
+    | Parameters (BF16) | 3.75 GB |
+    | Gradients (BF16) | 3.75 GB |
+    | Optimizer (ZeRO-1) | 1.41 GB |
+    | Activations | ~10 GB |
+    | Working buffers | ~2 GB |
+    | **Total** | $\boxed{\sim 21 \text{ GB}}$ |
+
+    Both fit comfortably in 80GB H100.
 
 3. **Search space reduction**: You have 10,000 configurations. Applying GPU count constraint removes 80%, divisibility removes 50% of remainder, memory removes 30% of remainder. How many configs remain?
 
+??? success "Solution"
+    **Initial configuration count:** 10,000
+
+    **Stage 1: GPU count constraint**
+
+    Removes 80%:
+    $$N_1 = 10000 \times (1 - 0.80) = 10000 \times 0.20 = 2000$$
+
+    **Stage 2: Divisibility constraint**
+
+    Removes 50% of remainder:
+    $$N_2 = 2000 \times (1 - 0.50) = 2000 \times 0.50 = 1000$$
+
+    **Stage 3: Memory constraint**
+
+    Removes 30% of remainder:
+    $$N_3 = 1000 \times (1 - 0.30) = 1000 \times 0.70 = 700$$
+
+    **Answer:**
+
+    $$\boxed{700 \text{ configurations remain}}$$
+
+    **Cumulative reduction:**
+
+    $$\text{Survival rate} = 0.20 \times 0.50 \times 0.70 = 0.07 = 7\%$$
+
+    **Visualization:**
+
+    | Stage | Configs In | Removed | Configs Out |
+    |-------|------------|---------|-------------|
+    | Initial | - | - | 10,000 |
+    | GPU count | 10,000 | 8,000 (80%) | 2,000 |
+    | Divisibility | 2,000 | 1,000 (50%) | 1,000 |
+    | Memory | 1,000 | 300 (30%) | 700 |
+
+    This demonstrates why constraint pruning is so effective—even moderate rejection rates compound to eliminate 93% of the search space.
+
 4. **Bayesian vs Grid**: Grid search evaluates 1000 configurations in 100 hours. Bayesian optimization achieves same best result in 50 evaluations. If each eval takes 6 minutes, calculate time savings.
+
+??? success "Solution"
+    **Grid search:**
+
+    - Evaluations: 1,000
+    - Total time: 100 hours
+
+    Time per evaluation: $\frac{100 \times 60}{1000} = 6$ minutes ✓ (matches given)
+
+    **Bayesian optimization:**
+
+    - Evaluations needed: 50
+    - Time per evaluation: 6 minutes
+
+    Total time:
+    $$T_{bayes} = 50 \times 6 = 300 \text{ minutes} = \boxed{5 \text{ hours}}$$
+
+    **Time savings:**
+
+    $$\text{Savings} = 100 - 5 = \boxed{95 \text{ hours}}$$
+
+    $$\text{Speedup} = \frac{100}{5} = \boxed{20\times}$$
+
+    **Efficiency comparison:**
+
+    | Method | Evaluations | Time | Result |
+    |--------|-------------|------|--------|
+    | Grid search | 1,000 | 100 hours | Best config |
+    | Bayesian opt | 50 | 5 hours | Same best config |
+    | **Savings** | **95%** | **95%** | - |
+
+    **Why Bayesian is so effective:**
+
+    1. **Exploitation**: Focuses on promising regions
+    2. **Exploration**: Samples uncertain areas
+    3. **Model-guided**: Learns from each evaluation
+
+    **Cost analysis at $4/GPU-hour:**
+
+    Assuming 64 GPUs per evaluation:
+
+    | Method | GPU-hours | Cost |
+    |--------|-----------|------|
+    | Grid | 64 × 100 = 6,400 | $25,600 |
+    | Bayesian | 64 × 5 = 320 | $1,280 |
+    | **Savings** | 6,080 | **$24,320** |
 
 5. **Heuristic validation**: Use the ConfigurationAdvisor to generate a config for a 13B parameter model (40 layers, h=5120, 40 heads) on 64 GPUs. Then validate with the MemoryConstraint.
 
+??? success "Solution"
+    **Model specification:**
+
+    - Ψ = 13B parameters
+    - L = 40 layers
+    - H = 5120 hidden dimension
+    - A = 40 attention heads
+    - GPUs = 64
+
+    **ConfigurationAdvisor heuristics:**
+
+    **Step 1: TP selection**
+
+    Model size → TP heuristic:
+    - 13B is medium-sized
+    - Hidden dim 5120 is divisible by 8
+    - Prefer TP ≤ 8 (within a node)
+
+    $$\boxed{TP = 4}$$ (keeps layers reasonably sized)
+
+    **Step 2: PP selection**
+
+    After TP, remaining GPUs: 64/4 = 16
+
+    Layers per stage with various PP:
+    - PP=1: 40 layers/stage (no pipeline)
+    - PP=2: 20 layers/stage
+    - PP=4: 10 layers/stage
+    - PP=8: 5 layers/stage
+
+    Balance: 40 must divide evenly → PP ∈ {1, 2, 4, 5, 8, 10, 20, 40}
+
+    Constrained by 64/TP divisibility: PP ∈ {1, 2, 4, 8, 16}
+
+    $$\boxed{PP = 4}$$ (10 layers per stage, good balance)
+
+    **Step 3: DP selection**
+
+    $$DP = \frac{64}{TP \times PP} = \frac{64}{4 \times 4} = \boxed{4}$$
+
+    **Generated configuration:**
+
+    | Dimension | Value |
+    |-----------|-------|
+    | TP | 4 |
+    | PP | 4 |
+    | DP | 4 |
+    | Total | 64 ✓ |
+
+    **Memory validation:**
+
+    Parameters per GPU:
+    $$\Psi_{GPU} = \frac{13B}{TP \times PP} = \frac{13B}{16} = 812.5M$$
+
+    **Memory breakdown:**
+
+    | Component | Formula | Memory |
+    |-----------|---------|--------|
+    | Parameters (BF16) | $2 \times 812.5M$ | 1.63 GB |
+    | Gradients (BF16) | $2 \times 812.5M$ | 1.63 GB |
+    | Optimizer (FP32) | $12 \times 812.5M$ | 9.75 GB |
+    | **Static total** | | **13.0 GB** |
+
+    With ZeRO-1 (DP=4):
+    $$M_{opt}^{ZeRO1} = 9.75 / 4 = 2.44 \text{ GB}$$
+    Static with ZeRO-1: 5.7 GB
+
+    **Activation memory (B=8, S=4096):**
+
+    $$M_{act}^{layer} = \frac{8 \times 4096 \times 5120 \times 34}{4} = 1.43 \text{ GB/layer}$$
+
+    Layers per stage: 10
+
+    With checkpointing:
+    $$M_{act} \approx 2 \times 1.43 = 2.86 \text{ GB}$$
+
+    **Total per GPU:**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Static (ZeRO-1) | 5.7 GB |
+    | Activations (ckpt) | ~3 GB |
+    | Working buffers | ~2 GB |
+    | **Total** | **~11 GB** |
+
+    **Validation result:**
+
+    $$11 \text{ GB} < 80 \text{ GB (H100)} \quad \boxed{\checkmark \text{ PASS}}$$
+
+    Plenty of headroom for larger batch sizes.
+
 6. **Pipeline bubble trade-off**: Compare configs (PP=4, GA=16) vs (PP=8, GA=32) for bubble fraction. At what GA does the higher PP become advantageous?
+
+??? success "Solution"
+    **Bubble fraction formula:**
+
+    $$\text{Bubble} = \frac{PP - 1}{GA + PP - 1}$$
+
+    **Config 1: PP=4, GA=16**
+
+    $$\text{Bubble}_1 = \frac{4 - 1}{16 + 4 - 1} = \frac{3}{19} = 15.8\%$$
+
+    **Config 2: PP=8, GA=32**
+
+    $$\text{Bubble}_2 = \frac{8 - 1}{32 + 8 - 1} = \frac{7}{39} = 17.9\%$$
+
+    **Comparison:**
+
+    | Config | PP | GA | Bubble Fraction |
+    |--------|----|----|-----------------|
+    | 1 | 4 | 16 | 15.8% |
+    | 2 | 8 | 32 | 17.9% |
+
+    Config 1 (PP=4, GA=16) has lower bubble fraction.
+
+    **When does PP=8 become advantageous?**
+
+    For PP=8 to have lower bubble than PP=4 with GA=16:
+
+    $$\frac{7}{GA + 7} < \frac{3}{19}$$
+
+    Solve:
+    $$7 \times 19 < 3 \times (GA + 7)$$
+    $$133 < 3 \cdot GA + 21$$
+    $$112 < 3 \cdot GA$$
+    $$GA > 37.3$$
+
+    $$\boxed{GA \geq 38}$$ for PP=8 to have lower bubble than PP=4/GA=16
+
+    **Verification at GA=38:**
+
+    $$\text{Bubble}_{PP=8,GA=38} = \frac{7}{38 + 7} = \frac{7}{45} = 15.6\%$$
+
+    vs PP=4, GA=16: 15.8% ✓
+
+    **General formula for breakeven:**
+
+    For PP₂ to have same bubble as PP₁ with GA₁:
+
+    $$\frac{PP_2 - 1}{GA_2 + PP_2 - 1} = \frac{PP_1 - 1}{GA_1 + PP_1 - 1}$$
+
+    Solving for GA₂:
+
+    $$GA_2 = \frac{(PP_2 - 1)(GA_1 + PP_1 - 1)}{PP_1 - 1} - (PP_2 - 1)$$
+
+    **Trade-off analysis:**
+
+    | PP | GA for 10% bubble | GA for 5% bubble |
+    |----|-------------------|------------------|
+    | 4 | 27 | 57 |
+    | 8 | 63 | 133 |
+    | 16 | 135 | 285 |
+
+    **When to prefer higher PP:**
+
+    - Higher PP enables smaller per-GPU memory (more sharding)
+    - But requires more gradient accumulation to maintain efficiency
+    - Higher PP also has more communication overhead between stages
+
+    **Summary:**
+
+    $$\boxed{GA \geq 38 \text{ for PP=8 to beat PP=4/GA=16}}$$
 
 ## Key Takeaways
 

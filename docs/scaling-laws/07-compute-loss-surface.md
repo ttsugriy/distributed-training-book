@@ -213,16 +213,162 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
 1. **Optimal allocation**: Given $C = 10^{24}$ FLOPs and Chinchilla scaling ($\alpha = \beta = 0.5$, $A = B = 400$), calculate the optimal model size and token count.
 
+??? success "Solution"
+    **Using the 20:1 rule for Chinchilla-optimal allocation:**
+
+    The optimal ratio is $D^*/N^* \approx 20$.
+
+    Substituting into the compute constraint $C = 6ND$:
+    $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
+
+    **Solving for optimal model size:**
+    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}}$$
+
+    $$N^* = 2.89 \times 10^{10.5} \approx \boxed{91\text{B parameters}}$$
+
+    **Optimal token count:**
+    $$D^* = 20 \times N^* = 20 \times 91 \times 10^9 = \boxed{1.82\text{T tokens}}$$
+
+    **Verification:**
+    $$C = 6 \times 91 \times 10^9 \times 1.82 \times 10^{12} = 9.94 \times 10^{23} \approx 10^{24} \checkmark$$
+
+    | Parameter | Value |
+    |-----------|-------|
+    | Optimal $N^*$ | 91B |
+    | Optimal $D^*$ | 1.82T |
+    | Tokens/parameter | 20 |
+
 2. **Training time**: You have 512 H100 GPUs at 45% MFU. How long to train the optimal model from Exercise 1?
+
+??? success "Solution"
+    **Using the training time formula:**
+
+    $$T = \frac{C}{\text{GPUs} \times \text{Peak FLOP/s} \times \text{MFU}}$$
+
+    **Given:**
+
+    - $C = 10^{24}$ FLOPs
+    - GPUs = 512
+    - H100 peak = 1979 TFLOP/s = $1.979 \times 10^{15}$ FLOP/s
+    - MFU = 45% = 0.45
+
+    **Calculation:**
+
+    $$T = \frac{10^{24}}{512 \times 1.979 \times 10^{15} \times 0.45}$$
+
+    $$T = \frac{10^{24}}{4.56 \times 10^{17}} = 2.19 \times 10^6 \text{ seconds}$$
+
+    **Converting to days:**
+    $$T = \frac{2.19 \times 10^6}{3600 \times 24} = \boxed{25.4 \text{ days}}$$
+
+    **Practical considerations:**
+
+    | Factor | Impact |
+    |--------|--------|
+    | Checkpointing overhead | Add ~5-10% |
+    | Hardware failures | Plan for ~10% downtime |
+    | Realistic timeline | ~30-32 days |
 
 3. **Overtraining analysis**: LLaMA-2 7B was trained on 2T tokens.
    - What's the Chinchilla-optimal token count for 7B parameters?
    - By what factor is it overtrained?
    - Estimate the loss difference between this and training 7B on optimal tokens.
 
+??? success "Solution"
+    **Part 1: Chinchilla-optimal token count**
+
+    Using the 20:1 rule:
+    $$D^* = 20 \times N = 20 \times 7 \times 10^9 = \boxed{140\text{B tokens}}$$
+
+    **Part 2: Overtraining factor**
+
+    $$\text{Overtraining factor} = \frac{D_{\text{actual}}}{D^*} = \frac{2 \times 10^{12}}{140 \times 10^9} = \boxed{14.3\times}$$
+
+    **Part 3: Loss difference estimation**
+
+    Using $L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$ with Chinchilla exponents ($\alpha = 0.34$, $\beta = 0.28$):
+
+    The data-dependent term improvement:
+    $$\Delta L_{\text{data}} = B\left(\frac{1}{D_{\text{opt}}^\beta} - \frac{1}{D_{\text{overtrain}}^\beta}\right)$$
+
+    Ratio of data terms:
+    $$\frac{(140\text{B})^{0.28}}{(2\text{T})^{0.28}} = \left(\frac{140}{2000}\right)^{0.28} = 0.07^{0.28} = 0.50$$
+
+    The overtrained model achieves ~50% reduction in the data-dependent loss term compared to Chinchilla-optimal.
+
+    **Estimated improvement: ~0.1-0.2 nats lower loss** from overtraining.
+
+    **Key insight**: Overtraining trades training compute for inference efficiency. LLaMA-2 7B performs comparably to a ~15-20B Chinchilla-optimal model while being 2-3× cheaper to serve.
+
 4. **Iso-loss curve**: Derive the equation for an iso-loss curve $L(N, D) = L_0$ in the $(N, D)$ plane. What is its shape?
 
+??? success "Solution"
+    **Starting from the loss equation:**
+
+    $$L_0 = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
+
+    **Rearranging for the iso-loss curve:**
+
+    Let $L' = L_0 - L_\infty$ (the reducible loss):
+
+    $$L' = \frac{A}{N^\alpha} + \frac{B}{D^\beta}$$
+
+    **Solving for $D$ as a function of $N$:**
+
+    $$\frac{B}{D^\beta} = L' - \frac{A}{N^\alpha}$$
+
+    $$D^\beta = \frac{B}{L' - A/N^\alpha} = \frac{BN^\alpha}{L'N^\alpha - A}$$
+
+    $$\boxed{D = \left(\frac{BN^\alpha}{L'N^\alpha - A}\right)^{1/\beta}}$$
+
+    **Shape analysis:**
+
+    | Property | Value |
+    |----------|-------|
+    | Vertical asymptote | $N = (A/L')^{1/\alpha}$ |
+    | Horizontal asymptote | $D = (B/L')^{1/\beta}$ |
+    | Shape | Hyperbola-like curve in first quadrant |
+    | Curvature | Convex toward origin |
+
+    **Geometric interpretation:**
+
+    - For fixed loss $L_0$, there's a family of $(N, D)$ pairs that achieve it
+    - Larger models need less data to reach the same loss (and vice versa)
+    - The curve asymptotes show the minimum resources needed even with infinite investment in the other dimension
+
 5. **Marginal returns**: At the current training point $(N_0, D_0)$, you can either double parameters or double data. Which reduces loss more? Derive the condition for indifference.
+
+??? success "Solution"
+    **Loss reduction from doubling $N$:**
+
+    $$\Delta L_N = \frac{A}{N_0^\alpha} - \frac{A}{(2N_0)^\alpha} = \frac{A}{N_0^\alpha}\left(1 - \frac{1}{2^\alpha}\right) = \frac{A}{N_0^\alpha}(1 - 2^{-\alpha})$$
+
+    **Loss reduction from doubling $D$:**
+
+    $$\Delta L_D = \frac{B}{D_0^\beta} - \frac{B}{(2D_0)^\beta} = \frac{B}{D_0^\beta}(1 - 2^{-\beta})$$
+
+    **Indifference condition ($\Delta L_N = \Delta L_D$):**
+
+    $$\frac{A}{N_0^\alpha}(1 - 2^{-\alpha}) = \frac{B}{D_0^\beta}(1 - 2^{-\beta})$$
+
+    $$\boxed{\frac{A(1 - 2^{-\alpha})}{N_0^\alpha} = \frac{B(1 - 2^{-\beta})}{D_0^\beta}}$$
+
+    **For Chinchilla ($\alpha = \beta$, $A = B$):**
+
+    The condition simplifies to:
+    $$N_0^\alpha = D_0^\alpha \implies N_0 = D_0$$
+
+    But the 20:1 rule ($D^*/N^* = 20$) suggests $A \neq B$. The actual indifference point is at the Chinchilla optimum where marginal returns are equal.
+
+    **Decision rule:**
+
+    | Condition | Action |
+    |-----------|--------|
+    | $\frac{A(1-2^{-\alpha})}{N_0^\alpha} > \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double parameters |
+    | $\frac{A(1-2^{-\alpha})}{N_0^\alpha} < \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double data |
+    | Equal | Either choice equivalent |
+
+    **Practical implication:** If you're at a Chinchilla-optimal point, doubling either has equal marginal benefit. Most pre-2022 models were undertrained on data, making doubling $D$ more valuable.
 
 ## Key Takeaways
 

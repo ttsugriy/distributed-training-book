@@ -187,6 +187,95 @@ def measure_bandwidth(size_bytes, warmup=10, trials=100):
 
 1. Calculate the AllReduce time for a 10GB tensor across 256 GPUs on InfiniBand (α=2μs, β=50GB/s per link) using the ring algorithm.
 
+??? success "Solution"
+    **Using the ring AllReduce formula:**
+
+    $$T_{\text{AllReduce}}(n, P) = 2(P-1)\alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
+
+    **Given:**
+
+    - $n = 10$ GB $= 10 \times 10^9$ bytes
+    - $P = 256$ GPUs
+    - $\alpha = 2$ μs $= 2 \times 10^{-6}$ s
+    - $\beta = 50$ GB/s $= 50 \times 10^9$ B/s
+
+    **Latency term:**
+
+    $$2(P-1)\alpha = 2 \times 255 \times 2 \times 10^{-6} = 1.02 \times 10^{-3} \text{ s} \approx 1.02 \text{ ms}$$
+
+    **Bandwidth term:**
+
+    $$\frac{2(P-1)}{P} \cdot \frac{n}{\beta} = \frac{2 \times 255}{256} \times \frac{10 \times 10^9}{50 \times 10^9} = 1.992 \times 0.2 \approx 398 \text{ ms}$$
+
+    **Total time:**
+
+    $$T = 1.02 \text{ ms} + 398 \text{ ms} \approx \boxed{399 \text{ ms}}$$
+
+    **Observation:** The bandwidth term dominates (99.7% of total time). For large tensors, AllReduce is bandwidth-bound.
+
 2. You're bucketing gradients for AllReduce. Each small tensor is 1MB and you have 1000 of them. Compare the total AllReduce time for (a) individual AllReduce per tensor, (b) one AllReduce of the concatenated 1GB tensor. Assume α=2μs, β=50GB/s, P=64.
 
+??? success "Solution"
+    **Given:**
+
+    - 1000 tensors, each 1 MB
+    - $\alpha = 2$ μs, $\beta = 50$ GB/s, $P = 64$
+
+    **(a) Individual AllReduce per tensor (1 MB each):**
+
+    Per tensor:
+    $$T = 2(P-1)\alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
+
+    $$= 2 \times 63 \times 2 \times 10^{-6} + \frac{126}{64} \times \frac{10^6}{50 \times 10^9}$$
+
+    $$= 252 \text{ μs} + 1.97 \times 20 \text{ μs} = 252 \text{ μs} + 39.4 \text{ μs} = 291.4 \text{ μs}$$
+
+    Total for 1000 tensors:
+    $$T_{total}^{(a)} = 1000 \times 291.4 \text{ μs} = \boxed{291.4 \text{ ms}}$$
+
+    **(b) One AllReduce of concatenated 1 GB tensor:**
+
+    $$T = 2 \times 63 \times 2 \times 10^{-6} + \frac{126}{64} \times \frac{10^9}{50 \times 10^9}$$
+
+    $$= 252 \text{ μs} + 1.97 \times 20 \text{ ms} = 252 \text{ μs} + 39.4 \text{ ms} \approx \boxed{39.7 \text{ ms}}$$
+
+    **Speedup from bucketing:**
+
+    $$\frac{291.4 \text{ ms}}{39.7 \text{ ms}} \approx 7.3\times$$
+
+    **Breakdown:** Individual AllReduces spend $252 \text{ ms}$ on latency overhead alone (1000 × 252 μs), while the bucketed version pays only 252 μs. Bucketing saves $(k-1)\alpha = 999 \times 252 \text{ μs} \approx 252 \text{ ms}$ of latency.
+
 3. Derive the crossover point for NVLink (α=1μs, β=900GB/s). How does this compare to InfiniBand? What does this imply for optimal message sizes in tensor parallelism vs data parallelism?
+
+??? success "Solution"
+    **Crossover point formula:**
+
+    $$n^* = \alpha \cdot \beta$$
+
+    **NVLink crossover:**
+
+    $$n^*_{NVLink} = 1 \times 10^{-6} \times 900 \times 10^9 = 900 \text{ KB}$$
+
+    **InfiniBand crossover:**
+
+    $$n^*_{IB} = 2 \times 10^{-6} \times 50 \times 10^9 = 100 \text{ KB}$$
+
+    **Comparison:**
+
+    $$\frac{n^*_{NVLink}}{n^*_{IB}} = \frac{900 \text{ KB}}{100 \text{ KB}} = 9\times$$
+
+    NVLink's crossover point is 9× higher than InfiniBand.
+
+    **Implications for parallelism strategies:**
+
+    | Aspect | NVLink (TP) | InfiniBand (DP) |
+    |--------|-------------|-----------------|
+    | Crossover | 900 KB | 100 KB |
+    | Message sizes | Often 10s of MB (activations) | Often 10s of GB (gradients) |
+    | Regime | Bandwidth-bound | Bandwidth-bound |
+
+    - **Tensor parallelism** (NVLink): Activation tensors are typically 10-100 MB, well above the 900 KB crossover. Communication is bandwidth-bound.
+
+    - **Data parallelism** (InfiniBand): Gradient AllReduces are typically GB-scale, far above 100 KB. Also bandwidth-bound.
+
+    - **Key insight**: Both strategies operate in the bandwidth-bound regime for typical workloads. However, NVLink's 18× higher bandwidth (900 vs 50 GB/s) makes it essential for the frequent, per-layer communication of tensor parallelism. Data parallelism communicates less frequently (once per step), so it tolerates the lower InfiniBand bandwidth.

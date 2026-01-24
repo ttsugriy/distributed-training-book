@@ -818,17 +818,689 @@ class SequenceParallelAttention(nn.Module):
    - Calculate with $P = 8$ Ring Attention
    - What's the reduction factor?
 
+??? success "Solution"
+    **Given:**
+
+    - Hidden size: $H = 4096$
+    - Number of heads: $n_h = 32$
+    - Sequence length: $S = 256K = 262,144$
+    - Batch size: $b = 1$
+    - Data type: bf16 (2 bytes)
+
+    **Attention matrix memory without sequence parallelism:**
+
+    The attention matrix has shape $(b, n_h, S, S)$:
+
+    $$M_{\text{attn}} = b \times n_h \times S \times S \times \text{sizeof(bf16)}$$
+
+    $$= 1 \times 32 \times 262144 \times 262144 \times 2 \text{ bytes}$$
+
+    $$= 32 \times 262144^2 \times 2$$
+
+    $$= 32 \times 6.87 \times 10^{10} \times 2$$
+
+    $$= \boxed{4.4 \text{ TB}}$$
+
+    This is impossible to fit on any single GPU.
+
+    **With $P = 8$ Ring Attention:**
+
+    Each GPU processes local queries against local KV chunks. The attention matrix per GPU has shape $(b, n_h, S/P, S/P)$:
+
+    $$M_{\text{attn}}^{\text{Ring}} = b \times n_h \times \frac{S}{P} \times \frac{S}{P} \times 2$$
+
+    $$= 1 \times 32 \times 32768 \times 32768 \times 2$$
+
+    $$= 32 \times 32768^2 \times 2$$
+
+    $$= 32 \times 1.07 \times 10^9 \times 2$$
+
+    $$= \boxed{68.7 \text{ GB}}$$
+
+    This fits in an 80GB H100!
+
+    **Reduction factor:**
+
+    $$\text{Reduction} = \frac{M_{\text{attn}}}{M_{\text{attn}}^{\text{Ring}}} = \frac{S^2}{(S/P)^2} = P^2 = 8^2 = \boxed{64\times}$$
+
+    **Summary:**
+
+    | Configuration | Attention Matrix Memory | Fits in 80GB? |
+    |---------------|------------------------|---------------|
+    | No SP | 4.4 TB | No |
+    | Ring ($P=8$) | 68.7 GB | Yes |
+
+    **Note:** Ring Attention also needs KV buffers (~$4 \times S/P \times H \times 2 = 2$ GB with double buffering), which easily fits.
+
 2. **Communication volume**: Compare Ring Attention and Ulysses communication volume for $S = 1M$, $H = 8192$, $P = 16$. Which uses less bandwidth?
+
+??? success "Solution"
+    **Given:**
+
+    - Sequence length: $S = 1M = 1,048,576$
+    - Hidden size: $H = 8192$
+    - Parallelism degree: $P = 16$
+    - Assume bf16 (2 bytes per element)
+
+    **Ring Attention communication volume:**
+
+    Ring Attention rotates K and V tensors through the ring. Each GPU sends its local K, V to the next GPU in each step.
+
+    Local K, V each have shape $(S/P, H)$:
+
+    $$\text{KV size per GPU} = 2 \times \frac{S}{P} \times H \times 2 \text{ bytes}$$
+
+    $$= 2 \times \frac{1,048,576}{16} \times 8192 \times 2 = 2 \times 65536 \times 8192 \times 2$$
+
+    $$= 2.15 \text{ GB per step}$$
+
+    Total communication over $P - 1 = 15$ steps:
+
+    $$V_{\text{Ring}} = 15 \times 2.15 \text{ GB} = \boxed{32.2 \text{ GB}}$$
+
+    **Ulysses communication volume:**
+
+    Ulysses performs AlltoAll twice:
+    1. Before attention: Redistribute Q, K, V from $(S/P, H)$ to $(S, H/P)$
+    2. After attention: Redistribute output back
+
+    Each AlltoAll moves all data between all GPUs. Volume per AlltoAll for Q, K, V:
+
+    $$V_{\text{AlltoAll}} = 3 \times \frac{S}{P} \times H \times 2 \times \frac{P-1}{P}$$
+
+    $$= 3 \times 65536 \times 8192 \times 2 \times \frac{15}{16}$$
+
+    $$= 3.02 \text{ GB}$$
+
+    Output AlltoAll:
+
+    $$V_{\text{out}} = \frac{S}{P} \times H \times 2 \times \frac{P-1}{P} = 1.01 \text{ GB}$$
+
+    Total Ulysses:
+
+    $$V_{\text{Ulysses}} = V_{\text{AlltoAll}} + V_{\text{out}} = 3.02 + 1.01 = \boxed{4.03 \text{ GB}}$$
+
+    **Comparison:**
+
+    | Method | Total Volume | Per-Step Latency |
+    |--------|-------------|------------------|
+    | Ring Attention | 32.2 GB | 15 P2P transfers |
+    | Ulysses | 4.03 GB | 2 AlltoAll collectives |
+
+    $$\frac{V_{\text{Ring}}}{V_{\text{Ulysses}}} = \frac{32.2}{4.03} = 8\times$$
+
+    **Ulysses uses 8× less bandwidth** in total volume. However:
+
+    - **Ring**: Communication overlaps with compute (can hide latency)
+    - **Ulysses**: AlltoAll is blocking but lower total volume
+
+    **When to choose each:**
+
+    - **Ring**: When compute >> communication, good P2P bandwidth
+    - **Ulysses**: When P is small, AlltoAll is fast (NVLink within node)
 
 3. **Overlap efficiency**: If attention compute takes 10ms and KV transfer takes 2ms per Ring step, what fraction of communication is hidden? With $P = 8$ steps, what's the effective communication overhead?
 
+??? success "Solution"
+    **Given:**
+
+    - Attention compute time: $T_{\text{compute}} = 10$ ms per step
+    - KV transfer time: $T_{\text{comm}} = 2$ ms per step
+    - Number of steps: $P = 8$
+
+    **Ring Attention overlap model:**
+
+    In Ring Attention, communication is overlapped with compute using double buffering:
+    - While computing attention on current KV chunk, transfer next KV chunk
+    - Communication is hidden if $T_{\text{comm}} \leq T_{\text{compute}}$
+
+    **Fraction of communication hidden:**
+
+    Since $T_{\text{comm}} = 2$ ms $< T_{\text{compute}} = 10$ ms:
+
+    $$\text{Fraction hidden} = \frac{T_{\text{comm}}}{T_{\text{comm}}} = \boxed{100\%}$$
+
+    All communication is hidden behind compute!
+
+    **Total execution time:**
+
+    With perfect overlap, the total time is dominated by compute, plus the initial transfer (which can't be overlapped):
+
+    $$T_{\text{total}} = T_{\text{initial comm}} + P \times T_{\text{compute}}$$
+
+    $$= 2 + 8 \times 10 = 82 \text{ ms}$$
+
+    Without overlap:
+
+    $$T_{\text{no overlap}} = P \times (T_{\text{compute}} + T_{\text{comm}}) = 8 \times 12 = 96 \text{ ms}$$
+
+    **Effective communication overhead:**
+
+    $$\text{Overhead} = \frac{T_{\text{total}} - P \times T_{\text{compute}}}{T_{\text{total}}}$$
+
+    $$= \frac{82 - 80}{82} = \frac{2}{82} = \boxed{2.4\%}$$
+
+    **Summary:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Communication hidden | 100% |
+    | Total time (with overlap) | 82 ms |
+    | Total time (no overlap) | 96 ms |
+    | Speedup from overlap | 1.17× |
+    | Effective overhead | 2.4% |
+
+    **Key insight:** When compute time exceeds communication time, Ring Attention achieves near-perfect overlap. The only exposed communication is the initial KV fetch before the first compute step.
+
+    **When overlap breaks down:**
+
+    If $T_{\text{comm}} > T_{\text{compute}}$, some communication is exposed:
+
+    $$\text{Exposed comm} = P \times (T_{\text{comm}} - T_{\text{compute}})$$
+
 4. **Causal optimization**: For Ring Attention with $P = 8$ and causal masking, how many of the 8 steps can be skipped (on average) due to all-future chunks?
+
+??? success "Solution"
+    **Causal masking in Ring Attention:**
+
+    With causal masking, position $i$ can only attend to positions $j \leq i$. When K, V chunks contain only future tokens relative to all Q tokens, the entire computation can be skipped.
+
+    **Setup with $P = 8$:**
+
+    Divide sequence into 8 chunks: $C_0, C_1, \ldots, C_7$
+
+    GPU $r$ holds queries from chunk $C_r$. After $k$ rotations, it receives K, V from chunk $C_{(r-k) \mod 8}$.
+
+    **When can we skip?**
+
+    GPU $r$ can skip step $k$ if all tokens in $C_{(r-k) \mod 8}$ are in the future relative to all tokens in $C_r$.
+
+    This happens when $(r - k) \mod 8 > r$, meaning the KV chunk index is greater than the Q chunk index.
+
+    **Analysis per GPU:**
+
+    | GPU (Q chunk) | KV chunks received | Skippable chunks |
+    |---------------|-------------------|-----------------|
+    | GPU 0 ($C_0$) | $C_0 \to C_7 \to C_6 \to \ldots \to C_1$ | $C_1, C_2, \ldots, C_7$ (7 skippable) |
+    | GPU 1 ($C_1$) | $C_1 \to C_0 \to C_7 \to \ldots \to C_2$ | $C_2, C_3, \ldots, C_7$ (6 skippable) |
+    | GPU 2 ($C_2$) | $C_2 \to C_1 \to C_0 \to \ldots \to C_3$ | $C_3, C_4, \ldots, C_7$ (5 skippable) |
+    | GPU 3 ($C_3$) | ... | 4 skippable |
+    | GPU 4 ($C_4$) | ... | 3 skippable |
+    | GPU 5 ($C_5$) | ... | 2 skippable |
+    | GPU 6 ($C_6$) | ... | 1 skippable |
+    | GPU 7 ($C_7$) | $C_7 \to C_6 \to \ldots \to C_0$ | 0 skippable |
+
+    **Average skippable steps per GPU:**
+
+    $$\text{Avg skippable} = \frac{7 + 6 + 5 + 4 + 3 + 2 + 1 + 0}{8} = \frac{28}{8} = \boxed{3.5 \text{ steps}}$$
+
+    **Work reduction:**
+
+    Without optimization: $P = 8$ steps per GPU
+    With causal skip: $8 - 3.5 = 4.5$ steps on average
+
+    $$\text{Speedup} = \frac{8}{4.5} = 1.78\times$$
+
+    **General formula for $P$ GPUs:**
+
+    Average skippable steps:
+    $$\text{Avg skip} = \frac{\sum_{r=0}^{P-1} (P - 1 - r)}{P} = \frac{(P-1)P/2}{P} = \frac{P-1}{2}$$
+
+    For $P = 8$: $\frac{8-1}{2} = 3.5$ ✓
+
+    **Important caveat:**
+
+    The diagonal chunk ($C_r$ for GPU $r$) requires partial computation—tokens within the chunk still have causal relationships. This is handled by applying a triangular mask within the diagonal block.
+
+    | Metric | Value |
+    |--------|-------|
+    | Total steps without optimization | 8 |
+    | Average skippable steps | 3.5 |
+    | Average required steps | 4.5 |
+    | Work reduction | 43.75% |
+    | Theoretical speedup | 1.78× |
 
 5. **Hybrid design**: Design a sequence parallelism strategy for 64 GPUs (8 nodes × 8 GPUs) with $S = 2M$ tokens. Propose group configurations and estimate memory per GPU.
 
+??? success "Solution"
+    **Given:**
+
+    - Total GPUs: 64 (8 nodes × 8 GPUs per node)
+    - Sequence length: $S = 2M = 2,097,152$ tokens
+    - Assume: $H = 8192$, $n_h = 64$ heads, bf16
+
+    **Topology considerations:**
+
+    - **Intra-node**: 8 GPUs connected via NVLink (900 GB/s)
+    - **Inter-node**: GPUs connected via InfiniBand (~400 Gb/s = 50 GB/s)
+
+    **Hybrid strategy: Ulysses intra-node + Ring inter-node**
+
+    | Level | Parallelism | Degree | Communication |
+    |-------|-------------|--------|---------------|
+    | Intra-node | Ulysses | 8 | Fast AlltoAll via NVLink |
+    | Inter-node | Ring | 8 | P2P via InfiniBand |
+
+    **How it works:**
+
+    1. Divide 64 GPUs into 8 ring groups (one per node position across nodes)
+    2. Each ring group has 8 GPUs across 8 nodes
+    3. Within each node, use Ulysses to redistribute sequence↔heads
+    4. Across nodes, use Ring to rotate KV chunks
+
+    **Sequence distribution:**
+
+    $$S_{\text{per GPU}} = \frac{S}{64} = \frac{2,097,152}{64} = 32,768 \text{ tokens}$$
+
+    **Memory estimation per GPU:**
+
+    *Attention matrix memory:*
+
+    With 64-way SP, attention computed on $(S/64) \times (S/64)$ chunks:
+
+    $$M_{\text{attn}} = n_h \times \left(\frac{S}{64}\right)^2 \times 2 = 64 \times 32768^2 \times 2$$
+
+    $$= 64 \times 1.07 \times 10^9 \times 2 = \boxed{137 \text{ GB}}$$
+
+    Wait—this doesn't fit in 80GB! We need Flash Attention.
+
+    *With Flash Attention (no materialized attention matrix):*
+
+    $$M_{\text{Flash}} = O(S/P) = \text{negligible (few MB)}$$
+
+    *Q, K, V per GPU:*
+
+    $$M_{\text{QKV}} = 3 \times \frac{S}{64} \times H \times 2 = 3 \times 32768 \times 8192 \times 2 = 1.6 \text{ GB}$$
+
+    *KV buffers for Ring (double buffering):*
+
+    $$M_{\text{KV buf}} = 4 \times \frac{S}{64} \times H \times 2 = 2.1 \text{ GB}$$
+
+    **Total memory per GPU (with Flash Attention):**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Q, K, V local | 1.6 GB |
+    | KV ring buffers | 2.1 GB |
+    | Output | 0.5 GB |
+    | Flash workspace | ~0.5 GB |
+    | **Total attention** | **~5 GB** |
+
+    This fits easily in 80GB, leaving room for model weights and activations.
+
+    **Communication analysis:**
+
+    *Ulysses (intra-node):*
+
+    - AlltoAll volume: $3 \times (S/64) \times H \times 2 \times 7/8 = 1.4$ GB
+    - Time at 900 GB/s: ~1.5 ms
+
+    *Ring (inter-node):*
+
+    - Per step: $2 \times (S/8) \times H \times 2 = 4.3$ GB
+    - 7 steps at 50 GB/s: $7 \times 4.3 / 50 \approx 600$ ms
+
+    **Alternative: Pure Ring with 64-way**
+
+    - 63 steps of rotating KV
+    - Much higher latency but simpler
+    - Works if compute dominates
+
+    **Recommended configuration:**
+
+    ```
+    Intra-node: Ulysses (P=8)
+        - Fast AlltoAll on NVLink
+        - Redistributes S/8 → S, H → H/8
+
+    Inter-node: Ring (P=8)
+        - Overlapped P2P on InfiniBand
+        - Each node rotates as a unit
+
+    Memory per GPU: ~5 GB for attention
+    Sequence per GPU: 32K tokens
+    Total throughput: 2M token context
+    ```
+
+    | Configuration | Pros | Cons |
+    |---------------|------|------|
+    | Hybrid Ulysses+Ring | Best of both worlds | Complex implementation |
+    | Pure Ring-64 | Simple | 63 steps, high latency |
+    | Pure Ulysses-64 | Low volume | AlltoAll across nodes is slow |
+
 6. **Online softmax verification**: Implement and verify that combining three chunks $(A, B, C)$ as $(A \oplus B) \oplus C$ gives the same result as $A \oplus (B \oplus C)$ for the attention operation.
 
+??? success "Solution"
+    **Online softmax state representation:**
+
+    For each chunk, we track a tuple $(m, s, o)$:
+    - $m$: maximum logit seen so far
+    - $s$: sum of exponentials (scaled by current max)
+    - $o$: weighted output (scaled by current max)
+
+    **Combination operator $\oplus$:**
+
+    Given states $(m_1, s_1, o_1)$ and $(m_2, s_2, o_2)$:
+
+    $$m_{12} = \max(m_1, m_2)$$
+    $$s_{12} = s_1 \cdot e^{m_1 - m_{12}} + s_2 \cdot e^{m_2 - m_{12}}$$
+    $$o_{12} = o_1 \cdot e^{m_1 - m_{12}} + o_2 \cdot e^{m_2 - m_{12}}$$
+
+    **Implementation:**
+
+    ```python
+    import torch
+    import numpy as np
+
+    def create_chunk_state(logits, values):
+        """
+        Compute (m, s, o) state for a chunk.
+
+        Args:
+            logits: [seq_q, seq_kv] attention logits
+            values: [seq_kv, d] value vectors
+
+        Returns:
+            m: [seq_q] max logits
+            s: [seq_q] sum of exp(logits - m)
+            o: [seq_q, d] weighted sum of values
+        """
+        m = logits.max(dim=-1, keepdim=True).values  # [seq_q, 1]
+        exp_logits = torch.exp(logits - m)           # [seq_q, seq_kv]
+        s = exp_logits.sum(dim=-1, keepdim=True)     # [seq_q, 1]
+        o = exp_logits @ values                       # [seq_q, d]
+        return m.squeeze(-1), s.squeeze(-1), o
+
+    def combine_states(state1, state2):
+        """
+        Combine two (m, s, o) states using the associative operator.
+        """
+        m1, s1, o1 = state1
+        m2, s2, o2 = state2
+
+        m_new = torch.maximum(m1, m2)
+
+        # Correction factors
+        alpha1 = torch.exp(m1 - m_new).unsqueeze(-1)
+        alpha2 = torch.exp(m2 - m_new).unsqueeze(-1)
+
+        s_new = s1 * alpha1.squeeze(-1) + s2 * alpha2.squeeze(-1)
+        o_new = o1 * alpha1 + o2 * alpha2
+
+        return m_new, s_new, o_new
+
+    def finalize_output(state):
+        """Convert (m, s, o) state to final attention output."""
+        m, s, o = state
+        return o / s.unsqueeze(-1)
+
+    # Test associativity
+    torch.manual_seed(42)
+
+    seq_q, seq_kv, d = 4, 6, 8
+
+    # Create Q, K, V
+    Q = torch.randn(seq_q, d)
+    K = torch.randn(seq_kv, d)
+    V = torch.randn(seq_kv, d)
+
+    # Split K, V into 3 chunks
+    chunk_size = seq_kv // 3
+    K_chunks = [K[i*chunk_size:(i+1)*chunk_size] for i in range(3)]
+    V_chunks = [V[i*chunk_size:(i+1)*chunk_size] for i in range(3)]
+
+    # Compute logits for each chunk
+    logits_A = Q @ K_chunks[0].T
+    logits_B = Q @ K_chunks[1].T
+    logits_C = Q @ K_chunks[2].T
+
+    # Create states for each chunk
+    state_A = create_chunk_state(logits_A, V_chunks[0])
+    state_B = create_chunk_state(logits_B, V_chunks[1])
+    state_C = create_chunk_state(logits_C, V_chunks[2])
+
+    # Test (A ⊕ B) ⊕ C
+    state_AB = combine_states(state_A, state_B)
+    state_AB_C = combine_states(state_AB, state_C)
+    output_left = finalize_output(state_AB_C)
+
+    # Test A ⊕ (B ⊕ C)
+    state_BC = combine_states(state_B, state_C)
+    state_A_BC = combine_states(state_A, state_BC)
+    output_right = finalize_output(state_A_BC)
+
+    # Ground truth: standard attention
+    logits_full = Q @ K.T
+    attn_weights = torch.softmax(logits_full, dim=-1)
+    output_standard = attn_weights @ V
+
+    # Verify
+    print("Max diff (A⊕B)⊕C vs A⊕(B⊕C):",
+          (output_left - output_right).abs().max().item())
+    print("Max diff vs standard attention:",
+          (output_left - output_standard).abs().max().item())
+    ```
+
+    **Output:**
+
+    ```
+    Max diff (A⊕B)⊕C vs A⊕(B⊕C): 0.0
+    Max diff vs standard attention: 1.1920928955078125e-07
+    ```
+
+    **Verification results:**
+
+    | Comparison | Max Absolute Difference |
+    |------------|------------------------|
+    | $(A \oplus B) \oplus C$ vs $A \oplus (B \oplus C)$ | $\boxed{0.0}$ (exact) |
+    | Chunked vs Standard | ~$10^{-7}$ (numerical precision) |
+
+    **Why it works (mathematical proof):**
+
+    The combination operator is associative because:
+
+    1. **Max is associative**: $\max(\max(a, b), c) = \max(a, \max(b, c))$
+
+    2. **Weighted sums combine correctly**: The exponential rescaling ensures sums are always normalized to the global maximum.
+
+    3. **Softmax decomposition**: For any partition of keys:
+       $$\text{softmax}([x_A; x_B; x_C]) = \frac{[e^{x_A}; e^{x_B}; e^{x_C}]}{e^{m_A}s_A + e^{m_B}s_B + e^{m_C}s_C}$$
+
+       This can be computed incrementally by tracking $(m, s, o)$ and combining associatively.
+
 7. **Flash + Ring**: Modify the Ring Attention algorithm to use Flash Attention internally. What are the memory implications of the nested tiling?
+
+??? success "Solution"
+    **Flash Attention inside Ring Attention:**
+
+    Ring Attention and Flash Attention both use online softmax, making them naturally composable:
+
+    - **Ring**: Tiles across GPUs (distributed KV chunks)
+    - **Flash**: Tiles within GPU (SRAM-sized blocks)
+
+    **Nested tiling structure:**
+
+    ```
+    Ring Level (distributed):
+        For each KV chunk from ring:
+            Flash Level (local):
+                For each Q block that fits in SRAM:
+                    For each KV block from current chunk:
+                        Compute partial attention
+                        Update (m, s, o) state
+    ```
+
+    **Implementation:**
+
+    ```python
+    import torch
+    import torch.distributed as dist
+
+    def flash_attention_forward(q, k, v, block_size=256):
+        """
+        Flash Attention with online softmax.
+        Returns (output, m, lse) for Ring integration.
+
+        Args:
+            q: [seq_q, d]
+            k: [seq_kv, d]
+            v: [seq_kv, d]
+
+        Returns:
+            output: [seq_q, d]
+            m: [seq_q] max logits per query
+            lse: [seq_q] log-sum-exp per query
+        """
+        seq_q, d = q.shape
+        seq_kv = k.shape[0]
+
+        # Initialize online state
+        m = torch.full((seq_q,), float('-inf'), device=q.device)
+        lse = torch.zeros(seq_q, device=q.device)
+        output = torch.zeros(seq_q, d, device=q.device)
+
+        # Process K, V in blocks (simulating SRAM tiling)
+        for j in range(0, seq_kv, block_size):
+            k_block = k[j:j+block_size]  # [block, d]
+            v_block = v[j:j+block_size]  # [block, d]
+
+            # Compute attention scores for this block
+            scores = q @ k_block.T  # [seq_q, block]
+
+            # Online softmax update
+            m_block = scores.max(dim=-1).values  # [seq_q]
+            m_new = torch.maximum(m, m_block)
+
+            # Rescale previous accumulator
+            alpha = torch.exp(m - m_new)
+            lse = lse * alpha
+
+            # Add new contributions
+            exp_scores = torch.exp(scores - m_new.unsqueeze(-1))
+            lse = lse + exp_scores.sum(dim=-1)
+
+            # Update output
+            output = output * alpha.unsqueeze(-1)
+            output = output + exp_scores @ v_block
+
+            m = m_new
+
+        return output, m, lse
+
+    def ring_flash_attention(q_local, k_local, v_local, group):
+        """
+        Ring Attention using Flash Attention as inner kernel.
+
+        Args:
+            q_local: Local Q chunk [seq_local, d]
+            k_local: Local K chunk [seq_local, d]
+            v_local: Local V chunk [seq_local, d]
+            group: Process group for ring communication
+        """
+        rank = dist.get_rank(group)
+        world_size = dist.get_world_size(group)
+        device = q_local.device
+
+        seq_local, d = q_local.shape
+
+        # Initialize ring state (using online softmax representation)
+        m_global = torch.full((seq_local,), float('-inf'), device=device)
+        lse_global = torch.zeros(seq_local, device=device)
+        output_global = torch.zeros(seq_local, d, device=device)
+
+        # Double buffering for KV
+        k_recv = torch.empty_like(k_local)
+        v_recv = torch.empty_like(v_local)
+
+        k_curr, v_curr = k_local, v_local
+
+        for step in range(world_size):
+            # Async receive next KV (except last step)
+            if step < world_size - 1:
+                src = (rank - 1) % world_size
+                dst = (rank + 1) % world_size
+
+                recv_k = dist.irecv(k_recv, src=src, group=group)
+                recv_v = dist.irecv(v_recv, src=src, group=group)
+
+                send_k = dist.isend(k_curr, dst=dst, group=group)
+                send_v = dist.isend(v_curr, dst=dst, group=group)
+
+            # Flash Attention on current KV chunk
+            output_chunk, m_chunk, lse_chunk = flash_attention_forward(
+                q_local, k_curr, v_curr
+            )
+
+            # Combine with global state (online softmax merge)
+            m_new = torch.maximum(m_global, m_chunk)
+
+            alpha_global = torch.exp(m_global - m_new)
+            alpha_chunk = torch.exp(m_chunk - m_new)
+
+            lse_global = lse_global * alpha_global + lse_chunk * alpha_chunk
+            output_global = (output_global * alpha_global.unsqueeze(-1) +
+                           output_chunk * alpha_chunk.unsqueeze(-1))
+
+            m_global = m_new
+
+            # Wait for communication and swap buffers
+            if step < world_size - 1:
+                recv_k.wait()
+                recv_v.wait()
+                send_k.wait()
+                send_v.wait()
+
+                k_curr, k_recv = k_recv, k_curr
+                v_curr, v_recv = v_recv, v_curr
+
+        # Final normalization
+        output_final = output_global / lse_global.unsqueeze(-1)
+
+        return output_final
+    ```
+
+    **Memory analysis:**
+
+    | Component | Standard Ring | Flash + Ring |
+    |-----------|--------------|--------------|
+    | Attention matrix | $(S/P)^2$ per chunk | 0 (never materialized) |
+    | Q per GPU | $S/P \times d$ | $S/P \times d$ |
+    | K, V buffers | $4 \times S/P \times d$ | $4 \times S/P \times d$ |
+    | Flash workspace | 0 | $O(\text{block\_size} \times d)$ |
+    | Output accumulator | $S/P \times d$ | $S/P \times d$ |
+
+    **Memory implications of nested tiling:**
+
+    $$M_{\text{Flash+Ring}} = \underbrace{3 \times \frac{S}{P} \times d}_{\text{Q,K,V local}} + \underbrace{2 \times \frac{S}{P} \times d}_{\text{KV double buffer}} + \underbrace{O(B \times d)}_{\text{Flash SRAM}} + \underbrace{\frac{S}{P} \times d}_{\text{output}}$$
+
+    For $S = 1M$, $P = 8$, $d = 128$, $B = 256$:
+
+    - Q, K, V local: $3 \times 128K \times 128 \times 2 = 98$ MB
+    - KV buffers: $2 \times 128K \times 128 \times 2 = 65$ MB
+    - Flash workspace: ~1 MB
+    - Output: $128K \times 128 \times 2 = 33$ MB
+
+    **Total: ~200 MB** (vs 4+ GB without Flash)
+
+    **Key benefits:**
+
+    | Benefit | Explanation |
+    |---------|-------------|
+    | $O(S/P)$ memory | No $(S/P)^2$ attention matrix |
+    | IO efficiency | Flash reduces HBM traffic |
+    | Composability | Both use online softmax |
+    | Numerical stability | Log-sum-exp trick throughout |
+
+    **Memory reduction:**
+
+    Without Flash: $M = O((S/P)^2)$ for attention matrix
+    With Flash: $M = O(S/P)$ linear in local sequence
+
+    For $S/P = 128K$:
+    - Without Flash: $128K^2 \times 2 = 32$ GB (doesn't fit!)
+    - With Flash: ~200 MB
+
+    $$\text{Reduction} = \frac{(S/P)^2}{S/P \cdot d} = \frac{S/P}{d} = \frac{128K}{128} = \boxed{1024\times}$$
 
 ## Key Takeaways
 

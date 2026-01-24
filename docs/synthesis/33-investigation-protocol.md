@@ -1166,6 +1166,845 @@ Profile step breakdown
 
 6. **Fix Verification**: Apply a fix to a known problem. Use the FixVerifier to confirm the problem is resolved without introducing regressions.
 
+??? success "Solution"
+    **Exercise 1: Triage System**
+
+    ```python
+    import re
+    import traceback
+    from enum import Enum
+    from dataclasses import dataclass
+    from typing import Optional, List, Dict
+    import torch.distributed as dist
+
+    class FailureCategory(Enum):
+        OOM = "out_of_memory"
+        NETWORK = "network"
+        NUMERICAL = "numerical"
+        HARDWARE = "hardware"
+        SOFTWARE = "software"
+        UNKNOWN = "unknown"
+
+    @dataclass
+    class TriageResult:
+        category: FailureCategory
+        confidence: float  # 0.0 to 1.0
+        details: str
+        suggested_actions: List[str]
+        affected_ranks: List[int]
+
+    class TriageSystem:
+        """Automatic failure categorization for distributed training."""
+
+        OOM_PATTERNS = [
+            r"CUDA out of memory",
+            r"RuntimeError: CUDA error: out of memory",
+            r"torch.cuda.OutOfMemoryError",
+            r"Tried to allocate .* GiB",
+            r"OOM",
+        ]
+
+        NETWORK_PATTERNS = [
+            r"NCCL error",
+            r"Connection refused",
+            r"Timeout",
+            r"Socket",
+            r"ETIMEDOUT",
+            r"Connection reset",
+            r"NCCL WARN",
+        ]
+
+        NUMERICAL_PATTERNS = [
+            r"NaN",
+            r"Inf",
+            r"overflow",
+            r"underflow",
+            r"Loss is nan",
+            r"Gradient overflow",
+        ]
+
+        HARDWARE_PATTERNS = [
+            r"ECC error",
+            r"GPU has fallen off the bus",
+            r"Xid",
+            r"hardware exception",
+            r"NVLink error",
+        ]
+
+        def triage(self, error: Exception, logs: str = "") -> TriageResult:
+            """Categorize a failure based on exception and logs."""
+            error_str = str(error) + "\n" + traceback.format_exc() + "\n" + logs
+
+            # Check patterns in order of specificity
+            checks = [
+                (self.OOM_PATTERNS, FailureCategory.OOM, self._oom_actions),
+                (self.HARDWARE_PATTERNS, FailureCategory.HARDWARE, self._hardware_actions),
+                (self.NETWORK_PATTERNS, FailureCategory.NETWORK, self._network_actions),
+                (self.NUMERICAL_PATTERNS, FailureCategory.NUMERICAL, self._numerical_actions),
+            ]
+
+            for patterns, category, action_fn in checks:
+                matches = self._count_matches(error_str, patterns)
+                if matches > 0:
+                    confidence = min(0.5 + 0.1 * matches, 0.95)
+                    return TriageResult(
+                        category=category,
+                        confidence=confidence,
+                        details=self._extract_details(error_str, patterns),
+                        suggested_actions=action_fn(),
+                        affected_ranks=self._find_affected_ranks(error_str),
+                    )
+
+            return TriageResult(
+                category=FailureCategory.UNKNOWN,
+                confidence=0.3,
+                details=str(error)[:500],
+                suggested_actions=["Collect full logs", "Check system health", "Review recent changes"],
+                affected_ranks=[],
+            )
+
+        def _count_matches(self, text: str, patterns: List[str]) -> int:
+            return sum(1 for p in patterns if re.search(p, text, re.IGNORECASE))
+
+        def _extract_details(self, text: str, patterns: List[str]) -> str:
+            for pattern in patterns:
+                match = re.search(f".*{pattern}.*", text, re.IGNORECASE)
+                if match:
+                    return match.group(0)[:200]
+            return ""
+
+        def _find_affected_ranks(self, text: str) -> List[int]:
+            ranks = set()
+            for match in re.finditer(r"rank[:\s]+(\d+)", text, re.IGNORECASE):
+                ranks.add(int(match.group(1)))
+            return sorted(ranks)
+
+        def _oom_actions(self) -> List[str]:
+            return [
+                "Reduce batch size",
+                "Enable gradient checkpointing",
+                "Increase tensor parallelism",
+                "Enable ZeRO-3 if using ZeRO-1/2",
+                "Check for memory leaks in custom code",
+            ]
+
+        def _network_actions(self) -> List[str]:
+            return [
+                "Check network connectivity between nodes",
+                "Verify NCCL_IB_DISABLE setting",
+                "Increase NCCL timeout (NCCL_TIMEOUT)",
+                "Check for stragglers causing timeouts",
+                "Verify firewall rules",
+            ]
+
+        def _numerical_actions(self) -> List[str]:
+            return [
+                "Reduce learning rate",
+                "Enable loss scaling if using FP16",
+                "Check for data corruption",
+                "Add gradient clipping",
+                "Verify model initialization",
+            ]
+
+        def _hardware_actions(self) -> List[str]:
+            return [
+                "Run nvidia-smi to check GPU health",
+                "Check ECC error counts",
+                "Verify GPU temperatures",
+                "Consider excluding problematic GPU",
+                "Contact infrastructure team",
+            ]
+
+    # Test harness to induce failures
+    def test_triage_system():
+        triage = TriageSystem()
+
+        # Test OOM
+        try:
+            raise RuntimeError("CUDA out of memory. Tried to allocate 20.00 GiB")
+        except Exception as e:
+            result = triage.triage(e)
+            assert result.category == FailureCategory.OOM
+            print(f"✓ OOM detected: {result.confidence:.0%} confidence")
+
+        # Test Network
+        try:
+            raise RuntimeError("NCCL error: unhandled system error, ETIMEDOUT")
+        except Exception as e:
+            result = triage.triage(e)
+            assert result.category == FailureCategory.NETWORK
+            print(f"✓ Network error detected: {result.confidence:.0%} confidence")
+
+        # Test Numerical
+        try:
+            raise ValueError("Loss is nan at step 1000")
+        except Exception as e:
+            result = triage.triage(e)
+            assert result.category == FailureCategory.NUMERICAL
+            print(f"✓ Numerical error detected: {result.confidence:.0%} confidence")
+
+        print("\nAll triage tests passed!")
+    ```
+
+    **Exercise 2: Bisection Debugging**
+
+    ```python
+    from dataclasses import dataclass
+    from typing import Callable, List, Tuple
+    import subprocess
+
+    @dataclass
+    class BisectionResult:
+        breaking_point: int
+        last_working: int
+        observations: List[str]
+
+    def bisection_debug(
+        test_fn: Callable[[int], bool],
+        min_scale: int = 8,
+        max_scale: int = 64,
+    ) -> BisectionResult:
+        """
+        Find the exact scale where training breaks.
+
+        Args:
+            test_fn: Function that returns True if training works at given scale
+            min_scale: Minimum GPU count (known to work)
+            max_scale: Maximum GPU count (known to fail)
+
+        Returns:
+            BisectionResult with breaking point and observations
+        """
+        observations = []
+        low, high = min_scale, max_scale
+
+        # Verify boundaries
+        assert test_fn(low), f"Test should pass at min_scale={low}"
+        assert not test_fn(high), f"Test should fail at max_scale={high}"
+
+        observations.append(f"Confirmed: works at {low}, fails at {high}")
+
+        while high - low > 1:
+            mid = (low + high) // 2
+            # Round to power of 2 if close
+            for p2 in [8, 16, 32, 64, 128]:
+                if abs(mid - p2) <= 2:
+                    mid = p2
+                    break
+
+            print(f"Testing scale: {mid} GPUs...")
+            if test_fn(mid):
+                observations.append(f"✓ Scale {mid}: PASS")
+                low = mid
+            else:
+                observations.append(f"✗ Scale {mid}: FAIL")
+                high = mid
+
+        observations.append(f"Breaking point: {low} → {high}")
+        return BisectionResult(
+            breaking_point=high,
+            last_working=low,
+            observations=observations,
+        )
+
+    def analyze_scale_change(working: int, breaking: int) -> List[str]:
+        """Analyze what changes at the breaking scale."""
+        changes = []
+
+        # Network topology changes
+        if working <= 8 and breaking > 8:
+            changes.append("Crossed single-node boundary (NVLink → network)")
+
+        # NCCL algorithm changes
+        if working < 16 and breaking >= 16:
+            changes.append("NCCL may switch from tree to ring algorithm")
+
+        # Memory per GPU
+        changes.append(f"Per-GPU batch size: {1024//breaking} vs {1024//working}")
+
+        # Communication volume
+        changes.append(f"AllReduce participants: {working} → {breaking}")
+        changes.append(f"Ring allreduce steps: {working-1} → {breaking-1}")
+
+        # Synchronization
+        changes.append(f"Barrier sync time increases with more GPUs")
+
+        return changes
+
+    # Example usage
+    """
+    def run_training_test(num_gpus: int) -> bool:
+        result = subprocess.run(
+            ["torchrun", f"--nproc_per_node={num_gpus}", "train.py", "--test"],
+            capture_output=True,
+            timeout=300,
+        )
+        return result.returncode == 0
+
+    result = bisection_debug(run_training_test, min_scale=8, max_scale=64)
+    print(f"Breaking point: {result.breaking_point} GPUs")
+    for obs in result.observations:
+        print(f"  {obs}")
+
+    changes = analyze_scale_change(result.last_working, result.breaking_point)
+    print("\nChanges at breaking point:")
+    for change in changes:
+        print(f"  - {change}")
+    """
+    ```
+
+    **Typical findings when going from 8 → 64 GPUs:**
+
+    | Scale | Change | Impact |
+    |-------|--------|--------|
+    | 8 → 16 | Cross node boundary | NVLink → InfiniBand |
+    | 16 → 32 | AllReduce latency | 2× participants |
+    | 32 → 64 | Memory pressure | Smaller per-GPU batch |
+
+    **Exercise 3: Five Whys Practice**
+
+    ```markdown
+    # Five Whys Analysis Template
+
+    ## Incident: Training NaN at step 10,000
+
+    **Why 1: Why did training produce NaN?**
+    → Loss exploded to infinity before becoming NaN
+
+    **Why 2: Why did loss explode?**
+    → Gradients grew exponentially over ~50 steps
+
+    **Why 3: Why did gradients grow exponentially?**
+    → Learning rate warmup completed, full LR was too high for model state
+
+    **Why 4: Why was the learning rate too high?**
+    → LR was copied from a paper using different batch size without adjustment
+
+    **Why 5: Why wasn't LR adjusted for batch size?**
+    → No documented procedure for scaling hyperparameters with batch size
+
+    ## Root Cause
+    Missing documentation/checklist for adapting hyperparameters when
+    changing training configuration.
+
+    ## Corrective Actions
+    1. Immediate: Reduce LR by sqrt(batch_ratio)
+    2. Short-term: Add LR scaling formula to training checklist
+    3. Long-term: Implement automatic LR scaling based on batch size
+    ```
+
+    ```python
+    from dataclasses import dataclass
+    from typing import List, Optional
+
+    @dataclass
+    class WhyLevel:
+        question: str
+        answer: str
+        evidence: Optional[str] = None
+
+    class FiveWhysAnalysis:
+        """Structured Five Whys analysis for training failures."""
+
+        def __init__(self, incident: str):
+            self.incident = incident
+            self.levels: List[WhyLevel] = []
+
+        def add_why(self, question: str, answer: str, evidence: str = None):
+            self.levels.append(WhyLevel(question, answer, evidence))
+            return self
+
+        def get_root_cause(self) -> str:
+            if len(self.levels) >= 5:
+                return self.levels[-1].answer
+            return "Analysis incomplete - need at least 5 levels"
+
+        def generate_report(self) -> str:
+            report = [f"# Five Whys Analysis\n", f"**Incident**: {self.incident}\n"]
+
+            for i, level in enumerate(self.levels, 1):
+                report.append(f"\n**Why {i}**: {level.question}")
+                report.append(f"→ {level.answer}")
+                if level.evidence:
+                    report.append(f"  *Evidence*: {level.evidence}")
+
+            if len(self.levels) >= 5:
+                report.append(f"\n## Root Cause\n{self.get_root_cause()}")
+
+            return "\n".join(report)
+
+    # Example
+    analysis = FiveWhysAnalysis("GPU 3 consistently 20% slower")
+    analysis.add_why(
+        "Why is GPU 3 slower?",
+        "GPU 3 thermals hit 85°C, triggering throttling",
+        "nvidia-smi shows temp at 85°C vs 72°C for others"
+    ).add_why(
+        "Why is GPU 3 hotter?",
+        "Airflow to GPU 3 slot is restricted",
+        "Thermal camera shows hot spot"
+    ).add_why(
+        "Why is airflow restricted?",
+        "Adjacent cable bundle blocks intake",
+        "Visual inspection confirmed"
+    ).add_why(
+        "Why is cable bundle there?",
+        "Storage expansion installed without cable management",
+        "Change log shows storage added 2 weeks ago"
+    ).add_why(
+        "Why wasn't cable management done?",
+        "No thermal verification step in hardware change procedure",
+        "Procedure document review"
+    )
+
+    print(analysis.generate_report())
+    ```
+
+    **Exercise 4: Correlation Analysis**
+
+    ```python
+    import time
+    import json
+    from collections import defaultdict
+    from dataclasses import dataclass, asdict
+    from typing import List, Dict, Optional
+    from datetime import datetime
+    import numpy as np
+
+    @dataclass
+    class TrainingEvent:
+        timestamp: float
+        event_type: str  # "checkpoint", "lr_change", "batch_size_change", "failure"
+        details: Dict
+        step: int
+
+    class EventLogger:
+        """Log training events for correlation analysis."""
+
+        def __init__(self, log_file: str = "training_events.jsonl"):
+            self.log_file = log_file
+            self.events: List[TrainingEvent] = []
+
+        def log(self, event_type: str, details: Dict, step: int):
+            event = TrainingEvent(
+                timestamp=time.time(),
+                event_type=event_type,
+                details=details,
+                step=step,
+            )
+            self.events.append(event)
+
+            with open(self.log_file, "a") as f:
+                f.write(json.dumps(asdict(event)) + "\n")
+
+        def log_checkpoint(self, step: int, path: str):
+            self.log("checkpoint", {"path": path}, step)
+
+        def log_lr_change(self, step: int, old_lr: float, new_lr: float):
+            self.log("lr_change", {"old": old_lr, "new": new_lr}, step)
+
+        def log_failure(self, step: int, error: str, category: str):
+            self.log("failure", {"error": error, "category": category}, step)
+
+    class CorrelationAnalyzer:
+        """Analyze correlations between events and failures."""
+
+        def __init__(self, events: List[TrainingEvent]):
+            self.events = sorted(events, key=lambda e: e.timestamp)
+            self.failures = [e for e in events if e.event_type == "failure"]
+
+        def analyze_precursors(self, window_seconds: float = 300) -> Dict[str, float]:
+            """Find events that commonly precede failures."""
+            precursor_counts = defaultdict(int)
+            total_failures = len(self.failures)
+
+            for failure in self.failures:
+                # Look back in time window
+                for event in self.events:
+                    if event.event_type == "failure":
+                        continue
+                    time_diff = failure.timestamp - event.timestamp
+                    if 0 < time_diff <= window_seconds:
+                        precursor_counts[event.event_type] += 1
+
+            # Normalize by failure count
+            return {
+                event_type: count / total_failures
+                for event_type, count in precursor_counts.items()
+            }
+
+        def calculate_risk_ratios(self) -> Dict[str, float]:
+            """
+            Calculate risk ratio: P(failure | event) / P(failure | no event)
+            """
+            # Time windows after each event type
+            WINDOW = 600  # 10 minutes
+
+            event_types = set(e.event_type for e in self.events) - {"failure"}
+            risk_ratios = {}
+
+            total_time = self.events[-1].timestamp - self.events[0].timestamp
+            base_failure_rate = len(self.failures) / total_time
+
+            for event_type in event_types:
+                events_of_type = [e for e in self.events if e.event_type == event_type]
+
+                failures_after_event = 0
+                total_window_time = 0
+
+                for event in events_of_type:
+                    window_end = event.timestamp + WINDOW
+                    total_window_time += WINDOW
+
+                    for failure in self.failures:
+                        if event.timestamp < failure.timestamp <= window_end:
+                            failures_after_event += 1
+
+                if total_window_time > 0:
+                    failure_rate_after = failures_after_event / total_window_time
+                    risk_ratios[event_type] = failure_rate_after / base_failure_rate
+
+            return risk_ratios
+
+        def generate_report(self) -> str:
+            precursors = self.analyze_precursors()
+            risk_ratios = self.calculate_risk_ratios()
+
+            report = ["# Event-Failure Correlation Analysis\n"]
+            report.append(f"Total events: {len(self.events)}")
+            report.append(f"Total failures: {len(self.failures)}\n")
+
+            report.append("## Precursor Analysis (5-min window)")
+            report.append("| Event Type | Preceded Failures |")
+            report.append("|------------|-------------------|")
+            for event_type, rate in sorted(precursors.items(), key=lambda x: -x[1]):
+                report.append(f"| {event_type} | {rate:.0%} |")
+
+            report.append("\n## Risk Ratios")
+            report.append("| Event Type | Risk Ratio |")
+            report.append("|------------|------------|")
+            for event_type, ratio in sorted(risk_ratios.items(), key=lambda x: -x[1]):
+                flag = "⚠️" if ratio > 2.0 else ""
+                report.append(f"| {event_type} | {ratio:.2f}x {flag} |")
+
+            return "\n".join(report)
+    ```
+
+    **Example output after 1 week:**
+
+    | Event Type | Risk Ratio | Interpretation |
+    |------------|------------|----------------|
+    | checkpoint | 3.2x ⚠️ | Checkpointing may cause OOM pressure |
+    | lr_change | 2.1x ⚠️ | LR increases destabilize training |
+    | batch_size_change | 1.8x | Batch changes stress memory |
+    | eval_start | 0.9x | Eval is safe |
+
+    **Exercise 5: Prevention Checklist**
+
+    ```python
+    from dataclasses import dataclass
+    from typing import List, Callable, Optional
+    from enum import Enum
+
+    class CheckResult(Enum):
+        PASS = "✓"
+        FAIL = "✗"
+        WARN = "⚠"
+        SKIP = "○"
+
+    @dataclass
+    class CheckItem:
+        name: str
+        description: str
+        check_fn: Optional[Callable[[], CheckResult]] = None
+        category: str = "general"
+        critical: bool = False
+
+    class PreventionChecklist:
+        """Custom prevention checklist for training runs."""
+
+        def __init__(self, model_name: str):
+            self.model_name = model_name
+            self.items: List[CheckItem] = []
+            self.results: dict = {}
+
+        def add_check(self, name: str, description: str,
+                      check_fn: Callable = None, category: str = "general",
+                      critical: bool = False):
+            self.items.append(CheckItem(name, description, check_fn, category, critical))
+            return self
+
+        def run_all(self) -> bool:
+            """Run all checks, return True if no critical failures."""
+            all_passed = True
+
+            for item in self.items:
+                if item.check_fn:
+                    try:
+                        result = item.check_fn()
+                    except Exception as e:
+                        result = CheckResult.FAIL
+                        print(f"Check '{item.name}' raised: {e}")
+                else:
+                    result = CheckResult.SKIP
+
+                self.results[item.name] = result
+
+                if result == CheckResult.FAIL and item.critical:
+                    all_passed = False
+
+            return all_passed
+
+        def generate_report(self) -> str:
+            categories = {}
+            for item in self.items:
+                if item.category not in categories:
+                    categories[item.category] = []
+                categories[item.category].append(item)
+
+            report = [f"# Pre-Training Checklist: {self.model_name}\n"]
+
+            for category, items in categories.items():
+                report.append(f"\n## {category.title()}")
+                for item in items:
+                    result = self.results.get(item.name, CheckResult.SKIP)
+                    critical = " [CRITICAL]" if item.critical else ""
+                    report.append(f"- {result.value} {item.name}{critical}")
+                    report.append(f"  {item.description}")
+
+            return "\n".join(report)
+
+    # Example checklist for LLaMA-style training
+    def create_llama_checklist() -> PreventionChecklist:
+        import torch
+
+        checklist = PreventionChecklist("LLaMA-70B")
+
+        # Memory checks
+        def check_gpu_memory():
+            free = torch.cuda.mem_get_info()[0] / 1e9
+            return CheckResult.PASS if free > 70 else CheckResult.FAIL
+
+        checklist.add_check(
+            "GPU Memory Available",
+            "Verify >70GB free per GPU for 70B model",
+            check_gpu_memory, "memory", critical=True
+        )
+
+        # Network checks
+        checklist.add_check(
+            "NCCL Version",
+            "Verify NCCL >= 2.18 for optimal performance",
+            category="network"
+        )
+
+        checklist.add_check(
+            "InfiniBand Status",
+            "Verify IB links are up: ibstat shows Active",
+            category="network", critical=True
+        )
+
+        # Numerical checks
+        checklist.add_check(
+            "Loss Scaling Configured",
+            "Verify dynamic loss scaling is enabled for FP16",
+            category="numerical"
+        )
+
+        checklist.add_check(
+            "Gradient Clipping",
+            "Verify grad clip norm = 1.0",
+            category="numerical"
+        )
+
+        # Checkpoint checks
+        checklist.add_check(
+            "Checkpoint Storage",
+            "Verify checkpoint directory has >5TB free",
+            category="checkpoint", critical=True
+        )
+
+        return checklist
+
+    # Run checklist
+    # checklist = create_llama_checklist()
+    # if not checklist.run_all():
+    #     print("CRITICAL CHECKS FAILED - DO NOT PROCEED")
+    # print(checklist.generate_report())
+    ```
+
+    **Exercise 6: Fix Verification**
+
+    ```python
+    import time
+    import statistics
+    from dataclasses import dataclass
+    from typing import List, Dict, Callable, Optional
+    from enum import Enum
+
+    class VerificationStatus(Enum):
+        FIXED = "fixed"
+        NOT_FIXED = "not_fixed"
+        REGRESSION = "regression"
+        INCONCLUSIVE = "inconclusive"
+
+    @dataclass
+    class Metric:
+        name: str
+        value: float
+        baseline: float
+        tolerance: float  # Acceptable deviation from baseline
+
+        @property
+        def is_regression(self) -> bool:
+            # Assuming higher is better for throughput, lower for loss
+            if "throughput" in self.name.lower() or "speed" in self.name.lower():
+                return self.value < self.baseline * (1 - self.tolerance)
+            else:
+                return self.value > self.baseline * (1 + self.tolerance)
+
+    @dataclass
+    class VerificationResult:
+        status: VerificationStatus
+        problem_resolved: bool
+        regressions: List[str]
+        metrics: Dict[str, Metric]
+        notes: str
+
+    class FixVerifier:
+        """Verify that a fix resolves the problem without regressions."""
+
+        def __init__(self, baseline_metrics: Dict[str, float]):
+            self.baseline = baseline_metrics
+            self.tolerance = 0.05  # 5% tolerance
+
+        def verify(
+            self,
+            problem_test: Callable[[], bool],  # Returns True if problem exists
+            metric_collector: Callable[[], Dict[str, float]],
+            num_trials: int = 3,
+        ) -> VerificationResult:
+            """
+            Verify a fix by:
+            1. Checking if the original problem is resolved
+            2. Collecting metrics to check for regressions
+            3. Running multiple trials for statistical significance
+            """
+            # Test if problem is resolved
+            problem_trials = [problem_test() for _ in range(num_trials)]
+            problem_resolved = not any(problem_trials)
+
+            # Collect metrics across trials
+            all_metrics = [metric_collector() for _ in range(num_trials)]
+
+            # Aggregate metrics
+            metrics = {}
+            regressions = []
+
+            for metric_name in all_metrics[0].keys():
+                values = [m[metric_name] for m in all_metrics]
+                avg_value = statistics.mean(values)
+                baseline_value = self.baseline.get(metric_name, avg_value)
+
+                metric = Metric(
+                    name=metric_name,
+                    value=avg_value,
+                    baseline=baseline_value,
+                    tolerance=self.tolerance,
+                )
+                metrics[metric_name] = metric
+
+                if metric.is_regression:
+                    regressions.append(
+                        f"{metric_name}: {baseline_value:.2f} → {avg_value:.2f}"
+                    )
+
+            # Determine overall status
+            if not problem_resolved:
+                status = VerificationStatus.NOT_FIXED
+            elif regressions:
+                status = VerificationStatus.REGRESSION
+            else:
+                status = VerificationStatus.FIXED
+
+            return VerificationResult(
+                status=status,
+                problem_resolved=problem_resolved,
+                regressions=regressions,
+                metrics=metrics,
+                notes=f"Ran {num_trials} trials",
+            )
+
+        def generate_report(self, result: VerificationResult) -> str:
+            report = ["# Fix Verification Report\n"]
+
+            status_emoji = {
+                VerificationStatus.FIXED: "✅",
+                VerificationStatus.NOT_FIXED: "❌",
+                VerificationStatus.REGRESSION: "⚠️",
+                VerificationStatus.INCONCLUSIVE: "❓",
+            }
+
+            report.append(f"**Status**: {status_emoji[result.status]} {result.status.value.upper()}")
+            report.append(f"**Problem Resolved**: {'Yes' if result.problem_resolved else 'No'}")
+
+            if result.regressions:
+                report.append("\n## Regressions Detected")
+                for reg in result.regressions:
+                    report.append(f"- ⚠️ {reg}")
+
+            report.append("\n## Metrics Comparison")
+            report.append("| Metric | Baseline | Current | Status |")
+            report.append("|--------|----------|---------|--------|")
+
+            for name, metric in result.metrics.items():
+                status = "🔴" if metric.is_regression else "🟢"
+                report.append(f"| {name} | {metric.baseline:.2f} | {metric.value:.2f} | {status} |")
+
+            return "\n".join(report)
+
+    # Example usage
+    """
+    # Baseline before attempting fix
+    baseline = {
+        "throughput_tokens_sec": 150000,
+        "memory_gb": 72,
+        "step_time_ms": 450,
+    }
+
+    verifier = FixVerifier(baseline)
+
+    def check_oom_problem():
+        # Returns True if OOM still occurs
+        try:
+            run_training_step()
+            return False
+        except RuntimeError as e:
+            return "out of memory" in str(e).lower()
+
+    def collect_metrics():
+        return {
+            "throughput_tokens_sec": measure_throughput(),
+            "memory_gb": get_peak_memory(),
+            "step_time_ms": measure_step_time(),
+        }
+
+    result = verifier.verify(check_oom_problem, collect_metrics)
+    print(verifier.generate_report(result))
+    """
+    ```
+
+    **Summary of verification workflow:**
+
+    | Step | Action | Purpose |
+    |------|--------|---------|
+    | 1 | Record baseline metrics | Establish performance reference |
+    | 2 | Apply fix | Implement the proposed solution |
+    | 3 | Test problem resolution | Confirm original issue is fixed |
+    | 4 | Collect new metrics | Measure current performance |
+    | 5 | Compare to baseline | Detect any regressions |
+    | 6 | Generate report | Document verification results |
+
 ## Key Takeaways
 
 1. **Systematic beats ad-hoc**: The five-phase protocol ensures nothing is missed.

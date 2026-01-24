@@ -1300,15 +1300,374 @@ class FaultTolerantTrainer:
 
 1. **MTBF calculation**: A cluster has 4,096 GPUs (MTBF 25,000 hours), 512 hosts (MTBF 8,000 hours), and 32 network switches (MTBF 100,000 hours). Calculate the system MTBF.
 
+??? success "Solution"
+    **System MTBF formula:**
+
+    For independent components, failure rates add:
+    $$\lambda_{system} = \sum_i n_i \cdot \lambda_i = \sum_i \frac{n_i}{MTBF_i}$$
+
+    $$MTBF_{system} = \frac{1}{\lambda_{system}}$$
+
+    **Component failure rates:**
+
+    | Component | Count | MTBF (hrs) | Failure Rate (per hr) |
+    |-----------|-------|------------|----------------------|
+    | GPUs | 4,096 | 25,000 | $\frac{4096}{25000} = 0.164$ |
+    | Hosts | 512 | 8,000 | $\frac{512}{8000} = 0.064$ |
+    | Switches | 32 | 100,000 | $\frac{32}{100000} = 0.00032$ |
+
+    **System failure rate:**
+
+    $$\lambda_{system} = 0.164 + 0.064 + 0.00032 = 0.228 \text{ failures/hour}$$
+
+    **System MTBF:**
+
+    $$MTBF_{system} = \frac{1}{0.228} = \boxed{4.38 \text{ hours}}$$
+
+    **Analysis:**
+
+    | Component | Contribution to Failure Rate |
+    |-----------|------------------------------|
+    | GPUs | 72% |
+    | Hosts | 28% |
+    | Switches | 0.14% |
+
+    GPUs dominate the failure rate due to their quantity, even with better individual reliability than hosts.
+
+    **Implications:**
+
+    - Expect a failure every ~4.4 hours
+    - Checkpoint interval should be << 4.4 hours
+    - Investment in GPU reliability has highest ROI
+
 2. **Optimal checkpoint interval**: Given MTBF of 2 hours, checkpoint time of 30 seconds, and step time of 500ms, what's the optimal checkpoint interval?
+
+??? success "Solution"
+    **Given:**
+
+    - MTBF = 2 hours = 7,200 seconds
+    - Checkpoint time: $C$ = 30 seconds
+    - Step time: $T_{step}$ = 0.5 seconds
+
+    **Optimal checkpoint interval formula (Young/Daly):**
+
+    $$I^* = \sqrt{2 \cdot C \cdot MTBF}$$
+
+    **Calculation:**
+
+    $$I^* = \sqrt{2 \times 30 \times 7200} = \sqrt{432,000} = \boxed{657 \text{ seconds}} \approx 11 \text{ minutes}$$
+
+    **Convert to steps:**
+
+    $$\text{Steps between checkpoints} = \frac{657}{0.5} = \boxed{1,314 \text{ steps}}$$
+
+    **Verify optimality:**
+
+    Total time with checkpointing = training time + checkpoint overhead + expected wasted work
+
+    $$T_{total} = T_{train} \times \left(1 + \frac{C}{I} + \frac{I}{2 \times MTBF}\right)$$
+
+    | Interval | Checkpoint Overhead | Expected Waste | Total Overhead |
+    |----------|--------------------:|---------------:|---------------:|
+    | 200s | 15.0% | 1.4% | 16.4% |
+    | 400s | 7.5% | 2.8% | 10.3% |
+    | **657s** | 4.6% | 4.6% | **9.1%** |
+    | 1000s | 3.0% | 6.9% | 9.9% |
+    | 2000s | 1.5% | 13.9% | 15.4% |
+
+    At the optimal interval, checkpoint overhead equals expected wasted work (both ~4.6%).
+
+    **Practical considerations:**
+
+    - Round to nice step count: 1,300 or 1,500 steps
+    - Account for async checkpointing reducing effective $C$
+    - Monitor actual failure rate and adjust
+
+    **Summary:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Optimal interval | 657 seconds |
+    | Steps between checkpoints | 1,314 |
+    | Total overhead at optimal | 9.1% |
 
 3. **Async overhead**: Model size is 50GB per rank. PCIe bandwidth is 32 GB/s. Parallel FS bandwidth per rank is 2 GB/s. Calculate sync vs async checkpoint overhead.
 
+??? success "Solution"
+    **Given:**
+
+    - Model size per rank: 50 GB
+    - PCIe bandwidth (GPU→CPU): 32 GB/s
+    - Parallel FS bandwidth (CPU→storage): 2 GB/s
+
+    **Synchronous checkpointing:**
+
+    All operations are on the critical path:
+
+    $$T_{sync} = T_{GPU \to CPU} + T_{CPU \to storage}$$
+    $$T_{sync} = \frac{50}{32} + \frac{50}{2} = 1.56 + 25 = \boxed{26.56 \text{ seconds}}$$
+
+    Training is blocked for the entire duration.
+
+    **Asynchronous checkpointing:**
+
+    Only GPU→CPU copy is on critical path (training resumes after):
+
+    $$T_{async}^{blocking} = T_{GPU \to CPU} = \frac{50}{32} = \boxed{1.56 \text{ seconds}}$$
+
+    Storage write happens in background.
+
+    **Overhead comparison:**
+
+    | Approach | Blocking Time | Speedup |
+    |----------|---------------|---------|
+    | Synchronous | 26.56s | 1× |
+    | Asynchronous | 1.56s | **17×** |
+
+    **Effective checkpoint time reduction:**
+
+    $$\text{Reduction} = \frac{26.56 - 1.56}{26.56} = \boxed{94\%}$$
+
+    **Background write considerations:**
+
+    The 25-second background write must complete before the next checkpoint:
+
+    $$\text{Min checkpoint interval} > 25 \text{ seconds}$$
+
+    For optimal interval of ~657s (from Exercise 2), this is easily satisfied.
+
+    **Impact on optimal checkpointing:**
+
+    Using async, effective checkpoint time becomes 1.56s instead of 26.56s:
+
+    $$I_{async}^* = \sqrt{2 \times 1.56 \times 7200} = 150 \text{ seconds}$$
+
+    More frequent checkpoints reduce wasted work!
+
+    **Memory overhead:**
+
+    Async requires double-buffering in CPU memory:
+
+    $$M_{overhead} = 50 \text{ GB/rank}$$
+
+    | Metric | Sync | Async |
+    |--------|------|-------|
+    | Blocking time | 26.56s | 1.56s |
+    | Optimal interval | 657s | 150s |
+    | Expected wasted work | 4.6% | 1.0% |
+    | CPU memory overhead | 0 | 50 GB |
+
 4. **Resharding math**: A checkpoint was saved with TP=8. Loading with TP=4. Each parameter was sharded along dimension 0. Write the resharding formula.
+
+??? success "Solution"
+    **Scenario:**
+
+    - Saved: TP=8 (8 shards along dimension 0)
+    - Loading: TP=4 (need 4 shards along dimension 0)
+
+    **Original sharding (TP=8):**
+
+    For a parameter with shape $[D_0, D_1, ...]$:
+
+    Each rank $r \in [0,7]$ holds:
+    $$\text{shard}_r = \text{param}\left[\frac{r \cdot D_0}{8} : \frac{(r+1) \cdot D_0}{8}, :, ...\right]$$
+
+    **Target sharding (TP=4):**
+
+    Each rank $r' \in [0,3]$ needs:
+    $$\text{shard}_{r'} = \text{param}\left[\frac{r' \cdot D_0}{4} : \frac{(r'+1) \cdot D_0}{4}, :, ...\right]$$
+
+    **Resharding formula:**
+
+    Since $8/4 = 2$, each new shard is formed by concatenating 2 old shards:
+
+    $$\boxed{\text{shard}_{r'}^{new} = \text{concat}\left(\text{shard}_{2r'}^{old}, \text{shard}_{2r'+1}^{old}\right)}$$
+
+    **Mapping:**
+
+    | New Rank (TP=4) | Old Ranks (TP=8) | Formula |
+    |-----------------|------------------|---------|
+    | 0 | 0, 1 | concat(shard_0, shard_1) |
+    | 1 | 2, 3 | concat(shard_2, shard_3) |
+    | 2 | 4, 5 | concat(shard_4, shard_5) |
+    | 3 | 6, 7 | concat(shard_6, shard_7) |
+
+    **General resharding formula:**
+
+    For TP_old → TP_new where TP_old > TP_new (merging shards):
+
+    $$k = \frac{TP_{old}}{TP_{new}}$$
+
+    $$\text{shard}_{r'}^{new} = \text{concat}\left(\text{shard}_{k \cdot r'}^{old}, \text{shard}_{k \cdot r'+1}^{old}, ..., \text{shard}_{k \cdot r'+(k-1)}^{old}\right)$$
+
+    For TP_old < TP_new (splitting shards):
+
+    $$k = \frac{TP_{new}}{TP_{old}}$$
+
+    $$\text{shard}_{r'}^{new} = \text{split}_k\left(\text{shard}_{\lfloor r'/k \rfloor}^{old}\right)[r' \mod k]$$
+
+    **Python implementation:**
+
+    ```python
+    def reshard_tp(old_shards, old_tp, new_tp, dim=0):
+        """Reshard from old_tp to new_tp along specified dimension."""
+        # Reconstruct full tensor
+        full = torch.cat(old_shards, dim=dim)
+
+        # Create new shards
+        chunk_size = full.shape[dim] // new_tp
+        new_shards = torch.split(full, chunk_size, dim=dim)
+
+        return list(new_shards)
+
+    # Example: TP=8 → TP=4
+    # old_shards: list of 8 tensors
+    # new_shards: list of 4 tensors (each 2× larger in dim 0)
+    new_shards = reshard_tp(old_shards, old_tp=8, new_tp=4)
+    ```
 
 5. **Compression trade-off**: Checkpoint size 100GB. LZ4 compression ratio 2.5x at 4 GB/s. Uncompressed write at 10 GB/s. Which is faster for save? For load?
 
+??? success "Solution"
+    **Given:**
+
+    - Checkpoint size: 100 GB (uncompressed)
+    - LZ4 compression ratio: 2.5× → compressed size = 40 GB
+    - LZ4 throughput: 4 GB/s (compression and decompression)
+    - Uncompressed I/O: 10 GB/s
+
+    **Save time analysis:**
+
+    **Without compression:**
+    $$T_{save}^{uncomp} = \frac{100}{10} = 10 \text{ seconds}$$
+
+    **With compression:**
+    $$T_{compress} = \frac{100}{4} = 25 \text{ seconds}$$
+    $$T_{write} = \frac{40}{10} = 4 \text{ seconds}$$
+
+    If sequential: $T_{save}^{comp} = 25 + 4 = 29$ seconds
+
+    If pipelined (compress while writing): $T_{save}^{comp} = \max(25, 4) = 25$ seconds
+
+    **Save verdict:**
+
+    $$\boxed{\text{Uncompressed is faster for save: 10s vs 25s}}$$
+
+    **Load time analysis:**
+
+    **Without compression:**
+    $$T_{load}^{uncomp} = \frac{100}{10} = 10 \text{ seconds}$$
+
+    **With compression:**
+    $$T_{read} = \frac{40}{10} = 4 \text{ seconds}$$
+    $$T_{decompress} = \frac{100}{4} = 25 \text{ seconds}$$
+
+    If sequential: $T_{load}^{comp} = 4 + 25 = 29$ seconds
+
+    If pipelined: $T_{load}^{comp} = \max(4, 25) = 25$ seconds
+
+    **Load verdict:**
+
+    $$\boxed{\text{Uncompressed is faster for load: 10s vs 25s}}$$
+
+    **Summary:**
+
+    | Operation | Uncompressed | Compressed | Winner |
+    |-----------|--------------|------------|--------|
+    | Save | 10s | 25s | Uncompressed |
+    | Load | 10s | 25s | Uncompressed |
+    | Storage | 100 GB | 40 GB | Compressed (2.5×) |
+
+    **When compression wins:**
+
+    Compression becomes faster when I/O is the bottleneck:
+
+    $$T_{uncomp} > T_{comp}$$
+    $$\frac{S}{BW_{io}} > \frac{S}{BW_{comp}}$$
+
+    Solve: $BW_{io} < \frac{BW_{comp}}{ratio} = \frac{4}{2.5} = 1.6$ GB/s
+
+    **If storage bandwidth were 1.5 GB/s:**
+
+    | Operation | Uncompressed | Compressed |
+    |-----------|--------------|------------|
+    | Save | 66.7s | max(25, 26.7) = 26.7s |
+    | Load | 66.7s | max(26.7, 25) = 26.7s |
+
+    Compression wins at low I/O bandwidth!
+
+    **Recommendation:** Use compression when storage bandwidth < 1.6 GB/s.
+
 6. **Elastic batch sizing**: Training at 64 GPUs with batch 2048 and LR 0.001. Cluster shrinks to 48 GPUs. What should the new batch size and LR be under linear scaling?
+
+??? success "Solution"
+    **Given:**
+
+    - Original: 64 GPUs, batch=2048, LR=0.001
+    - New: 48 GPUs
+
+    **Per-GPU batch size:**
+
+    $$B_{gpu} = \frac{2048}{64} = 32 \text{ samples/GPU}$$
+
+    **Option 1: Keep per-GPU batch constant**
+
+    New global batch:
+    $$B_{new} = 32 \times 48 = \boxed{1536}$$
+
+    **Linear scaling rule for LR:**
+
+    $$\frac{LR_{new}}{LR_{old}} = \frac{B_{new}}{B_{old}}$$
+
+    $$LR_{new} = 0.001 \times \frac{1536}{2048} = \boxed{0.00075}$$
+
+    **Summary (Option 1):**
+
+    | Parameter | Original (64 GPU) | New (48 GPU) |
+    |-----------|-------------------|--------------|
+    | GPUs | 64 | 48 |
+    | Batch/GPU | 32 | 32 |
+    | Global batch | 2048 | 1536 |
+    | Learning rate | 0.001 | 0.00075 |
+
+    **Option 2: Maintain global batch with gradient accumulation**
+
+    Keep B=2048 by accumulating gradients:
+
+    $$\text{accum steps} = \frac{2048}{48 \times 32} = \frac{2048}{1536} = 1.33$$
+
+    Not an integer! Adjust per-GPU batch:
+
+    - Option A: $B_{gpu}=43$, accum=1 → global batch = 2064 (close)
+    - Option B: $B_{gpu}=32$, accum=2 → global batch = 3072 (too high)
+    - Option C: $B_{gpu}=21$, accum=2 → global batch = 2016 (close)
+
+    **Option 2A configuration:**
+
+    | Parameter | Value |
+    |-----------|-------|
+    | GPUs | 48 |
+    | Batch/GPU | 43 |
+    | Global batch | 2064 |
+    | Learning rate | 0.001 × (2064/2048) = 0.001008 |
+
+    **Practical recommendation:**
+
+    Option 1 (reduced batch with scaled LR) is cleaner and maintains training dynamics.
+
+    **Final answer:**
+
+    $$\boxed{B = 1536, \quad LR = 0.00075}$$
+
+    **Throughput impact:**
+
+    Tokens per step: $1536 \times S$ vs $2048 \times S$ (75% of original)
+
+    Steps needed: 1.33× more steps to process same data
+
+    Time per step: similar (compute bound)
+
+    **Total training time increase:** ~33% slower
 
 ## Key Takeaways
 

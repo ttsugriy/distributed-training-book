@@ -273,16 +273,173 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio.
 
 1. **Compute-optimal calculation**: You have $C = 10^{22}$ FLOPs. Calculate the Chinchilla-optimal model size and token count.
 
+??? success "Solution"
+    **Using the Chinchilla 20:1 rule:**
+
+    From $C = 6ND$ and $D^* = 20N^*$:
+    $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
+
+    **Solving for optimal model size:**
+    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{22}}{120}} = \sqrt{8.33 \times 10^{19}}$$
+
+    $$N^* = 9.13 \times 10^9 \approx \boxed{9.1\text{B parameters}}$$
+
+    **Optimal token count:**
+    $$D^* = 20 \times N^* = 20 \times 9.1 \times 10^9 = \boxed{182\text{B tokens}}$$
+
+    **Verification:**
+    $$C = 6 \times 9.1 \times 10^9 \times 182 \times 10^9 = 9.94 \times 10^{21} \approx 10^{22} \checkmark$$
+
+    | Parameter | Value |
+    |-----------|-------|
+    | Compute budget | $10^{22}$ FLOPs |
+    | Optimal $N^*$ | 9.1B |
+    | Optimal $D^*$ | 182B |
+    | Tokens/parameter | 20 |
+
 2. **Undertrained analysis**: A model has 30B parameters and was trained on 150B tokens.
    - What's the compute used?
    - What's the Chinchilla-optimal allocation for that compute?
    - By what factor is the model over/underparameterized?
 
+??? success "Solution"
+    **Part 1: Compute used**
+
+    $$C = 6ND = 6 \times 30 \times 10^9 \times 150 \times 10^9 = \boxed{2.7 \times 10^{22} \text{ FLOPs}}$$
+
+    **Part 2: Chinchilla-optimal allocation**
+
+    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{2.7 \times 10^{22}}{120}} = \sqrt{2.25 \times 10^{20}}$$
+
+    $$N^* = 1.5 \times 10^{10} = \boxed{15\text{B parameters}}$$
+
+    $$D^* = 20 \times N^* = 20 \times 15 \times 10^9 = \boxed{300\text{B tokens}}$$
+
+    **Part 3: Over/underparameterization factor**
+
+    $$\text{Overparameterization} = \frac{N_{\text{actual}}}{N^*} = \frac{30\text{B}}{15\text{B}} = \boxed{2\times \text{ overparameterized}}$$
+
+    $$\text{Undertraining} = \frac{D^*}{D_{\text{actual}}} = \frac{300\text{B}}{150\text{B}} = 2\times \text{ undertrained on data}$$
+
+    **Summary:**
+
+    | Metric | Actual | Optimal | Ratio |
+    |--------|--------|---------|-------|
+    | Parameters | 30B | 15B | 2× over |
+    | Tokens | 150B | 300B | 2× under |
+    | Tokens/param | 5 | 20 | 4× below optimal |
+
+    The model is severely undertrained: it has 4× fewer tokens per parameter than Chinchilla-optimal.
+
 3. **Inference break-even**: A 70B Chinchilla-optimal model costs $10M to train. A 7B overtrained model achieving similar loss costs $15M to train. Inference cost is $0.001 per 1M tokens for 70B, $0.0001 per 1M tokens for 7B. How many tokens must you serve before overtraining is profitable?
+
+??? success "Solution"
+    **Total cost model:**
+
+    $$C_{\text{total}} = C_{\text{train}} + C_{\text{inference}} \times T$$
+
+    Where $T$ is tokens served (in millions).
+
+    **For 70B Chinchilla model:**
+    $$C_{70B} = \$10\text{M} + \$0.001 \times T$$
+
+    **For 7B overtrained model:**
+    $$C_{7B} = \$15\text{M} + \$0.0001 \times T$$
+
+    **Break-even condition:**
+    $$\$10\text{M} + \$0.001 \times T = \$15\text{M} + \$0.0001 \times T$$
+
+    $$\$0.001T - \$0.0001T = \$5\text{M}$$
+
+    $$\$0.0009 \times T = \$5\text{M}$$
+
+    $$T = \frac{\$5 \times 10^6}{\$0.0009} = 5.56 \times 10^9 \text{ million tokens}$$
+
+    $$T = \boxed{5.56 \times 10^{15} \text{ tokens} \approx 5.6 \text{ quadrillion tokens}}$$
+
+    **Interpretation:**
+
+    | Tokens Served | Cheaper Option |
+    |---------------|----------------|
+    | < 5.6 quadrillion | 70B Chinchilla |
+    | > 5.6 quadrillion | 7B overtrained |
+
+    For context, ChatGPT reportedly serves ~100T tokens/day. At that rate:
+    $$\text{Break-even time} = \frac{5.6 \times 10^{15}}{100 \times 10^{12}} \approx 56 \text{ days}$$
+
+    For high-volume inference, overtraining pays off quickly.
 
 4. **Data budget**: You have exactly 500B high-quality tokens. What's the largest model you should train?
 
+??? success "Solution"
+    **Using the Chinchilla 20:1 rule in reverse:**
+
+    If $D_{\text{max}} = 500\text{B}$ tokens and optimal ratio is $D^*/N^* = 20$:
+
+    $$N^* = \frac{D_{\text{max}}}{20} = \frac{500 \times 10^9}{20} = \boxed{25\text{B parameters}}$$
+
+    **Compute required:**
+    $$C = 6ND = 6 \times 25 \times 10^9 \times 500 \times 10^9 = 7.5 \times 10^{22} \text{ FLOPs}$$
+
+    **Why not larger?**
+
+    | Model Size | Issue |
+    |------------|-------|
+    | > 25B | Undertrained (tokens/param < 20) |
+    | < 25B | Wasted data capacity |
+    | = 25B | Chinchilla-optimal for data budget |
+
+    **Alternative: Accept undertraining**
+
+    If you train a 50B model on 500B tokens:
+
+    - Tokens/param = 10 (half of optimal)
+    - ~20% higher loss than 25B model trained on same data
+    - But larger model may have emergent capabilities
+
+    **Recommendation:** 25B is optimal for loss; larger sizes trade loss for capability.
+
 5. **MoE analysis**: A dense 70B model and a MoE with 70B active / 1T total parameters both train on 1.4T tokens. Which achieves lower loss? (Assume MoE gets ~1.5× the loss reduction per parameter from total vs active)
+
+??? success "Solution"
+    **Dense 70B model:**
+
+    Using $L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$:
+
+    $$L_{\text{dense}} \propto \frac{1}{(70\text{B})^\alpha}$$
+
+    **MoE model analysis:**
+
+    The MoE has:
+    - Active parameters: $N_{\text{active}} = 70\text{B}$
+    - Total parameters: $N_{\text{total}} = 1\text{T}$
+
+    With 1.5× loss reduction from total parameters:
+
+    $$L_{\text{MoE}} \propto \frac{1}{(N_{\text{active}})^\alpha \cdot (N_{\text{total}}/N_{\text{active}})^{\alpha/2}}$$
+
+    The effective parameter count for loss scaling:
+    $$N_{\text{eff}} = N_{\text{active}} \cdot \left(\frac{N_{\text{total}}}{N_{\text{active}}}\right)^{0.5} = 70\text{B} \cdot \left(\frac{1000\text{B}}{70\text{B}}\right)^{0.5}$$
+
+    $$N_{\text{eff}} = 70\text{B} \cdot 3.78 = 265\text{B}$$
+
+    **Loss comparison:**
+
+    | Model | Effective $N$ | Relative Loss Term |
+    |-------|---------------|-------------------|
+    | Dense 70B | 70B | $(70\text{B})^{-0.34} = 1.00$ |
+    | MoE 70B/1T | 265B | $(265\text{B})^{-0.34} = 0.69$ |
+
+    **The MoE achieves ~31% lower parameter-dependent loss** with the same compute per forward pass.
+
+    **Why MoE wins:**
+
+    - Same inference cost (70B active params)
+    - More knowledge stored in experts (1T total params)
+    - Each token routes to specialists
+    - Effective capacity >> active capacity
+
+    **Caveat:** Training MoE requires ~1T parameters in memory/communication, increasing infrastructure complexity. The 1.5× factor is empirical and varies by architecture.
 
 ## Key Takeaways
 

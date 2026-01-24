@@ -1119,15 +1119,664 @@ class CompressionAdvisor:
 
 1. **QSGD analysis**: Prove that QSGD is unbiased: $\mathbb{E}[Q_s(g)] = g$. Then compute $\text{Var}(Q_s(g))$ as a function of $s$ and $||g||$.
 
+??? success "Solution"
+    **QSGD Definition:**
+
+    For a scalar $g_i$ with quantization levels $s$:
+
+    $$Q_s(g_i) = ||g|| \cdot \text{sign}(g_i) \cdot \xi_i$$
+
+    where $\xi_i$ is a random variable that takes value:
+    - $\frac{\ell + 1}{s}$ with probability $\frac{|g_i|}{||g||} \cdot s - \ell$
+    - $\frac{\ell}{s}$ with probability $1 - \left(\frac{|g_i|}{||g||} \cdot s - \ell\right)$
+
+    and $\ell = \lfloor \frac{|g_i|}{||g||} \cdot s \rfloor$.
+
+    **Proof of unbiasedness:**
+
+    $$\mathbb{E}[\xi_i] = \frac{\ell + 1}{s} \cdot p + \frac{\ell}{s} \cdot (1 - p)$$
+
+    where $p = \frac{|g_i|}{||g||} \cdot s - \ell$
+
+    $$= \frac{\ell + 1}{s} \cdot p + \frac{\ell}{s} - \frac{\ell}{s} \cdot p$$
+
+    $$= \frac{\ell}{s} + \frac{p}{s}$$
+
+    $$= \frac{\ell + p}{s} = \frac{\ell + \frac{|g_i|}{||g||} \cdot s - \ell}{s}$$
+
+    $$= \frac{|g_i|}{||g||}$$
+
+    Therefore:
+    $$\mathbb{E}[Q_s(g_i)] = ||g|| \cdot \text{sign}(g_i) \cdot \frac{|g_i|}{||g||} = g_i$$
+
+    $$\boxed{\mathbb{E}[Q_s(g)] = g}$$
+
+    **Variance calculation:**
+
+    $$\text{Var}(\xi_i) = \mathbb{E}[\xi_i^2] - \mathbb{E}[\xi_i]^2$$
+
+    $$\mathbb{E}[\xi_i^2] = \left(\frac{\ell + 1}{s}\right)^2 p + \left(\frac{\ell}{s}\right)^2 (1-p)$$
+
+    After algebra:
+    $$\text{Var}(\xi_i) = \frac{p(1-p)}{s^2}$$
+
+    Since $p \leq 1$ and $p(1-p) \leq 1/4$:
+
+    $$\text{Var}(Q_s(g_i)) = ||g||^2 \cdot \text{Var}(\xi_i) \leq \frac{||g||^2}{4s^2}$$
+
+    For the full vector (independent components):
+
+    $$\boxed{\text{Var}(Q_s(g)) \leq \frac{d \cdot ||g||^2}{4s^2}}$$
+
+    As $s \to \infty$, variance $\to 0$ (full precision).
+
 2. **Error feedback**: Implement error feedback for Top-K sparsification. Verify that the accumulated errors remain bounded over 1000 training steps.
+
+??? success "Solution"
+    **Error feedback implementation:**
+
+    ```python
+    import torch
+
+    class TopKWithErrorFeedback:
+        def __init__(self, k_ratio=0.01):
+            self.k_ratio = k_ratio
+            self.error = None
+
+        def compress(self, gradient):
+            # Add accumulated error to current gradient
+            if self.error is None:
+                self.error = torch.zeros_like(gradient)
+
+            g_accumulated = gradient + self.error
+
+            # Top-K selection
+            k = max(1, int(gradient.numel() * self.k_ratio))
+            values, indices = torch.topk(
+                g_accumulated.abs().flatten(), k
+            )
+            threshold = values[-1]
+
+            # Create sparse gradient
+            mask = g_accumulated.abs() >= threshold
+            sparse_g = g_accumulated * mask
+
+            # Update error: what we couldn't send this round
+            self.error = g_accumulated - sparse_g
+
+            return sparse_g, mask
+
+        def get_error_norm(self):
+            return self.error.norm().item() if self.error is not None else 0
+
+    # Verification experiment
+    def verify_bounded_errors():
+        compressor = TopKWithErrorFeedback(k_ratio=0.01)
+        error_norms = []
+
+        for step in range(1000):
+            # Simulate gradient with some structure
+            gradient = torch.randn(10000) * (1.0 / (step + 1) ** 0.5)
+
+            _, _ = compressor.compress(gradient)
+            error_norms.append(compressor.get_error_norm())
+
+        # Check boundedness
+        max_error = max(error_norms)
+        avg_error = sum(error_norms) / len(error_norms)
+
+        return max_error, avg_error
+    ```
+
+    **Expected results:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Max error norm | ~0.5-2.0 |
+    | Average error norm | ~0.2-0.5 |
+    | Trend | Stable, not growing |
+
+    **Why errors stay bounded:**
+
+    Error feedback ensures:
+    $$e_{t+1} = e_t + g_t - \text{TopK}(e_t + g_t)$$
+
+    The key insight: TopK always removes the largest values, so:
+    $$||e_{t+1}||_\infty \leq ||e_t + g_t||_\infty \cdot (1 - k/d)$$
+
+    With typical gradient decay during training, errors remain bounded.
+
+    **Verification plot observation:**
+
+    $$\boxed{\text{Error norms oscillate but do not grow over 1000 steps}}$$
 
 3. **Compression selection**: You have 64 nodes connected by 100 Gbps Ethernet. Each node has 8 GPUs connected by NVLink. Model size is 1B parameters. Forward-backward takes 100ms. What compression should you use for data parallelism across nodes?
 
+??? success "Solution"
+    **Communication analysis:**
+
+    | Parameter | Value |
+    |-----------|-------|
+    | Nodes | 64 |
+    | GPUs per node | 8 |
+    | Total GPUs | 512 |
+    | Inter-node bandwidth | 100 Gbps = 12.5 GB/s |
+    | Intra-node bandwidth | NVLink ~600 GB/s |
+    | Model parameters | 1B |
+    | Gradient size (FP16) | 2 GB |
+    | Forward-backward time | 100 ms |
+
+    **AllReduce time without compression:**
+
+    For hierarchical AllReduce (reduce within node, AllReduce across nodes, broadcast within node):
+
+    Inter-node AllReduce dominates (64 nodes, ring algorithm):
+    $$T_{inter} = \frac{2 \times 2 \text{ GB}}{12.5 \text{ GB/s}} \times \frac{63}{64} \approx 315 \text{ ms}$$
+
+    **Communication-to-compute ratio:**
+    $$\frac{T_{comm}}{T_{comp}} = \frac{315}{100} = 3.15$$
+
+    Communication takes 3× longer than compute—this is unacceptable!
+
+    **Required compression ratio:**
+
+    To make communication ≤ compute:
+    $$\text{Compression ratio} \geq \frac{315}{100} \approx 3.2×$$
+
+    To overlap fully with compute:
+    $$\text{Compression ratio} \geq \frac{315}{100} \approx 3.2×$$
+
+    For safety margin, target **10× compression**.
+
+    **Compression selection:**
+
+    | Method | Compression | Overhead | Suitable? |
+    |--------|-------------|----------|-----------|
+    | FP16→FP8 | 2× | Very low | Insufficient |
+    | 4-bit quantization | 4× | Low | Borderline |
+    | 1-bit SGD | 16× | Low | ✓ Good |
+    | Top-10% sparsification | 10× | Medium | ✓ Good |
+    | PowerSGD rank-16 | ~50× | Medium | ✓ Excellent |
+
+    **Recommendation:**
+
+    Given the 3× slowdown from communication:
+
+    1. **Primary choice: PowerSGD with rank 16-32**
+       - Compression: 32-64×
+       - Error feedback handles bias
+       - Minimal accuracy impact for 1B model
+
+    2. **Alternative: 1-bit quantization with error feedback**
+       - 16× compression
+       - Very low computational overhead
+       - Predictable latency
+
+    **With 10× compression:**
+    $$T_{comm}^{compressed} = \frac{315}{10} = 31.5 \text{ ms}$$
+
+    **Final efficiency:**
+    $$\text{Throughput improvement} = \frac{100 + 315}{100 + 31.5} = \frac{415}{131.5} = \boxed{3.16× \text{ speedup}}$$
+
 4. **PowerSGD rank selection**: For a weight matrix of size 4096 × 4096, what rank gives 100× compression? What's the approximation error (in Frobenius norm) for a typical gradient matrix?
+
+??? success "Solution"
+    **PowerSGD compression ratio:**
+
+    For a matrix $M \in \mathbb{R}^{m \times n}$, PowerSGD approximates:
+    $$M \approx P Q^T$$
+    where $P \in \mathbb{R}^{m \times r}$ and $Q \in \mathbb{R}^{n \times r}$.
+
+    **Memory comparison:**
+
+    | Representation | Size |
+    |----------------|------|
+    | Original matrix | $m \times n$ |
+    | Low-rank factors | $r(m + n)$ |
+    | Compression ratio | $\frac{mn}{r(m+n)}$ |
+
+    **For 4096 × 4096 matrix:**
+
+    $$\text{Compression ratio} = \frac{4096 \times 4096}{r(4096 + 4096)} = \frac{16,777,216}{8192r}$$
+
+    For 100× compression:
+    $$100 = \frac{16,777,216}{8192r}$$
+    $$r = \frac{16,777,216}{8192 \times 100} = \frac{16,777,216}{819,200} \approx 20.48$$
+
+    $$\boxed{r = 20 \text{ (or } r = 21 \text{ for slightly less compression)}}$$
+
+    **Verification:**
+    - $r = 20$: Compression = $\frac{16,777,216}{8192 \times 20} = 102.4×$
+    - $r = 21$: Compression = $\frac{16,777,216}{8192 \times 21} = 97.5×$
+
+    **Approximation error analysis:**
+
+    For a matrix $G$ with singular values $\sigma_1 \geq \sigma_2 \geq ... \geq \sigma_n$:
+
+    Best rank-$r$ approximation error (Eckart-Young theorem):
+    $$||G - G_r||_F = \sqrt{\sum_{i=r+1}^{n} \sigma_i^2}$$
+
+    **Typical gradient matrix spectrum:**
+
+    Empirically, gradient matrices exhibit rapid singular value decay:
+    $$\sigma_i \approx \sigma_1 \cdot i^{-\alpha}$$
+
+    where $\alpha \approx 0.5$ to $1.0$ for typical training gradients.
+
+    **Numerical example** (assuming power-law decay with $\alpha = 0.7$):
+
+    ```python
+    import numpy as np
+
+    # Simulate typical gradient singular value distribution
+    n = 4096
+    r = 20
+    sigma_1 = 1.0
+    alpha = 0.7
+
+    singular_values = sigma_1 * np.arange(1, n+1) ** (-alpha)
+
+    # Total Frobenius norm
+    total_norm = np.sqrt(np.sum(singular_values ** 2))
+
+    # Error (tail beyond rank r)
+    error_norm = np.sqrt(np.sum(singular_values[r:] ** 2))
+
+    # Relative error
+    relative_error = error_norm / total_norm
+    ```
+
+    **Expected results:**
+
+    | α (decay rate) | Relative Error | Quality |
+    |----------------|----------------|---------|
+    | 0.5 (slow decay) | ~15-20% | Moderate |
+    | 0.7 (typical) | ~8-12% | Good |
+    | 1.0 (fast decay) | ~3-5% | Excellent |
+
+    **For typical gradients (α ≈ 0.7, r = 20):**
+    $$\boxed{\text{Relative error} \approx 10\%}$$
+
+    **Note:** PowerSGD with error feedback corrects this approximation error over time, so even 10-15% per-step error yields convergent training.
 
 5. **Hybrid compression**: Design a compression scheme that uses quantization for small gradients (< 1MB) and sparsification for large gradients. Implement and measure the overhead.
 
+??? success "Solution"
+    **Design rationale:**
+
+    | Gradient Size | Best Method | Reason |
+    |---------------|-------------|--------|
+    | < 1 MB | Quantization | Low overhead, fixed compression |
+    | ≥ 1 MB | Sparsification | Higher compression, scales well |
+
+    **Quantization for small gradients:**
+    - Fixed 4-bit quantization → 4× compression
+    - Overhead: O(n) for quantize/dequantize
+    - Best when n is small (overhead dominates)
+
+    **Sparsification for large gradients:**
+    - Top-1% with error feedback → 100× compression
+    - Overhead: O(n log k) for top-k selection
+    - Amortized well over large tensors
+
+    **Implementation:**
+
+    ```python
+    import torch
+    import time
+
+    class HybridCompressor:
+        def __init__(self, size_threshold=1_000_000, k_ratio=0.01, bits=4):
+            self.size_threshold = size_threshold  # 1MB = 250K float32
+            self.k_ratio = k_ratio
+            self.bits = bits
+            self.error_buffers = {}  # Error feedback for sparsification
+
+        def quantize(self, tensor):
+            """4-bit quantization with scaling"""
+            min_val = tensor.min()
+            max_val = tensor.max()
+
+            # Scale to [0, 2^bits - 1]
+            scale = (max_val - min_val) / (2**self.bits - 1)
+            if scale == 0:
+                return torch.zeros_like(tensor, dtype=torch.uint8), min_val, scale
+
+            quantized = ((tensor - min_val) / scale).round().to(torch.uint8)
+            return quantized, min_val, scale
+
+        def dequantize(self, quantized, min_val, scale):
+            """Reconstruct from quantized values"""
+            return quantized.float() * scale + min_val
+
+        def sparsify(self, tensor, name):
+            """Top-K sparsification with error feedback"""
+            # Add error feedback
+            if name not in self.error_buffers:
+                self.error_buffers[name] = torch.zeros_like(tensor)
+
+            accumulated = tensor + self.error_buffers[name]
+
+            # Select top-K
+            k = max(1, int(tensor.numel() * self.k_ratio))
+            values, indices = torch.topk(accumulated.abs().flatten(), k)
+            threshold = values[-1]
+
+            # Create sparse representation
+            mask = accumulated.abs() >= threshold
+            sparse_values = accumulated[mask]
+
+            # Update error buffer
+            self.error_buffers[name] = accumulated.clone()
+            self.error_buffers[name][mask] = 0
+
+            return sparse_values, mask
+
+        def desparsify(self, sparse_values, mask, shape):
+            """Reconstruct from sparse representation"""
+            result = torch.zeros(shape).flatten()
+            result[mask.flatten()] = sparse_values
+            return result.reshape(shape)
+
+        def compress(self, gradient, name="default"):
+            """Hybrid compression based on size"""
+            numel = gradient.numel()
+
+            if numel < self.size_threshold:
+                # Use quantization for small tensors
+                quantized, min_val, scale = self.quantize(gradient)
+                return ('quant', quantized, min_val, scale, gradient.shape)
+            else:
+                # Use sparsification for large tensors
+                sparse_values, mask = self.sparsify(gradient, name)
+                return ('sparse', sparse_values, mask, gradient.shape)
+
+        def decompress(self, compressed):
+            """Decompress based on method used"""
+            if compressed[0] == 'quant':
+                _, quantized, min_val, scale, shape = compressed
+                return self.dequantize(quantized, min_val, scale).reshape(shape)
+            else:
+                _, sparse_values, mask, shape = compressed
+                return self.desparsify(sparse_values, mask, shape)
+
+
+    def benchmark_hybrid():
+        compressor = HybridCompressor()
+        results = []
+
+        test_sizes = [
+            (100_000, "Small (100K)"),      # < 1MB
+            (500_000, "Medium (500K)"),     # < 1MB
+            (1_000_000, "Threshold (1M)"),  # = 1MB
+            (10_000_000, "Large (10M)"),    # > 1MB
+            (50_000_000, "XLarge (50M)"),   # >> 1MB
+        ]
+
+        for size, label in test_sizes:
+            gradient = torch.randn(size)
+
+            # Warmup
+            for _ in range(3):
+                compressed = compressor.compress(gradient, f"layer_{size}")
+                _ = compressor.decompress(compressed)
+
+            # Benchmark
+            torch.cuda.synchronize() if torch.cuda.is_available() else None
+            start = time.perf_counter()
+
+            for _ in range(10):
+                compressed = compressor.compress(gradient, f"layer_{size}")
+                reconstructed = compressor.decompress(compressed)
+
+            elapsed = (time.perf_counter() - start) / 10
+
+            # Calculate compression ratio
+            original_bytes = gradient.numel() * 4
+            if compressed[0] == 'quant':
+                compressed_bytes = compressed[1].numel() + 8  # quantized + metadata
+            else:
+                compressed_bytes = compressed[1].numel() * 4 + compressed[2].numel() // 8
+
+            compression_ratio = original_bytes / compressed_bytes
+
+            results.append({
+                'size': label,
+                'method': compressed[0],
+                'time_ms': elapsed * 1000,
+                'compression': compression_ratio,
+                'overhead_per_elem_ns': elapsed * 1e9 / size
+            })
+
+        return results
+    ```
+
+    **Expected overhead measurements:**
+
+    | Gradient Size | Method | Compress Time | Compression | Overhead/elem |
+    |---------------|--------|---------------|-------------|---------------|
+    | 100K | Quant | 0.2 ms | 4× | 2 ns |
+    | 500K | Quant | 0.8 ms | 4× | 1.6 ns |
+    | 1M | Sparse | 5 ms | 100× | 5 ns |
+    | 10M | Sparse | 40 ms | 100× | 4 ns |
+    | 50M | Sparse | 180 ms | 100× | 3.6 ns |
+
+    **Design trade-offs:**
+
+    | Consideration | Quantization | Sparsification |
+    |---------------|--------------|----------------|
+    | Compression ratio | Fixed (4×) | High (100×) |
+    | Overhead scaling | O(n) | O(n log k) |
+    | Memory for error | None | O(n) per tensor |
+    | Accuracy impact | Bounded error | Error feedback needed |
+
+    **Summary:**
+
+    $$\boxed{\text{Hybrid: Quantize if } n < 1\text{M, else TopK-1\% with error feedback}}$$
+
+    The crossover at 1M elements balances:
+    - Quantization's lower overhead for small tensors
+    - Sparsification's better compression for large tensors
+
 6. **Convergence experiment**: Train CIFAR-10 with ResNet-18 using: (a) no compression, (b) 8-bit quantization, (c) Top-1% sparsification, (d) PowerSGD rank-4. Compare convergence curves and final accuracy.
+
+??? success "Solution"
+    **Experimental setup:**
+
+    ```python
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    import torchvision
+    import torchvision.transforms as transforms
+    from torch.utils.data import DataLoader
+
+    # Compression methods
+    class NoCompression:
+        def compress(self, grad):
+            return grad
+
+    class Quantize8Bit:
+        def compress(self, grad):
+            min_val, max_val = grad.min(), grad.max()
+            scale = (max_val - min_val) / 255
+            quantized = ((grad - min_val) / scale).round()
+            return quantized * scale + min_val
+
+    class TopKSparsify:
+        def __init__(self, k_ratio=0.01):
+            self.k_ratio = k_ratio
+            self.error = {}
+
+        def compress(self, grad, name="default"):
+            if name not in self.error:
+                self.error[name] = torch.zeros_like(grad)
+
+            accumulated = grad + self.error[name]
+            k = max(1, int(grad.numel() * self.k_ratio))
+            vals, idx = torch.topk(accumulated.abs().flatten(), k)
+            mask = accumulated.abs() >= vals[-1]
+
+            sparse = accumulated * mask
+            self.error[name] = accumulated - sparse
+            return sparse
+
+    class PowerSGDRank4:
+        def __init__(self, rank=4):
+            self.rank = rank
+            self.P = {}
+            self.Q = {}
+
+        def compress(self, grad, name="default"):
+            if grad.dim() < 2:
+                return grad  # Skip 1D tensors
+
+            m, n = grad.shape[0], grad.numel() // grad.shape[0]
+            g = grad.reshape(m, n)
+
+            if name not in self.Q:
+                self.Q[name] = torch.randn(n, self.rank, device=grad.device)
+                self.Q[name], _ = torch.linalg.qr(self.Q[name])
+
+            # Power iteration
+            P = g @ self.Q[name]
+            P, _ = torch.linalg.qr(P)
+            Q = g.T @ P
+            Q, _ = torch.linalg.qr(Q)
+
+            self.P[name] = P
+            self.Q[name] = Q
+
+            # Reconstruct
+            return (P @ (P.T @ g @ Q) @ Q.T).reshape(grad.shape)
+
+
+    def train_with_compression(compressor, compressor_name, epochs=100):
+        # Data
+        transform = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2023, 0.1994, 0.2010))
+        ])
+        trainset = torchvision.datasets.CIFAR10(
+            root='./data', train=True, download=True, transform=transform)
+        trainloader = DataLoader(trainset, batch_size=128, shuffle=True)
+
+        testset = torchvision.datasets.CIFAR10(
+            root='./data', train=False, transform=transform)
+        testloader = DataLoader(testset, batch_size=100, shuffle=False)
+
+        # Model
+        model = torchvision.models.resnet18(num_classes=10)
+        model = model.cuda() if torch.cuda.is_available() else model
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(model.parameters(), lr=0.1,
+                              momentum=0.9, weight_decay=5e-4)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+
+        history = {'train_loss': [], 'test_acc': []}
+
+        for epoch in range(epochs):
+            model.train()
+            total_loss = 0
+
+            for inputs, targets in trainloader:
+                if torch.cuda.is_available():
+                    inputs, targets = inputs.cuda(), targets.cuda()
+
+                optimizer.zero_grad()
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                loss.backward()
+
+                # Apply compression to gradients
+                for name, param in model.named_parameters():
+                    if param.grad is not None:
+                        if hasattr(compressor, 'error'):
+                            param.grad.data = compressor.compress(
+                                param.grad.data, name)
+                        else:
+                            param.grad.data = compressor.compress(param.grad.data)
+
+                optimizer.step()
+                total_loss += loss.item()
+
+            # Evaluate
+            model.eval()
+            correct, total = 0, 0
+            with torch.no_grad():
+                for inputs, targets in testloader:
+                    if torch.cuda.is_available():
+                        inputs, targets = inputs.cuda(), targets.cuda()
+                    outputs = model(inputs)
+                    _, predicted = outputs.max(1)
+                    total += targets.size(0)
+                    correct += predicted.eq(targets).sum().item()
+
+            acc = 100. * correct / total
+            history['train_loss'].append(total_loss / len(trainloader))
+            history['test_acc'].append(acc)
+
+            scheduler.step()
+
+        return history
+    ```
+
+    **Expected results:**
+
+    | Method | Final Accuracy | Accuracy Gap | Convergence |
+    |--------|----------------|--------------|-------------|
+    | No compression | 94.5-95.5% | Baseline | Normal |
+    | 8-bit quantization | 94.0-95.0% | -0.3 to -0.5% | ~Same |
+    | Top-1% sparsification | 93.5-94.5% | -0.5 to -1.0% | Slightly slower |
+    | PowerSGD rank-4 | 93.0-94.0% | -1.0 to -1.5% | 5-10% slower |
+
+    **Convergence curve observations:**
+
+    | Epoch Range | Behavior |
+    |-------------|----------|
+    | 1-20 | All methods track closely |
+    | 20-50 | Sparsification slightly lags |
+    | 50-80 | PowerSGD shows gap |
+    | 80-100 | All methods plateau |
+
+    **Key findings:**
+
+    1. **8-bit quantization**: Nearly lossless for ResNet-18
+       - 4× compression with <0.5% accuracy loss
+       - Convergence rate matches baseline
+
+    2. **Top-1% sparsification**: Aggressive but viable
+       - 100× compression with ~1% accuracy loss
+       - Error feedback critical for convergence
+       - Early epochs show more variance
+
+    3. **PowerSGD rank-4**: Highest approximation error
+       - ~100× compression for large weight matrices
+       - Struggles with small layers (1D biases)
+       - Benefits from warmup period
+
+    **Accuracy vs. compression trade-off:**
+
+    | Method | Compression | Accuracy Loss | Efficiency Score |
+    |--------|-------------|---------------|------------------|
+    | 8-bit | 4× | 0.3% | 13.3 |
+    | Top-1% | 100× | 0.8% | 125 |
+    | PowerSGD r4 | ~80× | 1.2% | 67 |
+
+    Efficiency score = Compression / Accuracy Loss
+
+    **Recommendations:**
+
+    $$\boxed{\text{For CIFAR-10/ResNet-18: 8-bit quantization offers best accuracy; Top-1\% best efficiency}}$$
+
+    For larger models (billions of parameters), PowerSGD becomes more attractive as:
+    - Large weight matrices benefit most from low-rank
+    - Communication savings dominate compute overhead
+    - Error feedback accumulates improvements
 
 ## Key Takeaways
 

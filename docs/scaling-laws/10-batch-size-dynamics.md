@@ -344,6 +344,235 @@ When noise scale drops, safe to increase batch size.
 
 6. **Dynamic batching**: You want to train for 1M tokens/step initially, ramping to 4M tokens/step. If you switch at the midpoint of training, how many fewer gradient updates do you perform compared to constant 1M tokens/step?
 
+??? success "Solution"
+    **Given data:**
+
+    | Batch Size | Steps to Convergence |
+    |------------|---------------------|
+    | 256 | 100,000 |
+    | 1,024 | 28,000 |
+    | 4,096 | 15,000 |
+
+    **Using the diminishing returns model:**
+
+    $$S(B) = S_{\min} + \frac{S_{\text{noise}}}{B}$$
+
+    **Check perfect scaling from B=256 to B=1024 (4× increase):**
+
+    If scaling were perfect: $S(1024) = 100,000 / 4 = 25,000$
+
+    Actual: 28,000 steps → already seeing diminishing returns
+
+    **Set up equations:**
+
+    From $S(256) = 100,000$:
+    $$S_{\min} + \frac{S_{\text{noise}}}{256} = 100,000$$
+
+    From $S(1024) = 28,000$:
+    $$S_{\min} + \frac{S_{\text{noise}}}{1024} = 28,000$$
+
+    **Solve:**
+
+    Subtract second from first:
+    $$S_{\text{noise}} \left(\frac{1}{256} - \frac{1}{1024}\right) = 72,000$$
+    $$S_{\text{noise}} \times \frac{3}{1024} = 72,000$$
+    $$S_{\text{noise}} = 24,576,000$$
+
+    Substitute back:
+    $$S_{\min} = 28,000 - \frac{24,576,000}{1024} = 28,000 - 24,000 = 4,000$$
+
+    **Verify with B=4096:**
+    $$S(4096) = 4,000 + \frac{24,576,000}{4096} = 4,000 + 6,000 = 10,000$$
+
+    Actual: 15,000 steps (discrepancy suggests model is approximate)
+
+    **Estimate $B_{\text{crit}}$:**
+
+    The critical batch size is where noise and curvature contributions are equal:
+    $$\frac{S_{\text{noise}}}{B_{\text{crit}}} = S_{\min}$$
+    $$B_{\text{crit}} = \frac{S_{\text{noise}}}{S_{\min}} = \frac{24,576,000}{4,000} = \boxed{6,144}$$
+
+    **Interpretation:** Batch sizes above ~6K will show significant diminishing returns. The data shows we're already past $B_{\text{crit}}$ at 4096, confirming the estimate is in the right range.
+
+??? success "Solution"
+    **Given:**
+
+    - Base batch: $B_0 = 256$
+    - Base learning rate: $\eta_0 = 0.001$
+    - Target batch: $B = 4096$
+    - Scaling factor: $B/B_0 = 16$
+
+    **(a) Linear scaling:**
+
+    $$\eta = \eta_0 \times \frac{B}{B_0} = 0.001 \times 16 = \boxed{0.016}$$
+
+    **(b) Square root scaling:**
+
+    $$\eta = \eta_0 \times \sqrt{\frac{B}{B_0}} = 0.001 \times \sqrt{16} = 0.001 \times 4 = \boxed{0.004}$$
+
+    **Which to use?**
+
+    | Batch Size | Relative to $B_{\text{crit}}$ | Recommended Scaling |
+    |------------|-------------------------------|---------------------|
+    | 4,096 | Below 6K (from Exercise 1) | Linear (0.016) |
+    | 8,192 | Above 6K | Square root |
+    | 16,384 | Well above | Constant or sqrt |
+
+    **Practical note:** Start with linear scaling (0.016) but use warmup. If training is unstable, fall back to square root (0.004).
+
+??? success "Solution"
+    **Given:**
+
+    - Base batch: $B_0 = 512$, steps $S_0 = 50,000$
+    - Target batch: $B = 8192$, steps $S = 6,000$
+
+    **Scaling efficiency formula:**
+
+    $$E(B) = \frac{S_0/S(B)}{B/B_0}$$
+
+    **Calculate:**
+
+    $$E(8192) = \frac{50,000/6,000}{8,192/512} = \frac{8.33}{16} = \boxed{0.52 = 52\%}$$
+
+    **Interpretation:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Batch increase | 16× |
+    | Step reduction | 8.33× |
+    | Scaling efficiency | 52% |
+    | "Wasted" compute | 48% |
+
+    **Perfect scaling would give:**
+    $$S_{\text{perfect}} = \frac{50,000}{16} = 3,125 \text{ steps}$$
+
+    Actual: 6,000 steps → 1.92× more steps than perfect scaling.
+
+    **Conclusion:** At batch 8192, we're well past $B_{\text{crit}}$. Almost half the compute is "wasted" in the sense that it doesn't reduce training steps. However, if wall-clock time is the constraint, this may still be worthwhile.
+
+??? success "Solution"
+    **LARS update rule:**
+
+    $$\Delta w_l = -\eta \cdot \phi_l \cdot \nabla w_l$$
+
+    Where the trust ratio is:
+    $$\phi_l = \frac{||w_l||}{||\nabla w_l||}$$
+
+    (ignoring weight decay for simplicity)
+
+    **Relative update magnitude:**
+
+    $$\frac{||\Delta w_l||}{||w_l||} = \frac{\eta \cdot \phi_l \cdot ||\nabla w_l||}{||w_l||}$$
+
+    $$= \frac{\eta \cdot \frac{||w_l||}{||\nabla w_l||} \cdot ||\nabla w_l||}{||w_l||}$$
+
+    $$= \frac{\eta \cdot ||w_l||}{||w_l||}$$
+
+    $$= \boxed{\eta}$$
+
+    **Key insight:** The relative update $||\Delta w||/||w||$ equals $\eta$ for **all layers**, regardless of:
+
+    - Weight magnitude $||w_l||$
+    - Gradient magnitude $||\nabla w_l||$
+
+    **Why this matters:**
+
+    | Layer | Without LARS | With LARS |
+    |-------|--------------|-----------|
+    | Small weights, large gradients | Huge relative update | $\eta$ |
+    | Large weights, small gradients | Tiny relative update | $\eta$ |
+    | Any layer | $\eta \cdot ||\nabla w|| / ||w||$ | $\eta$ |
+
+    **Consequence:** All layers update at the same relative rate, preventing:
+    - Early layers from updating too slowly
+    - Output layers from updating too aggressively
+    - Training instability at large batch sizes
+
+    This is why LARS enables training with batch sizes of 32K+ where standard SGD fails.
+
+??? success "Solution"
+    **Given:**
+
+    - GPUs: 8
+    - Per-GPU batch: 32
+    - Current effective batch: $8 \times 32 = 256$
+    - Target effective batch: 2,048
+    - Forward-backward time: 100ms
+    - All-reduce time: 20ms
+
+    **Accumulation steps:**
+
+    $$\text{Accumulation steps} = \frac{\text{Target batch}}{\text{Current batch}} = \frac{2048}{256} = \boxed{8}$$
+
+    **Time breakdown per effective step:**
+
+    | Phase | Count | Time Each | Total |
+    |-------|-------|-----------|-------|
+    | Forward-backward passes | 8 | 100ms | 800ms |
+    | All-reduce (only at end) | 1 | 20ms | 20ms |
+    | **Total** | | | **820ms** |
+
+    **Comparison with true data parallelism (64 GPUs):**
+
+    If we had 64 GPUs with batch 32 each:
+    - Forward-backward: 100ms
+    - All-reduce: ~40ms (slightly higher for more GPUs)
+    - Total: ~140ms
+
+    **Efficiency comparison:**
+
+    $$\text{Accumulation slowdown} = \frac{820\text{ms}}{140\text{ms}} \approx 5.9\times$$
+
+    **Key insight:** Gradient accumulation trades time for memory. It's useful when:
+    1. $B_{\text{crit}}$ hasn't been reached yet
+    2. GPU memory limits batch size
+    3. More GPUs aren't available
+
+??? success "Solution"
+    **Setup:**
+
+    Let total training be $N$ tokens (e.g., 2T tokens).
+
+    **Constant batch size (1M tokens/step):**
+
+    $$\text{Updates}_{\text{constant}} = \frac{N}{1\text{M}} = N \text{ updates (in millions)}$$
+
+    **Dynamic batch size:**
+
+    - First half ($N/2$ tokens) at 1M tokens/step:
+    $$\text{Updates}_1 = \frac{N/2}{1\text{M}} = \frac{N}{2\text{M}}$$
+
+    - Second half ($N/2$ tokens) at 4M tokens/step:
+    $$\text{Updates}_2 = \frac{N/2}{4\text{M}} = \frac{N}{8\text{M}}$$
+
+    - Total dynamic updates:
+    $$\text{Updates}_{\text{dynamic}} = \frac{N}{2\text{M}} + \frac{N}{8\text{M}} = \frac{4N + N}{8\text{M}} = \frac{5N}{8\text{M}}$$
+
+    **Reduction:**
+
+    $$\text{Reduction} = \frac{N}{\text{M}} - \frac{5N}{8\text{M}} = \frac{8N - 5N}{8\text{M}} = \frac{3N}{8\text{M}}$$
+
+    $$\text{Reduction fraction} = \frac{3N/8}{N} = \boxed{37.5\%}$$
+
+    **Concrete example with N = 2T tokens:**
+
+    | Strategy | Updates | Wall-clock (relative) |
+    |----------|---------|----------------------|
+    | Constant 1M | 2,000,000 | 1.0× |
+    | Dynamic (1M→4M) | 1,250,000 | ~0.75× |
+    | Reduction | 750,000 | 25% faster |
+
+    **Wait—why is wall-clock only 25% faster if we have 37.5% fewer updates?**
+
+    The 4M batch steps take ~2× longer than 1M batch steps (more compute per step). But we gain on communication overhead being amortized over more tokens.
+
+    **Actual wall-clock speedup** depends on:
+    - Communication overhead fraction
+    - GPU utilization at each batch size
+    - Whether we're below $B_{\text{crit}}$ for both batch sizes
+
+    **Summary:** Dynamic batching reduces gradient updates by 37.5%, translating to ~20-30% wall-clock speedup depending on system characteristics.
+
 ## Key Takeaways
 
 1. **Critical batch size exists**: Beyond $B_{\text{crit}}$, compute is wasted.

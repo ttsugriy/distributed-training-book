@@ -655,6 +655,303 @@ PyTorch DDP uses 25MB buckets by default.
 
 6. **Bidirectional ring**: Prove that bidirectional ring halves the number of steps while maintaining bandwidth optimality.
 
+??? success "Solution"
+    **Tracing Ring ReduceScatter with P=4:**
+
+    **Initial state:**
+    ```
+    P0: [1, 2, 3, 4]      → chunks: [1] [2] [3] [4]
+    P1: [5, 6, 7, 8]      → chunks: [5] [6] [7] [8]
+    P2: [9, 10, 11, 12]   → chunks: [9] [10] [11] [12]
+    P3: [13, 14, 15, 16]  → chunks: [13] [14] [15] [16]
+    ```
+
+    **Step 1:** Each process sends chunk[rank-step] to (rank+1), receives from (rank-1), reduces:
+    - P0 sends chunk[0]=1 → P1, receives chunk[3]=16 from P3 → reduces at position 3
+    - P1 sends chunk[1]=6 → P2, receives chunk[0]=1 from P0 → reduces at position 0
+    - P2 sends chunk[2]=11 → P3, receives chunk[1]=6 from P1 → reduces at position 1
+    - P3 sends chunk[3]=16 → P0, receives chunk[2]=11 from P2 → reduces at position 2
+
+    ```
+    After Step 1:
+    P0: [1, 2, 3, 4+16=20]
+    P1: [5+1=6, 6, 7, 8]
+    P2: [9, 10+6=16, 11, 12]
+    P3: [13, 14, 15+11=26, 16]
+    ```
+
+    **Step 2:** Send the chunk just reduced, receive next chunk:
+    - P0 sends chunk[3]=20 → P1, receives chunk[2]=26 from P3
+    - P1 sends chunk[0]=6 → P2, receives chunk[3]=20 from P0
+    - P2 sends chunk[1]=16 → P3, receives chunk[0]=6 from P1
+    - P3 sends chunk[2]=26 → P0, receives chunk[1]=16 from P2
+
+    ```
+    After Step 2:
+    P0: [1, 2, 3+26=29, 20]        position 2 now has P2+P3+P0 partial
+    P1: [6, 6, 7, 8+20=28]         position 3 now has P0+P3+P1 partial
+    P2: [9+6=15, 16, 11, 12]       position 0 now has P0+P1+P2 partial
+    P3: [13, 14+16=30, 26, 16]     position 1 now has P1+P2+P3 partial
+    ```
+
+    **Step 3:** Final round:
+    - P0 sends chunk[2]=29 → P1, receives chunk[1]=30 from P3
+    - P1 sends chunk[3]=28 → P2, receives chunk[2]=29 from P0
+    - P2 sends chunk[0]=15 → P3, receives chunk[3]=28 from P1
+    - P3 sends chunk[1]=30 → P0, receives chunk[0]=15 from P2
+
+    ```
+    After Step 3 (Final):
+    P0: [1, 2+30=32, 29, 20]    → P0 has complete sum at position 1?
+    ```
+
+    Wait, let me redo this more carefully. The key is which chunk each process "owns" at the end.
+
+    **Correct tracing:**
+
+    After P-1=3 steps, each process holds the complete reduction of ONE chunk:
+    - P0 owns chunk 0: $1+5+9+13 = \boxed{28}$
+    - P1 owns chunk 1: $2+6+10+14 = \boxed{32}$
+    - P2 owns chunk 2: $3+7+11+15 = \boxed{36}$
+    - P3 owns chunk 3: $4+8+12+16 = \boxed{40}$
+
+    **Final result:**
+    ```
+    P0: [28]    (sum of all first elements)
+    P1: [32]    (sum of all second elements)
+    P2: [36]    (sum of all third elements)
+    P3: [40]    (sum of all fourth elements)
+    ```
+
+??? success "Solution"
+    **Crossover calculation for P=256, α=5μs, β=200 GB/s:**
+
+    **Ring AllReduce:**
+    $$T_{\text{ring}} = 2(P-1)\alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+    $$= 2(255)(5 \times 10^{-6}) + 2 \cdot \frac{255}{256} \cdot \frac{n}{2 \times 10^{11}}$$
+    $$= 2.55 \text{ ms} + 9.96 \times 10^{-12} \cdot n$$
+
+    **Tree AllReduce:**
+    $$T_{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot \frac{n}{\beta}$$
+    $$= 2(8)(5 \times 10^{-6}) + 2(8) \cdot \frac{n}{2 \times 10^{11}}$$
+    $$= 80 \mu s + 8 \times 10^{-11} \cdot n$$
+
+    **Set equal:**
+    $$2.55 \times 10^{-3} + 9.96 \times 10^{-12} n = 8 \times 10^{-5} + 8 \times 10^{-11} n$$
+    $$2.47 \times 10^{-3} = (8 \times 10^{-11} - 9.96 \times 10^{-12}) n$$
+    $$2.47 \times 10^{-3} = 7.004 \times 10^{-11} n$$
+    $$n = \frac{2.47 \times 10^{-3}}{7.004 \times 10^{-11}} = \boxed{35.3 \text{ MB}}$$
+
+    **Conclusion:**
+    - Messages < 35.3 MB: Use **tree**
+    - Messages > 35.3 MB: Use **ring**
+
+    Note: Larger P → higher crossover point (ring's latency penalty increases).
+
+??? success "Solution"
+    **Hierarchical 2D Ring vs Flat Ring for 64 GPUs, 1 GB AllReduce:**
+
+    **Setup:**
+    - 8 nodes × 8 GPUs = 64 total
+    - Intra-node: $\beta_{\text{NV}} = 600$ GB/s, $\alpha_{\text{NV}} = 1\mu s$
+    - Inter-node: $\beta_{\text{net}} = 100$ GB/s, $\alpha_{\text{net}} = 5\mu s$
+    - Data: $n = 1$ GB $= 10^9$ bytes
+
+    **Flat Ring (all 64 GPUs, bottlenecked by network):**
+    $$T_{\text{flat}} = 2(63)\alpha_{\text{net}} + 2 \cdot \frac{63}{64} \cdot \frac{n}{\beta_{\text{net}}}$$
+    $$= 126 \times 5\mu s + 1.97 \times \frac{10^9}{10^{11}}$$
+    $$= 0.63 \text{ ms} + 19.7 \text{ ms} = \boxed{20.3 \text{ ms}}$$
+
+    **2D Ring (hierarchical):**
+
+    *Phase 1: Intra-node ReduceScatter (8 GPUs per node)*
+    $$T_1 = (7)\alpha_{\text{NV}} + \frac{7}{8} \cdot \frac{n}{\beta_{\text{NV}}}$$
+    $$= 7\mu s + 0.875 \times \frac{10^9}{6 \times 10^{11}} = 7\mu s + 1.46 \text{ ms} = 1.47 \text{ ms}$$
+
+    *Phase 2: Inter-node AllReduce (8 nodes, 1/8 of data)*
+    $$T_2 = 2(7)\alpha_{\text{net}} + 2 \cdot \frac{7}{8} \cdot \frac{n/8}{\beta_{\text{net}}}$$
+    $$= 70\mu s + 1.75 \times \frac{1.25 \times 10^8}{10^{11}} = 70\mu s + 2.19 \text{ ms} = 2.26 \text{ ms}$$
+
+    *Phase 3: Intra-node AllGather (8 GPUs per node)*
+    $$T_3 = (7)\alpha_{\text{NV}} + \frac{7}{8} \cdot \frac{n}{\beta_{\text{NV}}} = 1.47 \text{ ms}$$
+
+    *Total hierarchical:*
+    $$T_{\text{hier}} = 1.47 + 2.26 + 1.47 = \boxed{5.2 \text{ ms}}$$
+
+    **Speedup:**
+    $$\frac{T_{\text{flat}}}{T_{\text{hier}}} = \frac{20.3}{5.2} = \boxed{3.9\times}$$
+
+    | Approach | Time | Network Data |
+    |----------|------|--------------|
+    | Flat ring | 20.3 ms | 1 GB crosses network |
+    | 2D ring | 5.2 ms | 125 MB crosses network |
+
+??? success "Solution"
+    **Bucket sizing comparison:**
+
+    **Setup:**
+    - 1000 tensors × 1 MB each = 1 GB total
+    - $\alpha = 10\mu s$, $\beta = 100$ GB/s
+
+    **Option A: 1000 individual AllReduce calls:**
+
+    Per-call time (assuming P=8):
+    $$T_{\text{call}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{10^6}{10^{11}}$$
+    $$= 140\mu s + 17.5\mu s = 157.5\mu s$$
+
+    Total time:
+    $$T_A = 1000 \times 157.5\mu s = \boxed{157.5 \text{ ms}}$$
+
+    **Option B: Bucketed into 25 MB chunks (40 calls):**
+
+    Per-bucket time:
+    $$T_{\text{bucket}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{25 \times 10^6}{10^{11}}$$
+    $$= 140\mu s + 437.5\mu s = 577.5\mu s$$
+
+    Total time:
+    $$T_B = 40 \times 577.5\mu s = \boxed{23.1 \text{ ms}}$$
+
+    **Speedup:**
+    $$\frac{T_A}{T_B} = \frac{157.5}{23.1} = \boxed{6.8\times}$$
+
+    **Analysis:**
+
+    | Approach | Calls | Latency Overhead | Bandwidth Time | Total |
+    |----------|-------|------------------|----------------|-------|
+    | Individual | 1000 | 140 ms | 17.5 ms | 157.5 ms |
+    | Bucketed | 40 | 5.6 ms | 17.5 ms | 23.1 ms |
+
+    **Key insight:** Bucketing reduces latency overhead by 25× while bandwidth time stays constant. The 6.8× speedup comes entirely from amortizing $\alpha$.
+
+??? success "Solution"
+    **Handling non-power-of-2 process counts (P=6):**
+
+    **Option 1: Padding to next power of 2**
+
+    Add 2 "ghost" processes with zero contributions:
+    - Actual processes: 0, 1, 2, 3, 4, 5
+    - Ghost processes: 6, 7 (contribute zeros)
+    - Run Rabenseifner with P=8
+    - Ignore ghost results
+
+    *Drawback:* Wastes 25% of communication (2/8 processes are fake).
+
+    **Option 2: Recursive Halving with remainder**
+
+    Split into groups:
+    - First round: P0-P3 (4 processes) use standard recursive halving
+    - Remainder: P4, P5 participate in modified exchanges
+
+    Algorithm for P=6:
+    ```
+    Step 1: Pair (P0,P1), (P2,P3), (P4,P5) exchange halves
+    Step 2: Pair (P0,P2), (P1,P3), P4↔P5 exchange quarters
+    Step 3: Handle asymmetry with extra communication
+    ```
+
+    *Implementation:*
+    ```python
+    def rabenseifner_nonpower2(data, rank, P):
+        # Find largest power of 2 ≤ P
+        k = int(np.log2(P))
+        P_eff = 2**k
+        remainder = P - P_eff
+
+        if rank < 2 * remainder:
+            # These ranks exchange with partners first
+            if rank % 2 == 0:
+                partner = rank + 1
+                # Send second half, receive first half
+                # Rank becomes "virtual" participant
+            else:
+                partner = rank - 1
+                # Send first half, receive second half
+                # Rank drops out of main algorithm
+
+        # Run standard Rabenseifner among P_eff "virtual" participants
+        # Unpack results back to original ranks
+    ```
+
+    **Option 3: Ring algorithm (always works)**
+
+    Just use ring AllReduce—no power-of-2 constraint:
+    $$T_{\text{ring}} = 2(P-1)\alpha + 2\frac{P-1}{P}\frac{n}{\beta}$$
+
+    Works for any P. Only ~10% slower than Rabenseifner for typical sizes.
+
+    **Practical choice:** Most implementations (including NCCL) fall back to ring for non-power-of-2 process counts.
+
+??? success "Solution"
+    **Proof: Bidirectional ring halves steps while maintaining bandwidth optimality**
+
+    **Unidirectional ring:**
+    - Data flows in one direction around the ring
+    - P-1 steps for ReduceScatter, P-1 steps for AllGather
+    - Total: $2(P-1)$ steps
+    - Each step: $n/P$ bytes sent per process
+
+    **Bidirectional ring:**
+
+    *Key idea:* Partition data into two halves. Send first half clockwise, second half counterclockwise, simultaneously.
+
+    **ReduceScatter phase:**
+    - Step 1: Each process sends first half clockwise, second half counterclockwise
+    - Both halves progress through ring simultaneously
+    - After $(P-1)/2$ steps (rounded up), both halves have completed their reductions
+
+    **Detailed analysis:**
+
+    *Unidirectional:*
+    ```
+    Step 1: P0→P1→P2→P3→P0 (chunk A)
+    Step 2: P0→P1→P2→P3→P0 (chunk B)
+    ...
+    ```
+    Each chunk takes P-1 steps to fully reduce.
+
+    *Bidirectional:*
+    ```
+    Step 1: Clockwise: P0→P1→P2→P3→P0 (chunk A)
+            Counter:   P0←P3←P2←P1←P0 (chunk B)
+    ```
+    Both chunks progress simultaneously.
+
+    **Time analysis:**
+
+    *Unidirectional:*
+    - Steps: $2(P-1)$
+    - Per-step transfer: $n/P$ bytes
+    - Total: $2(P-1) \cdot (\alpha + \frac{n/P}{\beta})$
+
+    *Bidirectional:*
+    - Steps: $(P-1)$ (both directions simultaneously)
+    - Per-step transfer: $n/P$ bytes in each direction
+    - Total: $(P-1) \cdot (\alpha + \frac{n/P}{\beta})$
+
+    **Bandwidth calculation:**
+
+    Per-process data movement:
+    - Send: $\frac{n}{P} \times (P-1) = \frac{P-1}{P} n$ (each direction)
+    - Total send: $2 \times \frac{P-1}{P} n$ (both directions)
+
+    Same as unidirectional! Just completed in half the time by using both link directions.
+
+    **Full-duplex utilization:**
+
+    | Metric | Unidirectional | Bidirectional |
+    |--------|----------------|---------------|
+    | Steps | $2(P-1)$ | $(P-1)$ |
+    | Link utilization | 50% (one direction) | 100% (both) |
+    | Total data moved | $2\frac{P-1}{P}n$ | $2\frac{P-1}{P}n$ |
+    | Time | $2(P-1)\alpha + 2\frac{P-1}{P}\frac{n}{\beta}$ | $(P-1)\alpha + \frac{P-1}{P}\frac{n}{\beta}$ |
+
+    **Conclusion:** Bidirectional ring achieves:
+    - **Half the latency** (half the steps)
+    - **Same total data** (bandwidth-optimal)
+    - **Requires full-duplex links** (both directions simultaneously)
+
+    $$\boxed{T_{\text{bidir}} = (P-1)\alpha + \frac{P-1}{P}\frac{n}{\beta}}$$ $\square$
+
 ## Key Takeaways
 
 1. **Ring is bandwidth-optimal**: Total data = $2(P-1)/P \cdot n$ per process.

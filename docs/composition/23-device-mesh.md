@@ -972,9 +972,151 @@ mesh = auto_mesh(topology, dp_degree=64, tp_degree=8, pp_degree=1)
 
 1. **Mesh construction**: Create a 3D mesh for 256 GPUs with DP=8, PP=4, TP=8. Draw the structure showing which ranks are in each process group.
 
+??? success "Solution"
+    **Verify dimensions:**
+
+    $$8 \times 4 \times 8 = 256 \checkmark$$
+
+    **Mesh construction:**
+
+    ```python
+    import numpy as np
+
+    # Create 3D mesh: shape (DP=8, PP=4, TP=8)
+    mesh = np.arange(256).reshape(8, 4, 8)
+    axes = ["dp", "pp", "tp"]
+    ```
+
+    **Rank assignment visualization:**
+
+    ```
+    DP Slice 0 (ranks 0-31):
+    ┌─────────────────────────────────────────────────┐
+    │ PP Stage 0: [ 0,  1,  2,  3,  4,  5,  6,  7] TP │
+    │ PP Stage 1: [ 8,  9, 10, 11, 12, 13, 14, 15] TP │
+    │ PP Stage 2: [16, 17, 18, 19, 20, 21, 22, 23] TP │
+    │ PP Stage 3: [24, 25, 26, 27, 28, 29, 30, 31] TP │
+    └─────────────────────────────────────────────────┘
+
+    DP Slice 1 (ranks 32-63):
+    ┌─────────────────────────────────────────────────┐
+    │ PP Stage 0: [32, 33, 34, 35, 36, 37, 38, 39] TP │
+    │ PP Stage 1: [40, 41, 42, 43, 44, 45, 46, 47] TP │
+    │ PP Stage 2: [48, 49, 50, 51, 52, 53, 54, 55] TP │
+    │ PP Stage 3: [56, 57, 58, 59, 60, 61, 62, 63] TP │
+    └─────────────────────────────────────────────────┘
+    ... (continues for DP slices 2-7)
+    ```
+
+    **Process groups:**
+
+    | Axis | Group Size | Number of Groups | Example Groups |
+    |------|------------|------------------|----------------|
+    | TP | 8 | 32 | {0,1,2,3,4,5,6,7}, {8,9,10,11,12,13,14,15}, ... |
+    | PP | 4 | 64 | {0,8,16,24}, {1,9,17,25}, ... |
+    | DP | 8 | 32 | {0,32,64,96,128,160,192,224}, ... |
+
+    **Code to extract groups:**
+
+    ```python
+    # TP groups (vary last axis, fix first two)
+    tp_groups = [mesh[d, p, :].tolist() for d in range(8) for p in range(4)]
+    # PP groups (vary middle axis, fix first and last)
+    pp_groups = [mesh[d, :, t].tolist() for d in range(8) for t in range(8)]
+    # DP groups (vary first axis, fix last two)
+    dp_groups = [mesh[:, p, t].tolist() for p in range(4) for t in range(8)]
+    ```
+
 2. **Process group count**: For an $n$-dimensional mesh with dimensions $(d_1, d_2, \ldots, d_n)$, how many total process groups exist across all axes?
 
+??? success "Solution"
+    **Process groups per axis:**
+
+    For axis $i$ with dimension $d_i$:
+
+    - The group size is $d_i$
+    - Number of groups = (total GPUs) / $d_i$
+
+    $$G_i = \frac{\prod_{j=1}^{n} d_j}{d_i} = \prod_{j \neq i} d_j$$
+
+    **Total process groups:**
+
+    $$G_{total} = \sum_{i=1}^{n} G_i = \sum_{i=1}^{n} \frac{P}{d_i}$$
+
+    Where $P = \prod_{j=1}^{n} d_j$ is the total number of devices.
+
+    $$\boxed{G_{total} = P \sum_{i=1}^{n} \frac{1}{d_i}}$$
+
+    **Example: (8, 4, 8) mesh**
+
+    $$P = 8 \times 4 \times 8 = 256$$
+
+    | Axis | $d_i$ | $G_i = P/d_i$ |
+    |------|-------|---------------|
+    | DP | 8 | 32 |
+    | PP | 4 | 64 |
+    | TP | 8 | 32 |
+
+    $$G_{total} = 32 + 64 + 32 = \boxed{128 \text{ process groups}}$$
+
+    **General formula verification:**
+
+    $$G_{total} = 256 \times \left(\frac{1}{8} + \frac{1}{4} + \frac{1}{8}\right) = 256 \times 0.5 = 128 \checkmark$$
+
+    **Special cases:**
+
+    | Mesh Shape | Total Groups |
+    |------------|--------------|
+    | 1D: $(P,)$ | 1 |
+    | 2D: $(a, b)$ | $b + a = P(\frac{1}{a} + \frac{1}{b})$ |
+    | Uniform: $(d, d, ..., d)$ | $n \times d^{n-1}$ |
+
 3. **Submesh extraction**: Given a (4, 4, 8) mesh with axes ["dp", "pp", "tp"], extract the submesh for DP rank 2. What is its shape and what ranks does it contain?
+
+??? success "Solution"
+    **Original mesh:**
+
+    ```python
+    import numpy as np
+    mesh = np.arange(128).reshape(4, 4, 8)  # (DP=4, PP=4, TP=8)
+    ```
+
+    Total devices: $4 \times 4 \times 8 = 128$
+
+    **Submesh extraction (fix DP=2):**
+
+    ```python
+    submesh = mesh[2, :, :]  # Select DP rank 2
+    print(submesh.shape)  # (4, 8)
+    print(submesh)
+    ```
+
+    **Shape:** $\boxed{(4, 8)}$ with axes ["pp", "tp"]
+
+    **Ranks contained:**
+
+    Each DP slice contains $4 \times 8 = 32$ ranks.
+
+    DP rank 2 starts at: $2 \times 32 = 64$
+
+    ```
+    Submesh for DP=2:
+    ┌──────────────────────────────────────────────────────────┐
+    │ PP=0: [64, 65, 66, 67, 68, 69, 70, 71]  (TP ranks 0-7)  │
+    │ PP=1: [72, 73, 74, 75, 76, 77, 78, 79]  (TP ranks 0-7)  │
+    │ PP=2: [80, 81, 82, 83, 84, 85, 86, 87]  (TP ranks 0-7)  │
+    │ PP=3: [88, 89, 90, 91, 92, 93, 94, 95]  (TP ranks 0-7)  │
+    └──────────────────────────────────────────────────────────┘
+    ```
+
+    $$\boxed{\text{Ranks 64-95}}$$
+
+    **Process groups in submesh:**
+
+    | Axis | Groups |
+    |------|--------|
+    | PP | {64,72,80,88}, {65,73,81,89}, ..., {71,79,87,95} (8 groups) |
+    | TP | {64-71}, {72-79}, {80-87}, {88-95} (4 groups) |
 
 4. **Sharding specification**: Write a ShardingSpec for a weight matrix that is:
 
@@ -982,9 +1124,204 @@ mesh = auto_mesh(topology, dp_degree=64, tp_degree=8, pp_degree=1)
    - Sharded on output dimension across TP axis
    - Replicated across PP axis
 
+??? success "Solution"
+    **Weight matrix shape:** $(H_{out}, H_{in})$ — output dimension first
+
+    **Mesh axes:** ["dp", "pp", "tp"] with shape e.g., (8, 4, 8)
+
+    **Sharding specification:**
+
+    ```python
+    from dataclasses import dataclass
+    from enum import Enum
+    from typing import List, Optional
+
+    class ShardType(Enum):
+        REPLICATE = "R"       # Full copy on all devices
+        SHARD = "S"           # Split across devices
+
+    @dataclass
+    class ShardingSpec:
+        """Specifies how each tensor dimension maps to mesh axes."""
+        mesh_axes: List[str]  # ["dp", "pp", "tp"]
+        dim_specs: List[ShardType]  # Per tensor dimension
+
+    # For weight matrix W[H_out, H_in]:
+    weight_sharding = ShardingSpec(
+        mesh_axes=["dp", "pp", "tp"],
+        dim_specs={
+            "dp": ShardType.REPLICATE,    # Same weights for all DP replicas
+            "pp": ShardType.REPLICATE,    # Each PP stage has this layer's weights
+            "tp": ShardType.SHARD,        # Split output dim across TP
+        },
+        tensor_dims={
+            0: "tp",      # Output dimension (H_out) sharded across TP
+            1: None,      # Input dimension (H_in) replicated
+        }
+    )
+    ```
+
+    **Alternative notation (JAX-style):**
+
+    ```python
+    # P = PartitionSpec
+    # None = replicated, axis_name = sharded along that axis
+    weight_spec = P(None, "tp", None)  # Batch/DP, Output/TP, Input/replicated
+
+    # Or for 2D weight matrix on 3D mesh:
+    weight_spec = P("tp", None)  # Output sharded on TP, input replicated
+    # DP and PP are implicitly replicated (not in tensor dims)
+    ```
+
+    **Memory per GPU:**
+
+    For weight of shape $(H_{out}, H_{in})$:
+
+    $$M_{per\_GPU} = \frac{H_{out}}{TP} \times H_{in} \times \text{bytes}$$
+
+    | Sharding | Memory Formula |
+    |----------|----------------|
+    | Fully replicated | $H_{out} \times H_{in}$ |
+    | TP-sharded (output) | $\frac{H_{out}}{TP} \times H_{in}$ |
+    | TP-sharded (both) | $\frac{H_{out}}{TP} \times \frac{H_{in}}{TP}$ |
+
 5. **Optimal mesh mapping**: Given a cluster with 32 nodes × 8 GPUs/node and requirements DP=32, TP=8, how should ranks be assigned to minimize inter-node communication?
 
+??? success "Solution"
+    **Cluster topology:**
+
+    - 32 nodes × 8 GPUs/node = 256 GPUs
+    - Intra-node: NVLink (~900 GB/s bidirectional)
+    - Inter-node: InfiniBand (~400 Gb/s = 50 GB/s)
+
+    **Required parallelism:**
+
+    $$DP \times TP = 32 \times 8 = 256 \checkmark$$
+
+    **Key principle:** Place TP groups within nodes (high bandwidth), DP across nodes.
+
+    **Optimal assignment:**
+
+    ```
+    Node 0:  Ranks [0-7]   → TP group 0, DP ranks 0
+    Node 1:  Ranks [8-15]  → TP group 1, DP ranks 1
+    ...
+    Node 31: Ranks [248-255] → TP group 31, DP ranks 31
+    ```
+
+    **Mesh construction:**
+
+    ```python
+    import numpy as np
+
+    # Create mesh with TP as inner dimension (within nodes)
+    mesh = np.arange(256).reshape(32, 8)  # (DP=32, TP=8)
+
+    # Rank to (node, local_gpu) mapping:
+    def rank_to_location(rank):
+        node = rank // 8      # DP dimension
+        local_gpu = rank % 8  # TP dimension
+        return node, local_gpu
+    ```
+
+    **Communication analysis:**
+
+    | Operation | Parallelism | Within Node? | Bandwidth |
+    |-----------|-------------|--------------|-----------|
+    | TP AllReduce | TP=8 | Yes ✓ | 900 GB/s |
+    | DP AllReduce | DP=32 | No (cross-node) | 50 GB/s |
+
+    **Why this is optimal:**
+
+    TP communication happens every forward/backward pass (high frequency):
+    - 2× AllReduce per layer × many layers
+
+    DP communication happens once per step (lower frequency):
+    - 1× AllReduce for gradients
+
+    $$\boxed{\text{TP within nodes, DP across nodes}}$$
+
+    **Alternative (suboptimal) assignment:**
+
+    ```
+    # DON'T DO THIS: DP within nodes
+    Node 0: Ranks [0, 8, 16, ..., 248]  → DP group, different TP
+    ```
+
+    This forces frequent TP AllReduce over slow inter-node links.
+
+    **Bandwidth comparison:**
+
+    | Configuration | TP Bandwidth | DP Bandwidth | Effective |
+    |---------------|--------------|--------------|-----------|
+    | TP inner (optimal) | 900 GB/s | 50 GB/s | Best |
+    | DP inner | 50 GB/s | 900 GB/s | 18× slower TP |
+
 6. **Redistribution cost**: If AllGather along TP (size 8) takes 10ms and chunk (replicate→shard) is free, what's the redistribution cost from (REPLICATE, SHARD) to (SHARD, REPLICATE)?
+
+??? success "Solution"
+    **Initial state:** (REPLICATE, SHARD)
+
+    - Dimension 0: Replicated across mesh
+    - Dimension 1: Sharded across TP axis (size 8)
+
+    **Target state:** (SHARD, REPLICATE)
+
+    - Dimension 0: Sharded across TP axis
+    - Dimension 1: Replicated (full copy on each device)
+
+    **Redistribution operations:**
+
+    | Step | Operation | Dimension | Cost |
+    |------|-----------|-----------|------|
+    | 1 | AllGather | Dim 1: SHARD → REPLICATE | 10ms |
+    | 2 | Chunk/Slice | Dim 0: REPLICATE → SHARD | Free |
+
+    **Total redistribution cost:**
+
+    $$T_{redistribution} = T_{AllGather} + T_{chunk} = 10 + 0 = \boxed{10 \text{ ms}}$$
+
+    **Detailed breakdown:**
+
+    ```
+    Before: Tensor [M, N/8] on each of 8 GPUs
+            (full M rows, 1/8 of columns)
+
+    After AllGather on dim 1:
+            Tensor [M, N] on each GPU
+            (full tensor temporarily)
+
+    After chunking dim 0:
+            Tensor [M/8, N] on each GPU
+            (1/8 of rows, full columns)
+    ```
+
+    **Memory during redistribution:**
+
+    Peak memory = full tensor (after AllGather, before chunk)
+
+    | Phase | Per-GPU Memory |
+    |-------|----------------|
+    | Initial | $M \times \frac{N}{8}$ |
+    | After AllGather | $M \times N$ (8× increase) |
+    | After Chunk | $\frac{M}{8} \times N$ |
+
+    **Alternative: AllToAll (fused operation)**
+
+    AllToAll can do this redistribution directly:
+
+    $$T_{AllToAll} \approx T_{AllGather} = 10 \text{ ms}$$
+
+    Same cost, but lower peak memory (no intermediate full replica).
+
+    **General redistribution cost table:**
+
+    | From → To | Required Operation | Cost |
+    |-----------|-------------------|------|
+    | SHARD → REPLICATE | AllGather | $O(n-1)/n \cdot M / B$ |
+    | REPLICATE → SHARD | Local chunk | Free |
+    | (R,S) → (S,R) | AllGather + chunk | $\boxed{10 \text{ ms}}$ |
+    | (S,R) → (R,S) | AllGather + chunk | 10 ms |
 
 ## Key Takeaways
 

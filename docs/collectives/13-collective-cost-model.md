@@ -426,11 +426,112 @@ Always validate your model against measurements.
    - AllGather time
    - Speedup of hierarchical (4 nodes × 4 GPUs) vs flat
 
+??? success "Solution"
+    **Given parameters:**
+
+    - P = 16 GPUs
+    - n = 100 MB = 10⁸ bytes
+    - α = 10 μs = 10⁻⁵ s
+    - β = 100 GB/s = 10¹¹ bytes/s
+
+    **Part 1: AllReduce time (ring algorithm)**
+
+    Using the ring AllReduce formula:
+    $$T_{\text{AllReduce}} = 2(P-1) \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
+    Latency term:
+    $$T_\alpha = 2(16-1) \times 10^{-5} = 30 \times 10^{-5} = 0.3 \text{ ms}$$
+
+    Bandwidth term:
+    $$T_\beta = 2 \times \frac{15}{16} \times \frac{10^8}{10^{11}} = 2 \times 0.9375 \times 10^{-3} = 1.875 \text{ ms}$$
+
+    $$\boxed{T_{\text{AllReduce}} = 0.3 + 1.875 = 2.175 \text{ ms}}$$
+
+    **Part 2: AllGather time**
+
+    Using the ring AllGather formula:
+    $$T_{\text{AllGather}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
+    $$T_{\text{AllGather}} = 15 \times 10^{-5} + \frac{15}{16} \times \frac{10^8}{10^{11}}$$
+    $$= 0.15 \text{ ms} + 0.9375 \text{ ms} = \boxed{1.09 \text{ ms}}$$
+
+    **Part 3: Hierarchical (4×4) vs Flat speedup**
+
+    **Flat ring (P=16):** Already calculated: T_flat = 2.175 ms
+
+    **Hierarchical (4 nodes × 4 GPUs per node):**
+
+    Assuming same α and β for simplicity (in practice, NVLink would be faster intra-node):
+
+    *Phase 1: Intra-node ReduceScatter (G=4):*
+    $$T_1 = (4-1) \times 10^{-5} + \frac{3}{4} \times \frac{10^8}{10^{11}} = 0.03 + 0.75 = 0.78 \text{ ms}$$
+
+    *Phase 2: Inter-node AllReduce (N=4, data = n/G = 25 MB):*
+    $$T_2 = 2(4-1) \times 10^{-5} + 2 \times \frac{3}{4} \times \frac{2.5 \times 10^7}{10^{11}}$$
+    $$= 0.06 + 0.375 = 0.435 \text{ ms}$$
+
+    *Phase 3: Intra-node AllGather (G=4):*
+    $$T_3 = (4-1) \times 10^{-5} + \frac{3}{4} \times \frac{10^8}{10^{11}} = 0.78 \text{ ms}$$
+
+    $$T_{\text{hier}} = 0.78 + 0.435 + 0.78 = 1.995 \text{ ms}$$
+
+    **Speedup:**
+    $$\text{Speedup} = \frac{T_{\text{flat}}}{T_{\text{hier}}} = \frac{2.175}{1.995} = \boxed{1.09\times}$$
+
+    **Note:** With uniform α and β, hierarchical shows modest speedup. The real benefit appears when network β is much slower than NVLink β (e.g., 50 GB/s vs 300 GB/s), giving speedups of 3-4×.
+
 2. **Efficiency analysis**: Your 8-GPU AllReduce of 1 GB takes 80ms. Network is 400 Gbps. Calculate:
 
    - Algorithmic bandwidth
    - Bus bandwidth
    - Efficiency vs theoretical peak
+
+??? success "Solution"
+    **Given:**
+
+    - P = 8 GPUs
+    - n = 1 GB = 10⁹ bytes
+    - T = 80 ms = 0.08 s
+    - Network = 400 Gbps = 50 GB/s
+
+    **Part 1: Algorithmic bandwidth**
+
+    $$\text{algbw} = \frac{n}{T} = \frac{10^9}{0.08} = 12.5 \text{ GB/s}$$
+
+    $$\boxed{\text{algbw} = 12.5 \text{ GB/s}}$$
+
+    **Part 2: Bus bandwidth**
+
+    For AllReduce, the correction factor is $\frac{2(P-1)}{P}$:
+
+    $$\text{busbw} = \text{algbw} \times \frac{2(P-1)}{P} = 12.5 \times \frac{2 \times 7}{8}$$
+    $$= 12.5 \times 1.75 = \boxed{21.875 \text{ GB/s}}$$
+
+    **Part 3: Efficiency vs theoretical peak**
+
+    The theoretical peak is the network bandwidth:
+
+    $$\text{Efficiency} = \frac{\text{busbw}}{\beta_{\text{peak}}} = \frac{21.875}{50} = \boxed{43.75\%}$$
+
+    **Analysis:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Algorithmic bandwidth | 12.5 GB/s |
+    | Bus bandwidth | 21.875 GB/s |
+    | Peak bandwidth | 50 GB/s |
+    | Efficiency | 43.75% |
+
+    **This efficiency is concerning.** Possible causes:
+
+    1. **Software overhead**: NCCL kernel launch, synchronization
+    2. **Protocol overhead**: Headers, checksums reducing effective bandwidth
+    3. **Contention**: Other traffic on shared network
+    4. **Memory copies**: PCIe bottleneck between GPU and NIC
+
+    **Expected efficiency** for well-optimized systems: 70-85%
+
+    **To investigate**, run NCCL-tests with varying message sizes to see if the issue is latency-bound (small messages) or bandwidth-bound (large messages).
 
 3. **Training time prediction**: A 13B model has:
 
@@ -441,6 +542,74 @@ Always validate your model against measurements.
 
    Estimate communication time per step. Which parallelism dominates?
 
+??? success "Solution"
+    **Setup:**
+
+    - 13B total parameters (4B attention + 9B FFN)
+    - TP = 8, DP = 8 (64 total GPUs)
+    - Sequence S = 4096, Hidden H = 5120
+    - Batch = 2M tokens → micro-batch per DP replica = 2M/8 = 250K tokens
+    - Per-GPU batch: B = 250K / 4096 ≈ 61 sequences
+
+    **Assume:**
+
+    - NVLink β = 300 GB/s (intra-node for TP)
+    - Network β = 50 GB/s (inter-node for DP)
+    - α_NV = 1 μs, α_net = 5 μs
+
+    **Part 1: Tensor Parallel Communication**
+
+    TP requires AllReduce of activations within each TP group.
+
+    Activation size per layer:
+    $$n_{\text{act}} = B \times S \times H \times 2 \text{ bytes (FP16)}$$
+    $$= 61 \times 4096 \times 5120 \times 2 = 2.56 \text{ GB}$$
+
+    Per transformer layer: 4 AllReduce operations (2 forward, 2 backward)
+
+    Each AllReduce (ring, P=8, NVLink):
+    $$T_{\text{AR}} = 2(8-1) \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{2.56 \times 10^9}{3 \times 10^{11}}$$
+    $$= 14 \mu s + 14.9 \text{ ms} = 14.9 \text{ ms}$$
+
+    Assuming ~40 layers:
+    $$T_{\text{TP}} = 40 \times 4 \times 14.9 = \boxed{2,384 \text{ ms}}$$
+
+    **Part 2: Data Parallel Communication**
+
+    DP requires AllReduce of gradients across DP groups.
+
+    Gradient size: 13B × 2 bytes (FP16) = 26 GB total
+
+    But with TP=8, each TP group only has 26/8 = 3.25 GB of unique gradients to sync.
+
+    AllReduce across DP=8 groups (network):
+    $$T_{\text{DP}} = 2(8-1) \times 5 \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{3.25 \times 10^9}{5 \times 10^{10}}$$
+    $$= 70 \mu s + 113.75 \text{ ms} = \boxed{114 \text{ ms}}$$
+
+    **Summary:**
+
+    | Parallelism | Communication Time | Percentage |
+    |-------------|-------------------|------------|
+    | Tensor Parallel | 2,384 ms | 95.4% |
+    | Data Parallel | 114 ms | 4.6% |
+    | **Total** | **2,498 ms** | 100% |
+
+    $$\boxed{\text{Tensor Parallelism dominates by } 21\times}$$
+
+    **Analysis:**
+
+    TP dominates because:
+    1. Activation tensors are large (2.56 GB per AllReduce)
+    2. 4 AllReduce ops per layer × 40 layers = 160 operations
+    3. Even with fast NVLink, sheer volume is massive
+
+    **Optimizations to consider:**
+
+    1. **Sequence parallelism**: Reduce activation size per GPU
+    2. **Activation checkpointing**: Trade compute for memory (doesn't help communication directly)
+    3. **Reduce TP degree**: TP=4 instead of TP=8 would halve TP communication, but increase per-GPU memory
+    4. **Overlap TP AllReduce with compute**: Use async collectives
+
 4. **Hierarchical benefit**: You're choosing between:
 
    - 64 GPUs: 8 nodes × 8 GPUs
@@ -448,7 +617,112 @@ Always validate your model against measurements.
 
    For 4 GB AllReduce with NVLink 300 GB/s, network 50 GB/s, which is faster?
 
+??? success "Solution"
+    **Given:**
+
+    - n = 4 GB = 4 × 10⁹ bytes
+    - β_NV = 300 GB/s (NVLink, intra-node)
+    - β_net = 50 GB/s (network, inter-node)
+    - α_NV = 1 μs, α_net = 5 μs
+
+    **Configuration A: 8 nodes × 8 GPUs (G=8, N=8)**
+
+    *Phase 1: Intra-node ReduceScatter (G=8):*
+    $$T_1 = (8-1) \times 10^{-6} + \frac{7}{8} \times \frac{4 \times 10^9}{3 \times 10^{11}}$$
+    $$= 7 \mu s + 11.67 \text{ ms} = 11.67 \text{ ms}$$
+
+    *Phase 2: Inter-node AllReduce (N=8, data = 4GB/8 = 500 MB per GPU):*
+    $$T_2 = 2(8-1) \times 5 \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{5 \times 10^8}{5 \times 10^{10}}$$
+    $$= 70 \mu s + 17.5 \text{ ms} = 17.57 \text{ ms}$$
+
+    *Phase 3: Intra-node AllGather (G=8):*
+    $$T_3 = (8-1) \times 10^{-6} + \frac{7}{8} \times \frac{4 \times 10^9}{3 \times 10^{11}} = 11.67 \text{ ms}$$
+
+    $$T_A = 11.67 + 17.57 + 11.67 = \boxed{40.91 \text{ ms}}$$
+
+    **Configuration B: 16 nodes × 4 GPUs (G=4, N=16)**
+
+    *Phase 1: Intra-node ReduceScatter (G=4):*
+    $$T_1 = (4-1) \times 10^{-6} + \frac{3}{4} \times \frac{4 \times 10^9}{3 \times 10^{11}}$$
+    $$= 3 \mu s + 10 \text{ ms} = 10 \text{ ms}$$
+
+    *Phase 2: Inter-node AllReduce (N=16, data = 4GB/4 = 1 GB per GPU):*
+    $$T_2 = 2(16-1) \times 5 \times 10^{-6} + 2 \times \frac{15}{16} \times \frac{10^9}{5 \times 10^{10}}$$
+    $$= 150 \mu s + 37.5 \text{ ms} = 37.65 \text{ ms}$$
+
+    *Phase 3: Intra-node AllGather (G=4):*
+    $$T_3 = 10 \text{ ms}$$
+
+    $$T_B = 10 + 37.65 + 10 = \boxed{57.65 \text{ ms}}$$
+
+    **Comparison:**
+
+    | Configuration | Phase 1 | Phase 2 | Phase 3 | Total |
+    |---------------|---------|---------|---------|-------|
+    | 8×8 (A) | 11.67 ms | 17.57 ms | 11.67 ms | **40.91 ms** |
+    | 16×4 (B) | 10 ms | 37.65 ms | 10 ms | 57.65 ms |
+
+    $$\boxed{\text{8×8 is 1.41× faster than 16×4}}$$
+
+    **Why 8×8 wins:**
+
+    1. **More GPUs per node** → smaller data crosses slow network
+       - 8×8: 500 MB per GPU crosses network
+       - 16×4: 1 GB per GPU crosses network (2× more!)
+
+    2. **Fewer nodes** → fewer inter-node AllReduce steps
+       - 8×8: N=8 → 2×7 = 14 latency steps
+       - 16×4: N=16 → 2×15 = 30 latency steps
+
+    **Key insight:** Maximize GPUs per node to minimize network traffic. The network is the bottleneck, so keeping more computation intra-node pays off.
+
 5. **Overlap potential**: Compute takes 2000ms, communication takes 600ms. If you can overlap 80% of communication, what's the speedup?
+
+??? success "Solution"
+    **Given:**
+
+    - $T_{\text{compute}} = 2000$ ms
+    - $T_{\text{comm}} = 600$ ms
+    - Overlap fraction = 80%
+
+    **Without overlap (sequential execution):**
+
+    $$T_{\text{sequential}} = T_{\text{compute}} + T_{\text{comm}} = 2000 + 600 = 2600 \text{ ms}$$
+
+    **With 80% overlap:**
+
+    The overlapped portion runs concurrently with compute. Only the non-overlapped portion adds to total time:
+
+    $$T_{\text{overlapped}} = T_{\text{compute}} + (1 - 0.80) \times T_{\text{comm}}$$
+    $$= 2000 + 0.20 \times 600 = 2000 + 120 = 2120 \text{ ms}$$
+
+    **Speedup:**
+
+    $$\text{Speedup} = \frac{T_{\text{sequential}}}{T_{\text{overlapped}}} = \frac{2600}{2120} = \boxed{1.23\times}$$
+
+    **Alternative view - time saved:**
+
+    $$\text{Time saved} = 2600 - 2120 = 480 \text{ ms}$$
+    $$\text{Reduction} = \frac{480}{2600} = 18.5\%$$
+
+    **Analysis:**
+
+    | Scenario | Total Time | Speedup |
+    |----------|------------|---------|
+    | No overlap (0%) | 2600 ms | 1.00× |
+    | 80% overlap | 2120 ms | 1.23× |
+    | 100% overlap | 2000 ms | 1.30× |
+
+    **Theoretical maximum speedup** (perfect overlap):
+    $$\text{Speedup}_{\text{max}} = \frac{T_{\text{compute}} + T_{\text{comm}}}{T_{\text{compute}}} = \frac{2600}{2000} = 1.30\times$$
+
+    We achieve $\frac{1.23 - 1.00}{1.30 - 1.00} = 77\%$ of the theoretical maximum benefit.
+
+    **Practical considerations:**
+
+    1. **Overlap techniques**: Gradient bucketing, async AllReduce, pipelining
+    2. **Why not 100%?**: Some operations require synchronization (e.g., first/last layers, optimizer step)
+    3. **Memory trade-off**: Overlapping requires buffering gradients during communication
 
 6. **Parameter measurement**: Design an experiment to separately measure:
 
@@ -456,6 +730,189 @@ Always validate your model against measurements.
    - GPU-GPU latency (different nodes)
    - NVLink bandwidth
    - Network bandwidth
+
+??? success "Solution"
+    **Experiment Design for α-β Parameter Measurement**
+
+    The key insight: use **tiny messages to isolate latency (α)** and **large messages to isolate bandwidth (β)**.
+
+    **Experiment 1: GPU-GPU Latency (Same Node) - α_NV**
+
+    ```python
+    import torch
+    import torch.distributed as dist
+    import time
+
+    def measure_intra_node_latency(iterations=10000):
+        """Measure NVLink latency using tiny AllReduce."""
+        # Tiny tensor - bandwidth term negligible
+        tensor = torch.zeros(1, device='cuda')
+
+        # Warmup
+        for _ in range(100):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        # Measure
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+
+        for _ in range(iterations):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        elapsed = time.perf_counter() - start
+
+        # For ring AllReduce: T ≈ 2(P-1)α when n→0
+        P = dist.get_world_size()  # Should be GPUs on same node
+        alpha_nv = elapsed / (iterations * 2 * (P - 1))
+
+        return alpha_nv * 1e6  # Return in microseconds
+    ```
+
+    **Run configuration**: Single node, all 8 GPUs, NCCL with NVLink only.
+
+    **Expected result**: α_NV ≈ 1-5 μs
+
+    ---
+
+    **Experiment 2: GPU-GPU Latency (Different Nodes) - α_net**
+
+    ```python
+    def measure_inter_node_latency(iterations=10000):
+        """Measure network latency using tiny AllReduce across nodes."""
+        # Use ONLY one GPU per node to isolate network latency
+        tensor = torch.zeros(1, device='cuda')
+
+        # Warmup
+        for _ in range(100):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        # Measure
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+
+        for _ in range(iterations):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        elapsed = time.perf_counter() - start
+
+        N = dist.get_world_size()  # Number of nodes
+        alpha_net = elapsed / (iterations * 2 * (N - 1))
+
+        return alpha_net * 1e6  # microseconds
+    ```
+
+    **Run configuration**: 1 GPU per node, multiple nodes, network only.
+
+    **Expected result**: α_net ≈ 5-20 μs (depends on network topology)
+
+    ---
+
+    **Experiment 3: NVLink Bandwidth - β_NV**
+
+    ```python
+    def measure_nvlink_bandwidth(size_gb=2.0, iterations=20):
+        """Measure NVLink bandwidth using large AllReduce."""
+        size = int(size_gb * 1e9 / 4)  # float32 elements
+        tensor = torch.zeros(size, device='cuda')
+
+        # Warmup
+        for _ in range(3):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        # Measure
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+
+        for _ in range(iterations):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        elapsed = time.perf_counter() - start
+
+        # For large n: T ≈ 2(P-1)/P × n/β (latency negligible)
+        P = dist.get_world_size()
+        n = size_gb * 1e9  # bytes
+        factor = 2 * (P - 1) / P
+
+        # β = factor × n × iterations / elapsed
+        beta_nv = factor * n * iterations / elapsed
+
+        return beta_nv / 1e9  # Return in GB/s
+    ```
+
+    **Run configuration**: Single node, all 8 GPUs, NVLink only.
+
+    **Expected result**: β_NV ≈ 200-300 GB/s per GPU (NVSwitch)
+
+    ---
+
+    **Experiment 4: Network Bandwidth - β_net**
+
+    ```python
+    def measure_network_bandwidth(size_gb=4.0, iterations=10):
+        """Measure network bandwidth using large AllReduce across nodes."""
+        size = int(size_gb * 1e9 / 4)
+        tensor = torch.zeros(size, device='cuda')
+
+        # Warmup
+        for _ in range(3):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        # Measure
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+
+        for _ in range(iterations):
+            dist.all_reduce(tensor)
+            torch.cuda.synchronize()
+
+        elapsed = time.perf_counter() - start
+
+        N = dist.get_world_size()
+        n = size_gb * 1e9
+        factor = 2 * (N - 1) / N
+
+        beta_net = factor * n * iterations / elapsed
+
+        return beta_net / 1e9  # GB/s
+    ```
+
+    **Run configuration**: 1 GPU per node (to avoid NVLink contribution), multiple nodes.
+
+    **Expected result**: β_net ≈ 40-50 GB/s per GPU (400 GbE)
+
+    ---
+
+    **Complete Measurement Protocol**
+
+    | Parameter | Configuration | Message Size | Iterations |
+    |-----------|---------------|--------------|------------|
+    | α_NV | 8 GPUs, 1 node | 4 bytes | 10,000 |
+    | α_net | 1 GPU/node, N nodes | 4 bytes | 10,000 |
+    | β_NV | 8 GPUs, 1 node | 2 GB | 20 |
+    | β_net | 1 GPU/node, N nodes | 4 GB | 10 |
+
+    **Validation steps:**
+
+    1. **Consistency check**: Run each experiment 5 times, report mean ± std
+    2. **Size sweep**: Vary message size from 1KB to 10GB, plot T vs n
+    3. **Fit α-β model**: Linear regression on T = α + n/β
+    4. **Compare to spec**: NVLink should be ~6× network bandwidth
+
+    **Example results table:**
+
+    | Parameter | Measured | Expected | Status |
+    |-----------|----------|----------|--------|
+    | α_NV | 2.3 μs | 1-5 μs | ✓ |
+    | α_net | 8.7 μs | 5-20 μs | ✓ |
+    | β_NV | 285 GB/s | 250-300 GB/s | ✓ |
+    | β_net | 47 GB/s | 40-50 GB/s | ✓ |
 
 ## Key Takeaways
 

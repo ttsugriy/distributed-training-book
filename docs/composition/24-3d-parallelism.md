@@ -876,12 +876,114 @@ Memory savings: (D-1)/D of optimizer memory
 
 1. **Configuration design**: You have 256 A100 GPUs (32 nodes × 8 GPUs) and want to train a 40B parameter model. Design a 3D parallelism configuration. Calculate memory per GPU and expected pipeline efficiency.
 
+??? success "Solution"
+    **Model characteristics (40B):**
+
+    $$M_{total} = 16\Psi = 16 \times 40 \times 10^9 = 640 \text{ GB}$$
+
+    **Configuration design:**
+
+    | Strategy | Value | Rationale |
+    |----------|-------|-----------|
+    | TP | 8 | Full intra-node (NVLink) |
+    | PP | 8 | 4 nodes per pipeline |
+    | DP | 4 | 256 / (8 × 8) = 4 replicas |
+
+    **Verify:** $8 \times 8 \times 4 = 256$ ✓
+
+    **Memory per GPU:**
+
+    | Component | Per-GPU Memory |
+    |-----------|----------------|
+    | Parameters | $\frac{2 \times 40B}{TP \times PP} = \frac{80}{64} = 1.25$ GB |
+    | Gradients | 1.25 GB |
+    | Optimizer | $\frac{12 \times 40B}{TP \times PP} = 7.5$ GB |
+    | **Subtotal static** | **10 GB** |
+
+    With ZeRO-1 on DP=4:
+
+    | Component | Per-GPU Memory |
+    |-----------|----------------|
+    | Parameters | 1.25 GB |
+    | Gradients | 1.25 GB |
+    | Optimizer | $\frac{7.5}{4} = 1.875$ GB |
+    | **Subtotal static** | **4.375 GB** |
+
+    **Activation memory estimate:**
+
+    Assuming B=4 per DP, S=4096, H=8192, 40 layers per stage:
+
+    $$M_{act} \approx \frac{40}{8} \times B \times S \times H \times 34 / TP$$
+
+    $$M_{act} \approx 5 \times 4 \times 4096 \times 8192 \times 34 / 8 \approx 35 \text{ GB (with checkpointing)}$$
+
+    **Total per GPU:** ~40 GB — fits in A100 80GB ✓
+
+    **Pipeline efficiency:**
+
+    With 32 micro-batches (M=32) and PP=8:
+
+    $$\eta_{PP} = \frac{M}{M + P - 1} = \frac{32}{32 + 8 - 1} = \frac{32}{39} = \boxed{82\%}$$
+
+    | Metric | Value |
+    |--------|-------|
+    | Bubble fraction | 18% |
+    | Expected MFU | ~40-45% (accounting for all overheads) |
+
 2. **Communication analysis**: For configuration DP=8, PP=4, TP=4 training a model with hidden_dim=8192 and batch_size=512:
 
    - Calculate TP communication volume per layer
    - Calculate PP communication volume per micro-batch
    - Calculate DP communication volume per step
    - Which is the bottleneck?
+
+??? success "Solution"
+    **Configuration:** DP=8, PP=4, TP=4 → Total GPUs = 128
+
+    **Given:** H=8192, batch_size=512, assume S=2048
+
+    **1. TP Communication (per layer):**
+
+    Each layer has 2 AllReduce operations (after column-parallel and row-parallel):
+
+    $$V_{TP}^{layer} = 2 \times B_{micro} \times S \times H \times 2 \text{ bytes}$$
+
+    Micro-batch size: $B_{micro} = \frac{512}{DP \times M} = \frac{512}{8 \times 32} = 2$ (assuming M=32)
+
+    $$V_{TP}^{layer} = 2 \times 2 \times 2048 \times 8192 \times 2 = 134 \text{ MB}$$
+
+    Effective volume (ring AllReduce): $\frac{TP-1}{TP} \times 134 = 100.5$ MB
+
+    **2. PP Communication (per micro-batch):**
+
+    Activation transfer between stages:
+
+    $$V_{PP}^{micro} = B_{micro} \times S \times H \times 2 = 2 \times 2048 \times 8192 \times 2 = 67 \text{ MB}$$
+
+    Point-to-point, so full volume counts.
+
+    **3. DP Communication (per step):**
+
+    AllReduce gradients across DP replicas:
+
+    Assume 30B model split across PP×TP:
+
+    $$V_{DP}^{step} = 2\Psi = 2 \times 30 \times 10^9 / (PP \times TP) = \frac{60 \text{ GB}}{16} = 3.75 \text{ GB}$$
+
+    Effective: $\frac{DP-1}{DP} \times 3.75 = 3.28$ GB
+
+    **4. Time analysis (assuming bandwidths):**
+
+    | Communication | Volume | Bandwidth | Time |
+    |---------------|--------|-----------|------|
+    | TP (per layer) | 100 MB | 450 GB/s (NVLink) | 0.22 ms |
+    | TP (total, 80 layers) | 8 GB | 450 GB/s | 18 ms |
+    | PP (total, 32 micro-batches) | 2.1 GB | 50 GB/s (IB) | 43 ms |
+    | DP (per step) | 3.28 GB | 50 GB/s | 66 ms |
+
+    $$\boxed{\text{DP AllReduce is the bottleneck (66 ms)}}$$
+
+    **Mitigation:** Overlap DP AllReduce with backward pass computation.
 
 3. **Interleaving trade-off**: Compare bubble fraction for PP=16, M=32 with:
 
@@ -890,7 +992,119 @@ Memory savings: (D-1)/D of optimizer memory
    - v=4 interleaving
    What's the communication overhead for each?
 
+??? success "Solution"
+    **Given:** PP=16 stages, M=32 micro-batches
+
+    **Bubble fraction formula:**
+
+    Without interleaving (1F1B):
+    $$\text{Bubble} = \frac{P - 1}{M + P - 1}$$
+
+    With interleaving factor $v$:
+    $$\text{Bubble}_{interleaved} = \frac{P - 1}{v \times M + P - 1}$$
+
+    **Calculations:**
+
+    | Interleaving | Bubble Formula | Bubble Fraction |
+    |--------------|----------------|-----------------|
+    | v=1 | $\frac{15}{32+15}$ | $\frac{15}{47} = 31.9\%$ |
+    | v=2 | $\frac{15}{64+15}$ | $\frac{15}{79} = 19.0\%$ |
+    | v=4 | $\frac{15}{128+15}$ | $\frac{15}{143} = \boxed{10.5\%}$ |
+
+    **Communication overhead:**
+
+    With interleaving factor $v$, each micro-batch crosses $v$ times more stage boundaries:
+
+    $$\text{Comm}_{interleaved} = v \times \text{Comm}_{base}$$
+
+    | Interleaving | Comm Multiplier | Bubble Reduction | Net Benefit? |
+    |--------------|-----------------|------------------|--------------|
+    | v=1 | 1× | baseline | baseline |
+    | v=2 | 2× | 12.9% less bubble | Yes, if comm < bubble |
+    | v=4 | 4× | 21.4% less bubble | Diminishing returns |
+
+    **Break-even analysis:**
+
+    Let $T_c$ = compute time, $T_{comm}$ = base PP communication time.
+
+    Interleaving benefits when:
+    $$\Delta\text{Bubble} \times T_c > (v-1) \times T_{comm}$$
+
+    For v=2:
+    $$0.129 \times T_c > 1 \times T_{comm}$$
+
+    If $T_c = 1000$ ms and $T_{comm} = 50$ ms:
+    $$129 \text{ ms} > 50 \text{ ms} \checkmark$$
+
+    **Summary:**
+
+    | v | Bubble | Comm Overhead | Recommended When |
+    |---|--------|---------------|------------------|
+    | 1 | 31.9% | 1× | Limited bandwidth |
+    | 2 | 19.0% | 2× | Typical (balanced) |
+    | 4 | 10.5% | 4× | High bandwidth links |
+
 4. **Scaling efficiency**: A 3D parallel configuration achieves 50% MFU on 512 GPUs. When scaling to 2048 GPUs (4× DP), predict the new MFU. What are the bottlenecks?
+
+??? success "Solution"
+    **Baseline:** 50% MFU at 512 GPUs
+
+    **Scaling scenario:** Only increase DP from D to 4D (keep TP, PP constant)
+
+    **Analysis of overheads:**
+
+    1. **Compute efficiency** (unchanged):
+       - Same batch per GPU → same compute density
+       - Kernel efficiency unchanged
+
+    2. **TP communication** (unchanged):
+       - TP groups unchanged
+       - Same overhead per forward/backward
+
+    3. **PP efficiency** (unchanged):
+       - Same pipeline depth
+       - Same bubble fraction
+
+    4. **DP communication** (increases):
+       - AllReduce now across 4× more GPUs
+       - Ring AllReduce: $T_{DP} = \frac{D-1}{D} \times \frac{2\Psi}{B}$
+
+    **DP scaling impact:**
+
+    At 512 GPUs with DP=D:
+    $$T_{DP}^{512} = \frac{D-1}{D} \times \frac{2\Psi}{B}$$
+
+    At 2048 GPUs with DP=4D:
+    $$T_{DP}^{2048} = \frac{4D-1}{4D} \times \frac{2\Psi}{B}$$
+
+    Ratio: $\frac{T_{DP}^{2048}}{T_{DP}^{512}} = \frac{(4D-1)/4D}{(D-1)/D} = \frac{4D-1}{4(D-1)} \approx 1.0$ for large D
+
+    **But** the DP AllReduce time stays the same per GPU, while compute per GPU stays the same.
+
+    **Real bottleneck: Batch size scaling**
+
+    To maintain efficiency, global batch must scale 4×:
+    $$B_{global}^{new} = 4 \times B_{global}^{old}$$
+
+    If we **don't** scale batch:
+    - Each GPU does 1/4 the work
+    - Communication stays same
+    - MFU drops significantly
+
+    **Predicted MFU:**
+
+    | Scenario | Global Batch | Per-GPU Work | MFU |
+    |----------|--------------|--------------|-----|
+    | Keep batch constant | 1× | 0.25× | ~20% |
+    | Scale batch 2× | 2× | 0.5× | ~35% |
+    | Scale batch 4× | 4× | 1× | $\boxed{\sim 48\%}$ |
+
+    **Bottlenecks at 2048 GPUs:**
+
+    1. **DP AllReduce latency** — more hops in larger rings
+    2. **Network congestion** — 4× more inter-node traffic
+    3. **Batch size limits** — may hit learning rate stability issues
+    4. **Memory bandwidth** — activation reloading at larger scale
 
 5. **ZeRO integration**: For DP=32, PP=8, TP=4 with 175B parameters:
 
@@ -898,7 +1112,132 @@ Memory savings: (D-1)/D of optimizer memory
    - Calculate optimizer memory per GPU with ZeRO-1
    - What's the activation memory budget freed up?
 
+??? success "Solution"
+    **Configuration:** DP=32, PP=8, TP=4 → Total GPUs = 1024
+
+    **Model partitioning:**
+
+    Parameters per GPU (before ZeRO):
+    $$\Psi_{GPU} = \frac{175B}{PP \times TP} = \frac{175B}{32} = 5.47B \text{ params}$$
+
+    **Without ZeRO:**
+
+    | Component | Size | Memory |
+    |-----------|------|--------|
+    | Parameters (fp16) | $5.47B \times 2$ | 10.9 GB |
+    | Gradients (fp16) | $5.47B \times 2$ | 10.9 GB |
+    | Optimizer states (fp32) | $5.47B \times 12$ | 65.6 GB |
+    | **Total** | | **87.4 GB** |
+
+    $$M_{opt}^{no\_ZeRO} = \boxed{65.6 \text{ GB}}$$
+
+    **With ZeRO-1 (optimizer state sharding across DP):**
+
+    ZeRO-1 shards optimizer states across DP=32:
+
+    $$M_{opt}^{ZeRO1} = \frac{65.6 \text{ GB}}{32} = \boxed{2.05 \text{ GB}}$$
+
+    | Component | Without ZeRO | With ZeRO-1 |
+    |-----------|--------------|-------------|
+    | Parameters | 10.9 GB | 10.9 GB |
+    | Gradients | 10.9 GB | 10.9 GB |
+    | Optimizer | 65.6 GB | 2.05 GB |
+    | **Total Static** | **87.4 GB** | **23.85 GB** |
+
+    **Activation memory budget freed:**
+
+    Memory saved:
+    $$\Delta M = 87.4 - 23.85 = 63.55 \text{ GB}$$
+
+    On an 80GB A100:
+
+    | Metric | Without ZeRO | With ZeRO-1 |
+    |--------|--------------|-------------|
+    | Static memory | 87.4 GB | 23.85 GB |
+    | Available for activations | -7.4 GB (OOM!) | 56.15 GB |
+    | **Feasible?** | No | Yes |
+
+    $$\boxed{\text{ZeRO-1 frees } \sim 64 \text{ GB for activations}}$$
+
+    **Note:** ZeRO-1 adds AllGather for optimizer states during the update step, but this is a one-time cost per step and can be overlapped.
+
 6. **Alternative ordering**: The standard ordering is (DP, PP, TP). What happens if you use (DP, TP, PP)? Analyze the communication pattern changes.
+
+??? success "Solution"
+    **Standard ordering (DP, PP, TP):**
+
+    ```
+    Mesh shape: (DP, PP, TP)
+    Innermost (TP): Consecutive ranks → intra-node (NVLink)
+    Middle (PP): Strides by TP → may cross nodes
+    Outermost (DP): Strides by PP×TP → crosses nodes
+    ```
+
+    **Alternative ordering (DP, TP, PP):**
+
+    ```
+    Mesh shape: (DP, TP, PP)
+    Innermost (PP): Consecutive ranks
+    Middle (TP): Strides by PP
+    Outermost (DP): Strides by TP×PP
+    ```
+
+    **Example with 64 GPUs (DP=2, TP=4, PP=8):**
+
+    | Ordering | TP Group (rank 0) | PP Chain (TP=0, DP=0) |
+    |----------|-------------------|------------------------|
+    | (DP, PP, TP) | {0,1,2,3} | {0,4,8,12,16,20,24,28} |
+    | (DP, TP, PP) | {0,8,16,24} | {0,1,2,3,4,5,6,7} |
+
+    **Communication impact:**
+
+    | Collective | Standard (DP,PP,TP) | Alternative (DP,TP,PP) |
+    |------------|---------------------|------------------------|
+    | TP AllReduce | Consecutive → NVLink | Strided → may cross nodes |
+    | PP Send/Recv | Strided → cross-node | Consecutive → may be NVLink |
+    | DP AllReduce | Large stride → cross-node | Large stride → cross-node |
+
+    **Analysis:**
+
+    **Standard ordering is preferred because:**
+
+    1. **TP frequency**: 2× AllReduce per layer × 80+ layers = 160+ collectives/step
+    2. **PP frequency**: 1× Send/Recv per micro-batch × 32 = 32 transfers/step
+    3. **DP frequency**: 1× AllReduce per step
+
+    TP needs highest bandwidth → must be innermost (NVLink).
+
+    **Alternative ordering consequences:**
+
+    | Issue | Impact |
+    |-------|--------|
+    | TP over cross-node | 18× bandwidth reduction (900 → 50 GB/s) |
+    | TP latency | Adds network hops |
+    | PP consecutive | Slight improvement for PP |
+
+    **Quantitative example:**
+
+    TP AllReduce time (100MB per operation):
+
+    | Ordering | Bandwidth | Time per AllReduce |
+    |----------|-----------|-------------------|
+    | Standard (NVLink) | 900 GB/s | 0.11 ms |
+    | Alternative (IB) | 50 GB/s | 2.0 ms |
+
+    Per step (160 AllReduces):
+
+    | Ordering | TP Time |
+    |----------|---------|
+    | Standard | 18 ms |
+    | Alternative | 320 ms |
+
+    $$\boxed{\text{Alternative ordering: 18× slower TP communication}}$$
+
+    **When might alternative work?**
+
+    - Very deep pipelines where PP dominates
+    - Extremely small TP groups
+    - Custom topologies where NVLink spans differently
 
 ## Key Takeaways
 

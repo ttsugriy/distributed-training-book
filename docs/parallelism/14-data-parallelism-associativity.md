@@ -668,17 +668,442 @@ model = DDP(
 
 1. **Partitioning proof**: Extend the partitioning theorem to unequal partition sizes. If $|B_i| = w_i \cdot |B|$ where $\sum_i w_i = 1$, what is the correct averaging formula?
 
+??? success "Solution"
+    **Extended Partitioning Theorem for Unequal Sizes**
+
+    Given batch $B$ partitioned into $P$ disjoint subsets $B_1, B_2, \ldots, B_P$ where $|B_i| = w_i \cdot |B|$ and $\sum_{i=1}^P w_i = 1$.
+
+    **Claim:**
+    $$\nabla_\theta L_B(\theta) = \sum_{i=1}^{P} w_i \cdot \nabla_\theta L_{B_i}(\theta)$$
+
+    **Proof:**
+
+    Starting from the definition:
+    $$\nabla_\theta L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x, \theta)$$
+
+    Since $B = \bigcup_{i=1}^{P} B_i$ with disjoint $B_i$:
+    $$= \frac{1}{|B|} \sum_{i=1}^{P} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
+
+    Multiplying and dividing by $|B_i|$:
+    $$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \frac{1}{|B_i|} \sum_{x \in B_i} \nabla_\theta \ell(x, \theta)$$
+
+    $$= \frac{1}{|B|} \sum_{i=1}^{P} |B_i| \cdot \nabla_\theta L_{B_i}(\theta)$$
+
+    Substituting $|B_i| = w_i \cdot |B|$:
+    $$= \frac{1}{|B|} \sum_{i=1}^{P} w_i \cdot |B| \cdot \nabla_\theta L_{B_i}(\theta)$$
+
+    $$= \boxed{\sum_{i=1}^{P} w_i \cdot \nabla_\theta L_{B_i}(\theta)} \quad \square$$
+
+    **Practical implication:**
+
+    When GPUs have unequal batch sizes (e.g., due to load balancing), the AllReduce should compute a **weighted average**, not a simple average:
+
+    ```python
+    # Weighted gradient averaging
+    local_batch_size = len(local_batch)
+    total_batch_size = dist.all_reduce(
+        torch.tensor(local_batch_size), op=dist.ReduceOp.SUM
+    )
+    weight = local_batch_size / total_batch_size
+
+    for param in model.parameters():
+        param.grad *= weight
+        dist.all_reduce(param.grad, op=dist.ReduceOp.SUM)
+    ```
+
+    **Special case:** When all $w_i = 1/P$, we recover the original theorem with simple averaging.
+
 2. **Compute-communication balance**: For a 7B parameter model on 8 H100s with NVLink (900 GB/s), what local batch size achieves $R = 2$ (compute 2× communication)?
+
+??? success "Solution"
+    **Given:**
+
+    - $\Psi = 7 \times 10^9$ parameters
+    - $P = 8$ GPUs
+    - $\beta = 900$ GB/s (NVLink bandwidth)
+    - $F = 1979 \times 10^{12}$ FLOP/s (H100 FP16 peak)
+    - FP16 training: sizeof(dtype) = 2 bytes
+    - Target: $R = 2$
+
+    **Compute-Communication Ratio Formula (from chapter):**
+
+    $$R = \frac{3b \cdot \beta}{F \cdot \text{sizeof}(\text{dtype})}$$
+
+    **Solving for batch size $b$:**
+
+    $$b = \frac{R \cdot F \cdot \text{sizeof}(\text{dtype})}{3 \cdot \beta}$$
+
+    $$b = \frac{2 \times 1979 \times 10^{12} \times 2}{3 \times 900 \times 10^9}$$
+
+    $$b = \frac{7.916 \times 10^{15}}{2.7 \times 10^{12}}$$
+
+    $$b = \boxed{2,932 \text{ samples}}$$
+
+    **Verification:**
+
+    *Communication time:*
+    $$T_{\text{comm}} = 2 \times \frac{P-1}{P} \times \frac{\Psi \times 2}{\beta}$$
+    $$= 2 \times \frac{7}{8} \times \frac{7 \times 10^9 \times 2}{900 \times 10^9}$$
+    $$= 1.75 \times 15.56 \text{ ms} = 27.2 \text{ ms}$$
+
+    *Compute time:*
+    $$T_{\text{compute}} = \frac{6\Psi \times b}{F}$$
+    $$= \frac{6 \times 7 \times 10^9 \times 2932}{1979 \times 10^{12}}$$
+    $$= \frac{1.23 \times 10^{14}}{1.979 \times 10^{15}} = 62.2 \text{ ms}$$
+
+    *Ratio check:*
+    $$R = \frac{62.2}{27.2} = 2.29 \approx 2 \checkmark$$
+
+    **Practical considerations:**
+
+    | Sequence Length | Samples (b=2932) | Tokens per GPU |
+    |-----------------|------------------|----------------|
+    | 512 | 2,932 | 1.5M |
+    | 2048 | 2,932 | 6.0M |
+    | 4096 | 2,932 | 12.0M |
+
+    With 4096 sequence length, this requires ~12M tokens per GPU per step—likely too large for memory. Gradient accumulation would be needed.
 
 3. **Overlap analysis**: A model has 100 layers of equal size. If AllReduce for all gradients takes 100ms and backward for all layers takes 80ms, what fraction of communication can be overlapped? What is the effective step time?
 
+??? success "Solution"
+    **Given:**
+
+    - $L = 100$ layers of equal size
+    - $T_{\text{AR}}^{\text{total}} = 100$ ms (total AllReduce time)
+    - $T_{\text{bwd}}^{\text{total}} = 80$ ms (total backward time)
+    - All layers equal → per-layer times are uniform
+
+    **Per-layer times:**
+
+    $$T_{\text{AR}}^{\text{layer}} = \frac{100}{100} = 1 \text{ ms}$$
+    $$T_{\text{bwd}}^{\text{layer}} = \frac{80}{100} = 0.8 \text{ ms}$$
+
+    **Overlap analysis:**
+
+    With bucket-based overlap, layer $i$'s AllReduce can overlap with layers $1, \ldots, i-1$'s backward computation.
+
+    ```
+    Layer 100: [bwd 0.8ms][  AR 1ms  ]
+    Layer 99:            [bwd 0.8ms][  AR 1ms  ]
+    Layer 98:                      [bwd 0.8ms][  AR 1ms  ]
+    ...
+    ```
+
+    **For each layer except the first:**
+    - AllReduce (1 ms) can potentially overlap with backward of earlier layers
+
+    Since backward is faster than AllReduce (0.8 ms < 1 ms), AllReduce is the bottleneck.
+
+    **Critical path analysis:**
+
+    - Layer 100: starts at t=0, backward finishes at t=0.8ms, AR finishes at t=1.8ms
+    - Layer 99: backward can start at t=0.8ms (after layer 100 backward), finishes at t=1.6ms
+      - But AR for layer 100 is still running until t=1.8ms
+      - Layer 99 AR starts at t=1.8ms, finishes at t=2.8ms
+    - This continues with AR being the bottleneck
+
+    **Actually, the overlap is limited by the relative speeds.**
+
+    Let's compute more carefully:
+
+    *Total backward time without overlap:* 80 ms
+
+    *Total AR time without overlap:* 100 ms
+
+    *With perfect pipelining:*
+    - First layer backward: 0.8 ms
+    - Then 99 AllReduces in sequence: 99 × 1 ms = 99 ms (partially overlapped)
+    - Last AllReduce finishes after last backward
+
+    The overlappable portion is the backward time of layers that can run concurrently with AllReduce:
+
+    $$\text{Overlap time} = T_{\text{bwd}}^{\text{total}} - T_{\text{bwd}}^{\text{first layer}} = 80 - 0.8 = 79.2 \text{ ms}$$
+
+    Since total AR time is 100 ms and backward (after first layer) is 79.2 ms:
+    $$\text{Overlapped communication} = \min(79.2, 100) = 79.2 \text{ ms}$$
+
+    **Fraction overlapped:**
+    $$\text{Overlap fraction} = \frac{79.2}{100} = \boxed{79.2\%}$$
+
+    **Effective step time:**
+
+    $$T_{\text{step}} = T_{\text{bwd}}^{\text{first layer}} + \max(T_{\text{bwd}}^{\text{remaining}}, T_{\text{AR}}^{\text{total}})$$
+
+    Since AR (100 ms) > remaining backward (79.2 ms):
+    $$T_{\text{step}} = 0.8 + 100 = \boxed{100.8 \text{ ms}}$$
+
+    **Comparison:**
+
+    | Scenario | Step Time |
+    |----------|-----------|
+    | No overlap | 80 + 100 = 180 ms |
+    | With overlap | 100.8 ms |
+    | Speedup | 1.79× |
+
+    **Key insight:** When AR is slower than backward, the step time approaches the AR time. The system is communication-bound.
+
 4. **Compression analysis**: Top-1% sparsification compresses gradients 100×. If the original AllReduce takes 50ms, what is the new time? Account for compression/decompression compute (assume 5ms each).
+
+??? success "Solution"
+    **Given:**
+
+    - Original AllReduce time: $T_{\text{AR}}^{\text{orig}} = 50$ ms
+    - Compression ratio: 100× (Top-1% sparsification)
+    - Compression compute: $T_{\text{compress}} = 5$ ms
+    - Decompression compute: $T_{\text{decompress}} = 5$ ms
+
+    **Analysis:**
+
+    *Original communication is bandwidth-dominated (large gradients):*
+    $$T_{\text{AR}}^{\text{orig}} \approx \frac{2(P-1)}{P} \cdot \frac{n}{\beta} \approx \frac{2n}{\beta} = 50 \text{ ms}$$
+
+    *Compressed communication:*
+    $$T_{\text{AR}}^{\text{compressed}} \approx \frac{2n/100}{\beta} = \frac{50}{100} = 0.5 \text{ ms}$$
+
+    **However, sparse AllReduce is more complex:**
+
+    Sparse tensors require AllGather of indices + values, not standard AllReduce:
+
+    - Indices: $0.01n$ elements × 4 bytes (int32) = $0.04n$ bytes
+    - Values: $0.01n$ elements × 2 bytes (FP16) = $0.02n$ bytes
+    - Total: $0.06n$ bytes (vs original $2n$ bytes)
+
+    Effective compression: $2n / 0.06n = 33×$ (not 100×!)
+
+    *Revised compressed communication:*
+    $$T_{\text{AR}}^{\text{compressed}} = \frac{50}{33} \approx 1.5 \text{ ms}$$
+
+    **Total time with compression:**
+
+    $$T_{\text{total}} = T_{\text{compress}} + T_{\text{AR}}^{\text{compressed}} + T_{\text{decompress}}$$
+    $$= 5 + 1.5 + 5 = \boxed{11.5 \text{ ms}}$$
+
+    **Speedup:**
+    $$\text{Speedup} = \frac{T_{\text{orig}}}{T_{\text{total}}} = \frac{50}{11.5} = \boxed{4.3\times}$$
+
+    **Summary:**
+
+    | Component | Time |
+    |-----------|------|
+    | Compression | 5 ms |
+    | Sparse AllReduce | 1.5 ms |
+    | Decompression | 5 ms |
+    | **Total** | **11.5 ms** |
+
+    **Key insights:**
+
+    1. **Compression overhead matters**: 10 ms of compute overhead is significant
+    2. **Index overhead reduces effective compression**: 100× sparsity ≠ 100× bandwidth reduction
+    3. **Still valuable**: 4.3× speedup is substantial for communication-bound training
+    4. **Break-even analysis**: Compression only helps if $T_{\text{compress}} + T_{\text{decompress}} < T_{\text{AR}}^{\text{orig}} - T_{\text{AR}}^{\text{compressed}}$
+
+    $$10 < 50 - 1.5 = 48.5 \text{ ms} \checkmark$$
 
 5. **Accumulation trade-off**: Training with local batch 32 takes 100ms compute and 40ms AllReduce per micro-batch. If you accumulate over 4 micro-batches, what is the time per effective step? What if memory allowed batch 128 directly (single forward-backward)?
 
+??? success "Solution"
+    **Given:**
+
+    - Micro-batch size: 32
+    - $T_{\text{compute}}^{\text{micro}} = 100$ ms per micro-batch
+    - $T_{\text{AR}} = 40$ ms per AllReduce
+    - Accumulation steps: $A = 4$
+    - Effective batch size: $32 \times 4 = 128$
+
+    **Case 1: Gradient Accumulation (4 micro-batches)**
+
+    With accumulation, we compute 4 micro-batches but AllReduce only once:
+
+    $$T_{\text{accum}} = A \times T_{\text{compute}}^{\text{micro}} + T_{\text{AR}}$$
+    $$= 4 \times 100 + 40 = \boxed{440 \text{ ms}}$$
+
+    **Case 2: Direct Batch 128 (no accumulation)**
+
+    Compute time scales linearly with batch size:
+    $$T_{\text{compute}}^{\text{direct}} = \frac{128}{32} \times 100 = 400 \text{ ms}$$
+
+    Total:
+    $$T_{\text{direct}} = T_{\text{compute}}^{\text{direct}} + T_{\text{AR}} = 400 + 40 = \boxed{440 \text{ ms}}$$
+
+    **Comparison:**
+
+    | Method | Compute | AllReduce | Total |
+    |--------|---------|-----------|-------|
+    | Accumulation (4×32) | 4 × 100 = 400 ms | 40 ms | 440 ms |
+    | Direct (128) | 400 ms | 40 ms | 440 ms |
+
+    $$\boxed{\text{Both methods take the same time: 440 ms}}$$
+
+    **Why are they equal?**
+
+    Gradient accumulation doesn't add overhead—it just splits the compute into multiple passes. The AllReduce only happens once in both cases.
+
+    **When does direct batching win?**
+
+    If there's overlap between compute and communication:
+
+    *With overlap (direct):*
+    $$T_{\text{direct}}^{\text{overlap}} = \max(T_{\text{compute}}, T_{\text{AR}}) = \max(400, 40) = 400 \text{ ms}$$
+
+    *With overlap (accumulation):*
+    - Can't overlap micro-batch 1-3 AR (we don't do AR)
+    - Can only overlap final AR with... nothing (compute is done)
+    $$T_{\text{accum}}^{\text{overlap}} = 4 \times 100 + 40 = 440 \text{ ms}$$
+
+    **Speedup from direct batching with overlap:**
+    $$\frac{440}{400} = 1.1\times$$
+
+    **Key insight:** Direct large batches enable better compute-communication overlap than gradient accumulation.
+
 6. **Staleness bound**: In asynchronous SGD with $P = 16$ workers and exponential staleness penalty $f(\tau) = e^{-0.1\tau}$, if maximum staleness is $\tau = 15$, what is the effective learning rate scaling?
 
+??? success "Solution"
+    **Given:**
+
+    - $P = 16$ workers
+    - Staleness penalty: $f(\tau) = e^{-0.1\tau}$
+    - Maximum staleness: $\tau_{\max} = 15$
+
+    **Staleness-adjusted update rule:**
+
+    $$\theta^{(t+1)} = \theta^{(t)} - \eta \cdot f(\tau) \cdot g^{(t-\tau)}$$
+
+    The effective learning rate is: $\eta_{\text{eff}} = \eta \cdot f(\tau)$
+
+    **Staleness distribution analysis:**
+
+    In asynchronous SGD with $P$ workers, staleness $\tau$ ranges from 0 to $P-1$ in the worst case (when one worker is always ahead).
+
+    With $\tau_{\max} = 15$ (close to $P - 1 = 15$), we have maximum asynchrony.
+
+    **Effective learning rate at different staleness levels:**
+
+    | Staleness $\tau$ | $f(\tau) = e^{-0.1\tau}$ | $\eta_{\text{eff}}/\eta$ |
+    |------------------|--------------------------|--------------------------|
+    | 0 | $e^0 = 1.000$ | 100% |
+    | 5 | $e^{-0.5} = 0.607$ | 60.7% |
+    | 10 | $e^{-1.0} = 0.368$ | 36.8% |
+    | 15 | $e^{-1.5} = 0.223$ | 22.3% |
+
+    **At maximum staleness ($\tau = 15$):**
+
+    $$\eta_{\text{eff}} = \eta \cdot e^{-0.1 \times 15} = \eta \cdot e^{-1.5} = \boxed{0.223 \cdot \eta}$$
+
+    The learning rate is scaled down to **22.3% of the base rate**.
+
+    **Average effective learning rate:**
+
+    Assuming uniform staleness distribution from 0 to $\tau_{\max}$:
+
+    $$\mathbb{E}[f(\tau)] = \frac{1}{\tau_{\max} + 1} \sum_{\tau=0}^{\tau_{\max}} e^{-0.1\tau}$$
+
+    This is a geometric series:
+    $$= \frac{1}{16} \cdot \frac{1 - e^{-0.1 \times 16}}{1 - e^{-0.1}} = \frac{1}{16} \cdot \frac{1 - e^{-1.6}}{1 - e^{-0.1}}$$
+
+    $$= \frac{1}{16} \cdot \frac{1 - 0.202}{1 - 0.905} = \frac{1}{16} \cdot \frac{0.798}{0.095} = \frac{8.4}{16} = 0.525$$
+
+    **Average effective learning rate:** $\boxed{52.5\%}$ of base rate.
+
+    **Practical implications:**
+
+    | Aspect | Value |
+    |--------|-------|
+    | Minimum scaling (fresh gradients) | 100% |
+    | Maximum scaling (stalest gradients) | 22.3% |
+    | Average scaling | 52.5% |
+    | Effective throughput loss | ~47.5% |
+
+    To match synchronous SGD convergence speed, you would need to increase the base learning rate by approximately $1/0.525 \approx 1.9\times$, but this may cause instability with fresh gradients.
+
 7. **Non-determinism quantification**: Two reduction orders $((g_0 + g_1) + g_2)$ and $(g_0 + (g_1 + g_2))$ differ by at most $\epsilon_{\text{machine}} \cdot |g_0 + g_1 + g_2|$. For a 1B parameter model with FP16 gradients ($\epsilon \approx 10^{-3}$), estimate the maximum gradient difference.
+
+??? success "Solution"
+    **Given:**
+
+    - Model parameters: $\Psi = 1 \times 10^9$
+    - Data type: FP16
+    - Machine epsilon: $\epsilon \approx 10^{-3}$ (actually $\epsilon_{\text{FP16}} = 2^{-10} \approx 9.77 \times 10^{-4}$)
+    - Error bound per reduction: $\epsilon \cdot |g_0 + g_1 + g_2|$
+
+    **Single reduction error:**
+
+    For a single floating-point addition of two numbers $a$ and $b$:
+    $$\text{fl}(a + b) = (a + b)(1 + \delta), \quad |\delta| \leq \epsilon$$
+
+    The absolute error is:
+    $$|error| \leq \epsilon \cdot |a + b|$$
+
+    **Error accumulation in AllReduce:**
+
+    For $P$ GPUs using ring AllReduce, we perform $P-1$ additions per parameter:
+
+    $$g = ((((g_0 + g_1) + g_2) + g_3) + \cdots + g_{P-1})$$
+
+    Each step accumulates error. Using standard error analysis:
+
+    $$|\text{accumulated error}| \leq (P-1) \cdot \epsilon \cdot |g_{\text{sum}}|$$
+
+    **Per-parameter error estimate:**
+
+    Assuming typical gradient magnitude $|g_i| \approx 10^{-4}$ (common for normalized training):
+
+    - Sum of $P = 8$ gradients: $|g_{\text{sum}}| \approx 8 \times 10^{-4}$ (if aligned)
+    - Per-parameter error: $\leq 7 \times 10^{-3} \times 8 \times 10^{-4} = 5.6 \times 10^{-6}$
+
+    **Different reduction orders:**
+
+    Two orderings can differ by at most:
+    $$|\text{difference}| \leq 2 \cdot (P-1) \cdot \epsilon \cdot |g_{\text{sum}}|$$
+
+    (Factor of 2 because each ordering can err in opposite directions)
+
+    **Total model-wide error:**
+
+    For 1B parameters, the aggregate gradient difference:
+
+    *L2 norm of differences:*
+
+    If errors are independent across parameters with variance $\sigma^2 = \epsilon^2 \cdot |g|^2$:
+
+    $$\|g_{\text{order1}} - g_{\text{order2}}\|_2 \approx \sqrt{\Psi} \cdot \sigma$$
+
+    $$= \sqrt{10^9} \cdot \epsilon \cdot |g_{\text{avg}}| \cdot (P-1)$$
+
+    With $|g_{\text{avg}}| \approx 10^{-4}$, $P = 8$, $\epsilon = 10^{-3}$:
+
+    $$= 3.16 \times 10^4 \cdot 10^{-3} \cdot 10^{-4} \cdot 7 = \boxed{2.2 \times 10^{-2}}$$
+
+    **Per-parameter maximum difference:**
+
+    $$|\Delta g_i|_{\max} \approx 2 \cdot (P-1) \cdot \epsilon \cdot |g_i| \approx 14 \cdot 10^{-3} \cdot 10^{-4} = \boxed{1.4 \times 10^{-6}}$$
+
+    **Relative error:**
+
+    $$\frac{|\Delta g|}{|g|} \approx 2(P-1) \cdot \epsilon = 14 \times 10^{-3} = \boxed{1.4\%}$$
+
+    **Summary:**
+
+    | Metric | Value |
+    |--------|-------|
+    | Per-parameter max difference | $1.4 \times 10^{-6}$ |
+    | Relative error per parameter | ~1.4% |
+    | L2 norm of difference (1B params) | ~0.022 |
+
+    **Practical implications:**
+
+    1. **Training stability**: 1.4% per-step variance accumulates over millions of steps
+    2. **Reproducibility**: Same code, different GPU count → different results
+    3. **Debugging**: Bitwise comparison across runs is impossible
+
+    **Mitigation strategies:**
+
+    | Strategy | Overhead | Determinism |
+    |----------|----------|-------------|
+    | Fixed reduction order | ~5% | Bit-exact per config |
+    | FP32 accumulation | 2× memory | Reduces error ~1000× |
+    | Kahan summation | 2× compute | Near FP64 accuracy |
+    | Tree reduction (balanced) | Same | More stable than ring |
 
 ## Key Takeaways
 

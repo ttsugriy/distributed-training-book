@@ -152,6 +152,91 @@ This hierarchy emerges directly from the bandwidth hierarchy of the cluster.
 
 1. You have a 256-GPU cluster with 8 GPUs per node (NVLink) and 400 Gbps InfiniBand between nodes. Calculate the maximum collective bandwidth for (a) 8-way AllReduce within a node, (b) 32-way AllReduce across 4 nodes.
 
+??? success "Solution"
+    **Ring AllReduce effective bandwidth:**
+
+    For ring AllReduce, effective bandwidth ≈ $\beta \times \frac{P}{2(P-1)}$ where $\beta$ is link bandwidth.
+
+    **(a) 8-way AllReduce within node (NVLink):**
+
+    - NVLink bandwidth: $\beta = 900$ GB/s
+    - $P = 8$ GPUs
+
+    $$BW_{eff} = 900 \times \frac{8}{2 \times 7} = 900 \times \frac{8}{14} \approx 514 \text{ GB/s}$$
+
+    In practice, NCCL achieves ~700-800 GB/s with optimized ring algorithms.
+
+    **(b) 32-way AllReduce across 4 nodes:**
+
+    Uses hierarchical AllReduce:
+
+    1. Reduce within each node (NVLink, fast)
+    2. Reduce across 4 node representatives (InfiniBand, slow)
+    3. Broadcast within each node (NVLink, fast)
+
+    Inter-node bottleneck:
+
+    - InfiniBand: 400 Gbps = 50 GB/s per direction
+    - 4-way AllReduce across nodes
+
+    $$BW_{eff}^{inter} = 50 \times \frac{4}{2 \times 3} \approx 33 \text{ GB/s}$$
+
+    The inter-node communication dominates, limiting effective bandwidth to **~30-40 GB/s** for the full 32-way collective.
+
 2. A transformer layer does two AllReduce operations for tensor parallelism. The hidden dimension is 8192, batch size is 32, sequence length is 2048. Calculate the total bytes transferred per layer and the time required on (a) NVLink, (b) InfiniBand.
 
+??? success "Solution"
+    **Activation tensor size (BF16):**
+
+    $$\text{Size} = B \times S \times H \times 2 = 32 \times 2048 \times 8192 \times 2 = 1.07 \text{ GB}$$
+
+    **Per AllReduce volume (ring, large P):**
+
+    $$V_{AR} \approx 2 \times \text{Size} = 2.14 \text{ GB}$$
+
+    **Total for 2 AllReduces:**
+
+    $$V_{total} = 2 \times 2.14 = 4.28 \text{ GB per layer}$$
+
+    **Time calculations:**
+
+    (a) **NVLink** (900 GB/s):
+    $$T_{NVLink} = \frac{4.28 \text{ GB}}{900 \text{ GB/s}} = 4.8 \text{ ms}$$
+
+    (b) **InfiniBand** (50 GB/s):
+    $$T_{IB} = \frac{4.28 \text{ GB}}{50 \text{ GB/s}} = 86 \text{ ms}$$
+
+    **Conclusion:** Tensor parallelism over InfiniBand is 18× slower than NVLink. This is why TP stays within NVLink domains.
+
 3. Why does pipeline parallelism use point-to-point communication rather than collectives? What would happen if each stage had to AllReduce with all other stages?
+
+??? success "Solution"
+    **Why point-to-point:**
+
+    Pipeline parallelism has a linear data flow: Stage 0 → Stage 1 → Stage 2 → ... → Stage N-1.
+
+    Each stage only needs to:
+
+    - **Receive** activations from the previous stage
+    - **Send** activations to the next stage
+
+    This is inherently **point-to-point** (Send/Recv), not collective.
+
+    **If AllReduce were required:**
+
+    | Problem | Impact |
+    |---------|--------|
+    | Global synchronization | All stages wait for slowest |
+    | Latency scales with P | $O(P)$ instead of $O(1)$ |
+    | Defeats pipelining | Can't overlap stages |
+    | Unnecessary data movement | Stages don't need each other's data |
+
+    **Quantitative example (8 stages):**
+
+    - Point-to-point: 1 hop latency (~1-5 μs per activation transfer)
+    - AllReduce: 7 hops minimum, all stages synchronized
+
+    Pipeline bubbles would grow from $\frac{P-1}{M+P-1}$ to nearly 100% utilization loss.
+
+    **Key insight:** PP exploits the *sequential* nature of neural network layers. Collectives are for *parallel* operations on the same data.
+

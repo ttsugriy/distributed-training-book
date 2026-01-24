@@ -375,6 +375,233 @@ gradients = handle.wait()  # Eventually complete
 
 6. **Algorithm selection**: Given α = 1μs, β = 100 GB/s, at what message size does ring AllReduce become faster than tree AllReduce for P = 64?
 
+??? success "Solution"
+    **AllReduce using ReduceScatter + AllGather:**
+
+    ```python
+    import numpy as np
+
+    def reduce_scatter(data, P, op=np.sum):
+        """Reduce across processes, scatter result shards."""
+        # Stack all data: shape (P, n)
+        stacked = np.stack(data)
+        # Reduce along process dimension
+        reduced = op(stacked, axis=0)
+        # Scatter: each process gets 1/P of result
+        chunk_size = len(reduced) // P
+        return [reduced[i*chunk_size:(i+1)*chunk_size] for i in range(P)]
+
+    def all_gather(shards, P):
+        """Gather all shards to all processes."""
+        gathered = np.concatenate(shards)
+        return [gathered.copy() for _ in range(P)]
+
+    def allreduce_via_decomposition(data, P):
+        """AllReduce = AllGather ∘ ReduceScatter"""
+        shards = reduce_scatter(data, P)
+        return all_gather(shards, P)
+
+    def allreduce_direct(data, P, op=np.sum):
+        """Direct AllReduce for comparison."""
+        stacked = np.stack(data)
+        reduced = op(stacked, axis=0)
+        return [reduced.copy() for _ in range(P)]
+
+    # Test
+    P = 4
+    data = [np.array([1, 2, 3, 4]),
+            np.array([2, 4, 6, 8]),
+            np.array([3, 6, 9, 12]),
+            np.array([4, 8, 12, 16])]
+
+    decomposed = allreduce_via_decomposition(data, P)
+    direct = allreduce_direct(data, P)
+
+    # Verify: both should give [10, 20, 30, 40] on all processes
+    assert all(np.array_equal(d, [10, 20, 30, 40]) for d in decomposed)
+    assert all(np.array_equal(d, [10, 20, 30, 40]) for d in direct)
+    print("✓ Decomposition verified!")
+    ```
+
+    **Result:** Both produce `[10, 20, 30, 40]` on all 4 processes.
+
+??? success "Solution"
+    **Demonstrating floating-point non-associativity:**
+
+    ```python
+    import numpy as np
+
+    def sequential_sum(values):
+        """Left-to-right sequential reduction."""
+        result = values[0]
+        for v in values[1:]:
+            result = result + v
+        return result
+
+    def tree_sum(values):
+        """Pairwise tree reduction."""
+        if len(values) == 1:
+            return values[0]
+        pairs = []
+        for i in range(0, len(values), 2):
+            if i + 1 < len(values):
+                pairs.append(values[i] + values[i+1])
+            else:
+                pairs.append(values[i])
+        return tree_sum(pairs)
+
+    # Example 1: Catastrophic cancellation
+    a = np.float32(1e20)
+    b = np.float32(-1e20)
+    c = np.float32(1.0)
+
+    seq_result = (a + b) + c  # = 0 + 1 = 1
+    alt_result = a + (b + c)  # = 1e20 + (-1e20) = 0 (c absorbed)
+
+    print(f"Sequential: (a + b) + c = {seq_result}")
+    print(f"Alternate:  a + (b + c) = {alt_result}")
+    print(f"Difference: {abs(seq_result - alt_result)}")
+
+    # Example 2: Many small values
+    np.random.seed(42)
+    values = [np.float32(1e-8) for _ in range(1000000)]
+    values.append(np.float32(1.0))
+
+    seq = sequential_sum(values)
+    tree = tree_sum(values)
+    exact = 1.0 + 1000000 * 1e-8  # = 1.01
+
+    print(f"\nSequential sum: {seq}")
+    print(f"Tree sum: {tree}")
+    print(f"Exact value: {exact}")
+    ```
+
+    **Output:**
+    ```
+    Sequential: (a + b) + c = 1.0
+    Alternate:  a + (b + c) = 0.0
+    Difference: 1.0
+
+    Sequential sum: 1.0100002
+    Tree sum: 1.0099999
+    Exact value: 1.01
+    ```
+
+    **Key insight:** Tree reduction can give different results than sequential reduction due to different grouping of operations. Neither matches the exact mathematical result.
+
+??? success "Solution"
+    **Communication volume comparison:**
+
+    **Naive Reduce + Broadcast:**
+
+    - Reduce: Each of $P-1$ processes sends $n$ bytes to root
+      - Total sent: $(P-1) \times n$
+    - Broadcast: Root sends $n$ bytes to each of $P-1$ processes
+      - Total sent: $(P-1) \times n$ (or $n \log P$ with tree)
+
+    **Total naive:** $2(P-1) \times n$ bytes (or $(P-1 + \log P) \times n$ with tree broadcast)
+
+    **Ring AllReduce:**
+
+    - Each process sends: $2 \times \frac{P-1}{P} \times n$ bytes
+    - Total across all processes: $2 \times \frac{P-1}{P} \times n \times P = 2(P-1)n$
+
+    **Wait—same total?** Yes, but the difference is in **per-process** and **per-link** load:
+
+    | Metric | Naive | Ring |
+    |--------|-------|------|
+    | Root sends | $(P-1)n$ | $\frac{2(P-1)}{P}n$ |
+    | Root receives | $(P-1)n$ | $\frac{2(P-1)}{P}n$ |
+    | Max link load | $(P-1)n$ | $\frac{n}{P}$ per step |
+
+    **Improvement factor for root bottleneck:**
+    $$\frac{(P-1)n}{\frac{2(P-1)}{P}n} = \frac{P}{2}$$
+
+    For $P = 64$: Ring reduces root load by **32×**.
+
+    **Key insight:** Total bytes are similar, but ring distributes load evenly across processes and time, eliminating the root bottleneck.
+
+??? success "Solution"
+    **Proof that Gather(Scatter(x)) = x on root:**
+
+    **Scatter operation:** Root sends chunk $i$ to process $i$:
+    $$\text{Scatter}([x_0, x_1, ..., x_{P-1}]) \to (P_0: x_0, P_1: x_1, ..., P_{P-1}: x_{P-1})$$
+
+    **Gather operation:** Root receives chunk from each process and concatenates:
+    $$\text{Gather}(P_0: y_0, P_1: y_1, ..., P_{P-1}: y_{P-1}) \to [y_0, y_1, ..., y_{P-1}]$$
+
+    **Composition:**
+    $$\text{Gather}(\text{Scatter}([x_0, x_1, ..., x_{P-1}]))$$
+    $$= \text{Gather}(P_0: x_0, P_1: x_1, ..., P_{P-1}: x_{P-1})$$
+    $$= [x_0, x_1, ..., x_{P-1}]$$
+    $$= x$$
+
+    **Therefore:** $\text{Gather} \circ \text{Scatter} = \text{Identity}$ (on root) $\square$
+
+    **Note:** This only holds on the root process. Other processes don't have the full result after Gather.
+
+??? success "Solution"
+    **AlltoAll communication volume:**
+
+    **Setup:** Each process $i$ has data $[D_{i,0}, D_{i,1}, ..., D_{i,P-1}]$ where $D_{i,j}$ is destined for process $j$.
+
+    **Data movement:** Process $i$ sends $D_{i,j}$ to process $j$ for all $j \neq i$.
+
+    **Per process:**
+    - Sends: $(P-1)$ chunks of size $n/P$ = $\frac{P-1}{P} \times n$ bytes
+    - Receives: $(P-1)$ chunks of size $n/P$ = $\frac{P-1}{P} \times n$ bytes
+
+    **Total per process:** $\frac{P-1}{P} \times n$ sent + $\frac{P-1}{P} \times n$ received
+
+    **AllGather comparison:**
+
+    - Each process contributes $n/P$, receives $n$ total
+    - Sends: $\frac{P-1}{P} \times n$ bytes (sends its chunk to $P-1$ others)
+    - Receives: $\frac{P-1}{P} \times n$ bytes (receives from $P-1$ others)
+
+    **Same volume!** Both move $\frac{P-1}{P} \times n$ bytes per process.
+
+    **Why same despite different semantics?**
+
+    | Operation | Sends | Receives | Pattern |
+    |-----------|-------|----------|---------|
+    | AllGather | Same data to all | Different data from each | 1-to-many |
+    | AlltoAll | Different data to each | Different data from each | Many-to-many |
+
+    The total data moved is identical; only the **pattern** differs. AlltoAll is a "personalized" AllGather where each destination gets unique data.
+
+??? success "Solution"
+    **Ring vs Tree crossover for P = 64:**
+
+    **Given:** $\alpha = 1\mu s = 10^{-6}$ s, $\beta = 100$ GB/s $= 10^{11}$ bytes/s, $P = 64$
+
+    **Ring AllReduce time:**
+    $$T_{\text{ring}} = 2(P-1)\alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+    $$= 2(63)(10^{-6}) + 2 \cdot \frac{63}{64} \cdot \frac{n}{10^{11}}$$
+    $$= 126 \mu s + 1.97 \cdot 10^{-11} \cdot n$$
+
+    **Tree AllReduce time:**
+    $$T_{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot \frac{n}{\beta}$$
+    $$= 2(6)(10^{-6}) + 2(6) \cdot \frac{n}{10^{11}}$$
+    $$= 12 \mu s + 1.2 \cdot 10^{-10} \cdot n$$
+
+    **Set equal to find crossover:**
+    $$126 \mu s + 1.97 \times 10^{-11} n = 12 \mu s + 1.2 \times 10^{-10} n$$
+    $$114 \mu s = (1.2 \times 10^{-10} - 1.97 \times 10^{-11}) n$$
+    $$114 \times 10^{-6} = 1.003 \times 10^{-10} \cdot n$$
+    $$n = \frac{114 \times 10^{-6}}{1.003 \times 10^{-10}} = \boxed{1.14 \text{ MB}}$$
+
+    **Conclusion:**
+    - Messages < 1.14 MB: Use **tree** (lower latency)
+    - Messages > 1.14 MB: Use **ring** (better bandwidth)
+
+    | Message Size | Ring Time | Tree Time | Winner |
+    |-------------|-----------|-----------|--------|
+    | 100 KB | 128 μs | 24 μs | Tree |
+    | 1 MB | 146 μs | 132 μs | Tree |
+    | 10 MB | 324 μs | 1.2 ms | Ring |
+    | 100 MB | 2.1 ms | 12 ms | Ring |
+
 ## Key Takeaways
 
 1. **Seven primitives suffice**: All distributed training communication uses these building blocks.

@@ -130,6 +130,105 @@ Key cost optimizations:
 
 1. Calculate the GPU-hour cost to train a 70B dense model for 2T tokens on H100s at $4/hr, assuming 45% MFU.
 
+??? success "Solution"
+    **Total FLOPs required:**
+
+    $$F_{total} = 6 \times P \times D = 6 \times 70 \times 10^9 \times 2 \times 10^{12} = 8.4 \times 10^{23} \text{ FLOPs}$$
+
+    **Effective compute per GPU-hour:**
+
+    $$F_{GPU-hr} = \text{MFU} \times \text{Peak} \times 3600 \text{ s}$$
+    $$= 0.45 \times 1979 \times 10^{12} \times 3600 = 3.21 \times 10^{18} \text{ FLOPs/GPU-hour}$$
+
+    **Total GPU-hours required:**
+
+    $$\text{GPU-hours} = \frac{8.4 \times 10^{23}}{3.21 \times 10^{18}} = 261,682 \text{ GPU-hours}$$
+
+    **Total cost:**
+
+    $$\text{Cost} = 261,682 \times \$4 = \boxed{\$1,046,728 \approx \$1.05\text{M}}$$
+
+    **Sanity check**: This is in the range of published training costs for models of this scale.
+
 2. You can choose between (a) 512 GPUs at 50% MFU or (b) 1024 GPUs at 35% MFU. Which is more cost-effective for a fixed training FLOP budget?
 
+??? success "Solution"
+    **Key insight**: Cost depends on GPU-hours, not raw GPU count.
+
+    For a fixed FLOP budget $F$:
+
+    $$\text{Time} = \frac{F}{\text{GPUs} \times \text{MFU} \times \text{Peak}}$$
+
+    $$\text{GPU-hours} = \text{GPUs} \times \text{Time} = \frac{F}{\text{MFU} \times \text{Peak}}$$
+
+    **Cost is inversely proportional to MFU** (not GPU count!):
+
+    **(a) 512 GPUs at 50% MFU:**
+    $$\text{Cost}_a \propto \frac{1}{0.50} = 2.0$$
+
+    **(b) 1024 GPUs at 35% MFU:**
+    $$\text{Cost}_b \propto \frac{1}{0.35} = 2.86$$
+
+    **Comparison:**
+    $$\frac{\text{Cost}_b}{\text{Cost}_a} = \frac{2.86}{2.0} = 1.43\times$$
+
+    **Option (a) is 43% cheaper** for the same training budget.
+
+    | Configuration | Relative Cost | Training Time |
+    |---------------|---------------|---------------|
+    | 512 GPUs @ 50% MFU | 1.00× | Longer |
+    | 1024 GPUs @ 35% MFU | 1.43× | Shorter |
+
+    **Lesson**: Efficiency matters more than parallelism degree for cost optimization. Only scale up if you can maintain high MFU.
+
 3. A spot instance costs $1.50/hr but has 5% chance of preemption per hour. On-demand costs $4/hr. If checkpointing overhead is 5% of training time, at what preemption frequency does spot become more expensive than on-demand?
+
+??? success "Solution"
+    **Setup:**
+
+    - Spot rate: $R_s = \$1.50$/hr
+    - On-demand rate: $R_d = \$4.00$/hr
+    - Checkpoint overhead: 5% of training time
+    - Base training time: $T$ hours
+
+    **On-demand cost:**
+    $$C_d = R_d \times T = 4T$$
+
+    **Spot effective time:**
+
+    With checkpoint overhead and preemption losses:
+    $$T_{eff} = T \times (1 + \text{checkpoint overhead} + \text{preemption overhead})$$
+
+    **Preemption model:**
+
+    If checkpoint interval is $c$ hours and preemption rate is $p$ per hour:
+
+    - Expected preemptions: $\approx p \times T_{eff}$
+    - Average lost work per preemption: $c/2$ hours
+    - Total lost time: $\frac{c}{2} \times p \times T_{eff}$
+
+    For hourly checkpoints ($c = 1$) with 5% overhead:
+    $$T_{eff} = T(1.05 + 0.5p \times T_{eff})$$
+
+    Solving: $T_{eff} = \frac{1.05T}{1 - 0.5p}$ (for small $pT$)
+
+    **Break-even condition:**
+    $$1.50 \times T_{eff} = 4.00 \times T$$
+    $$T_{eff} = 2.67T$$
+
+    Substituting:
+    $$\frac{1.05}{1 - 0.5p} = 2.67$$
+    $$1.05 = 2.67(1 - 0.5p)$$
+    $$1.05 = 2.67 - 1.33p$$
+    $$1.33p = 1.62$$
+    $$p = 1.22 = \boxed{122\%\text{ per hour}}$$
+
+    **Interpretation:** Spot remains cheaper even with very high preemption rates (>100%/hr) because the price differential is so large (2.67×). In practice, real preemption rates of 5-15% make spot instances highly cost-effective if you have robust checkpointing.
+
+    **Practical guidance:**
+
+    | Preemption Rate | Spot Multiplier | Still Cheaper? |
+    |-----------------|-----------------|----------------|
+    | 5%/hr | 1.08× | Yes (1.62 vs 4.00) |
+    | 20%/hr | 1.17× | Yes (1.76 vs 4.00) |
+    | 50%/hr | 1.40× | Yes (2.10 vs 4.00) |

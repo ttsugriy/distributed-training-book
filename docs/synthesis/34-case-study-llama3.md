@@ -655,6 +655,233 @@ if __name__ == "__main__":
 
 6. **Batch size dynamics**: LLaMA 3 increased batch from 4M to 16M tokens. If critical batch size scaled from 2M to 10M during training, estimate the compute efficiency at each phase.
 
+??? success "Solution"
+    **Exercise 1: Parallelism Trade-offs (PP=8 vs PP=16 vs PP=32)**
+
+    **Memory per GPU with Pipeline Parallelism:**
+
+    For LLaMA 3 405B with 126 layers:
+
+    | Config | Layers/Stage | Parameters/GPU | Memory Savings vs PP=16 |
+    |--------|--------------|----------------|-------------------------|
+    | PP=8 | 126/8 ≈ 16 | 405B/8 = 50.6B | -50% (uses more) |
+    | PP=16 | 126/16 ≈ 8 | 405B/16 = 25.3B | baseline |
+    | PP=32 | 126/32 ≈ 4 | 405B/32 = 12.7B | +50% savings |
+
+    **Pipeline Bubble Calculation:**
+
+    Using 1F1B schedule with $m$ microbatches and $p$ stages:
+    $$\text{Bubble fraction} = \frac{p-1}{m+p-1}$$
+
+    Assuming $m = 64$ microbatches:
+
+    | PP | Stages (p) | Bubble Fraction | Efficiency Loss |
+    |----|------------|-----------------|-----------------|
+    | 8 | 8 | $\frac{7}{71} = 9.9\%$ | 9.9% |
+    | 16 | 16 | $\frac{15}{79} = 19.0\%$ | 19.0% |
+    | 32 | 32 | $\frac{31}{95} = 32.6\%$ | 32.6% |
+
+    **Trade-off Analysis:**
+
+    $$\boxed{\text{PP=16 balances memory (25.3B/GPU) with acceptable bubble (19\%)}}$$
+
+    PP=32 saves memory but wastes 1/3 of compute in bubbles.
+
+    **Exercise 2: TP Scaling Limit**
+
+    **Communication Model:**
+
+    AllReduce time: $T = \alpha + \frac{M}{\beta}$
+
+    Where:
+    - $\alpha$ = latency (1 μs NVLink, 5 μs IB)
+    - $M$ = message size
+    - $\beta$ = bandwidth (900 GB/s NVLink, 50 GB/s IB)
+
+    **TP=8 (within node, NVLink):**
+    $$T_8 = 1\mu s + \frac{M}{900 \text{ GB/s}}$$
+
+    **TP=16 (across nodes, IB for inter-node):**
+    For TP=16, we use hierarchical AllReduce:
+    - Intra-node (8 GPUs): NVLink
+    - Inter-node (2 groups): IB
+
+    $$T_{16} = 2 \times (5\mu s + \frac{M/2}{50 \text{ GB/s}}) + 1\mu s + \frac{M}{900 \text{ GB/s}}$$
+
+    **Break-even point:**
+
+    Set $T_8 = T_{16}$ (accounting for 2× AllReduce operations per layer in TP):
+
+    For TP=8: 2 AllReduces of size $M$
+    For TP=16: 2 AllReduces of size $M$ but split across more GPUs
+
+    The per-GPU computation with TP=16 is half that of TP=8, so compute time halves.
+
+    Break-even when compute savings > communication overhead:
+
+    $$\frac{T_{compute}}{2} + T_{comm,16} < T_{compute} + T_{comm,8}$$
+
+    Solving for typical transformer layer with H=16384:
+    $$M = 2 \times B \times S \times H = 2 \times 1 \times 8192 \times 16384 = 268 \text{ MB}$$
+
+    At this size, NVLink advantage dominates. TP=16 only wins when:
+    $$\boxed{M > 2 \text{ GB (rarely practical for single AllReduce)}}$$
+
+    **Conclusion:** TP=8 (node-local) is almost always better than TP=16 due to NVLink's 18× bandwidth advantage.
+
+    **Exercise 3: FSDP Overlap**
+
+    **Given:**
+    - DP communication volume: 200 GB (full model gather)
+    - Network bandwidth: 50 GB/s
+    - Communication time: $T_{comm} = \frac{200}{50} = 4$ seconds
+
+    **Overlap requirement:**
+
+    To fully hide communication, compute must take at least as long:
+    $$T_{compute} \geq T_{comm} = 4 \text{ seconds}$$
+
+    **LLaMA 3 405B compute per forward pass:**
+
+    FLOPs per token: $2\Psi = 2 \times 405 \times 10^9 = 810$ GFLOPs
+
+    For batch of 1M tokens:
+    $$F_{fwd} = 810 \times 10^9 \times 10^6 = 8.1 \times 10^{17} \text{ FLOPs}$$
+
+    At 50% MFU on H100 (990 TFLOP/s effective):
+    $$T_{compute} = \frac{8.1 \times 10^{17}}{990 \times 10^{12}} = 818 \text{ seconds (per GPU)}$$
+
+    Wait—this is for full model. Per DP shard with FSDP, compute is distributed.
+
+    **Per-layer analysis (more practical):**
+
+    Per layer compute time ≈ $\frac{818}{126} \approx 6.5$ seconds
+
+    Per layer AllGather: $\frac{200/126}{50} \approx 32$ ms
+
+    $$\boxed{\text{Overlap fraction needed} = \frac{32 \text{ ms}}{6.5 \text{ s}} \approx 0.5\%}$$
+
+    The compute vastly exceeds communication per layer, so minimal overlap suffices.
+
+    **Exercise 4: Context Parallelism**
+
+    **Standard attention memory scaling:**
+
+    KV cache per layer: $2 \times B \times S \times H$ (K and V, in FP16)
+
+    For S=128K, H=16384, B=1:
+    $$M_{KV} = 2 \times 2 \times 1 \times 128000 \times 16384 = 8.4 \text{ GB per layer}$$
+
+    Total for 126 layers: $8.4 \times 126 = 1,058$ GB (impossible on single GPU!)
+
+    **With Context Parallelism (CP=8):**
+
+    Each GPU handles $S/8 = 16K$ tokens of context.
+
+    Local KV cache: $\frac{8.4}{8} = 1.05$ GB per layer per GPU
+
+    **Additional communication per layer:**
+
+    Ring attention requires passing KV blocks between CP ranks:
+    - Each GPU sends its KV block to next GPU in ring
+    - Message size: $2 \times 2 \times B \times (S/CP) \times H = 1.05$ GB
+    - Number of sends per layer: $CP - 1 = 7$
+
+    Total KV communication per layer:
+    $$\text{Comm} = 7 \times 1.05 \text{ GB} = 7.35 \text{ GB}$$
+
+    At 50 GB/s (IB between nodes):
+    $$T_{KV} = \frac{7.35}{50} = 147 \text{ ms per layer}$$
+
+    **Comparison:**
+
+    | Approach | Memory/GPU | Communication |
+    |----------|------------|---------------|
+    | Standard (no CP) | 1,058 GB total | 0 |
+    | CP=8 | 132 GB/GPU | 147 ms/layer |
+
+    $$\boxed{\text{CP=8 trades 147 ms/layer communication for 8× memory reduction}}$$
+
+    Without CP, 128K context is impossible. With CP, it's feasible at ~18.5s additional communication for full forward pass.
+
+    **Exercise 5: Failure Analysis**
+
+    **Scenario A: 5-minute recovery**
+
+    - Failures per day: 10
+    - Recovery time: 5 minutes = 300 seconds
+    - Daily recovery overhead: $10 \times 300 = 3000$ seconds = 50 minutes
+
+    Daily training time: 24 hours = 1440 minutes
+
+    $$\text{Time lost} = \frac{50}{1440} = 3.5\%$$
+
+    **Scenario B: 30-second in-memory recovery**
+
+    - Recovery time: 30 seconds
+    - Daily recovery overhead: $10 \times 30 = 300$ seconds = 5 minutes
+
+    $$\text{Time lost} = \frac{5}{1440} = 0.35\%$$
+
+    **Over full training run (85 days for 2T tokens):**
+
+    | Recovery Method | Daily Loss | Total Days Lost | Effective Training |
+    |-----------------|------------|-----------------|-------------------|
+    | 5-min checkpoint | 3.5% | 3.0 days | 82 days |
+    | 30-sec in-memory | 0.35% | 0.3 days | 84.7 days |
+
+    $$\boxed{\text{In-memory recovery saves } 2.7 \text{ days (3.2\% improvement)}}$$
+
+    **Additional considerations:**
+    - Work lost between checkpoints (typically 10-30 min intervals)
+    - With 5-min recovery: lose avg 15 min work per failure = 150 min/day = 10% additional
+    - With 30-sec recovery: lose avg 1 min work = 10 min/day = 0.7% additional
+
+    **Exercise 6: Batch Size Dynamics**
+
+    **Critical batch size theory:**
+
+    Compute efficiency when $B < B_{crit}$:
+    $$\eta = \frac{B}{B + B_{crit}}$$
+
+    When $B > B_{crit}$:
+    $$\eta \approx 1 - \frac{B_{crit}}{2B}$$
+
+    **Phase 1: Early training (B=4M, B_crit=2M)**
+
+    $$\eta_1 = 1 - \frac{2M}{2 \times 4M} = 1 - 0.25 = 75\%$$
+
+    Training is efficient—batch exceeds critical batch size.
+
+    **Phase 2: Mid training (B=8M, B_crit=5M)**
+
+    $$\eta_2 = 1 - \frac{5M}{2 \times 8M} = 1 - 0.31 = 69\%$$
+
+    Still efficient, but critical batch size is catching up.
+
+    **Phase 3: Late training (B=16M, B_crit=10M)**
+
+    $$\eta_3 = 1 - \frac{10M}{2 \times 16M} = 1 - 0.31 = 69\%$$
+
+    Efficiency maintained by scaling batch size with critical batch size.
+
+    **What if batch size stayed at 4M?**
+
+    Late training with B=4M, B_crit=10M:
+    $$\eta_{fixed} = \frac{4M}{4M + 10M} = 28.6\%$$
+
+    **Summary:**
+
+    | Phase | Batch Size | B_crit | Efficiency | vs Fixed B=4M |
+    |-------|------------|--------|------------|---------------|
+    | Early | 4M | 2M | 75% | 75% |
+    | Mid | 8M | 5M | 69% | 44% |
+    | Late | 16M | 10M | 69% | 29% |
+
+    $$\boxed{\text{Dynamic batching maintains 69-75\% efficiency vs 29\% with fixed batch}}$$
+
+    The 2-3× efficiency gain from dynamic batch sizing saves weeks of training time.
+
 ## Key Takeaways
 
 1. **Scale demands 4D+ parallelism**: 405B parameters across 16K GPUs requires combining TP, PP, DP, and CP.

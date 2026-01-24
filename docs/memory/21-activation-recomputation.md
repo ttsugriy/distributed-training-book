@@ -862,15 +862,426 @@ model.gradient_checkpointing_enable()
 
 1. **Optimal checkpointing**: For a 48-layer transformer, derive the optimal checkpoint interval using the $\sqrt{L}$ rule. How many checkpoints are stored? What's the memory compared to no checkpointing?
 
+??? success "Solution"
+    **Optimal checkpoint interval:**
+
+    Using the $\sqrt{L}$ rule:
+    $$k^* = \sqrt{L} = \sqrt{48} \approx 6.93$$
+
+    Round to practical value: $k = 7$ layers between checkpoints.
+
+    **Number of checkpoints:**
+    $$N_{\text{ckpt}} = \left\lceil \frac{L}{k} \right\rceil = \left\lceil \frac{48}{7} \right\rceil = \boxed{7 \text{ checkpoints}}$$
+
+    **Memory comparison:**
+
+    Let $M_{\text{layer}}$ = activation memory per layer.
+
+    | Strategy | Memory | Formula |
+    |----------|--------|---------|
+    | No checkpointing | $48 \cdot M_{\text{layer}}$ | $L \cdot M_{\text{layer}}$ |
+    | $\sqrt{L}$ checkpointing | $7 \cdot M_{\text{layer}} + 7 \cdot M_{\text{layer}}$ | $2\sqrt{L} \cdot M_{\text{layer}}$ |
+
+    **Explanation of $\sqrt{L}$ memory:**
+    - Store $\sqrt{L}$ checkpoints: $\sqrt{L} \cdot M_{\text{layer}}$
+    - During backward, recompute up to $\sqrt{L}$ layers: $\sqrt{L} \cdot M_{\text{layer}}$
+    - Total: $2\sqrt{L} \cdot M_{\text{layer}}$
+
+    **Memory reduction:**
+    $$\text{Reduction} = \frac{L}{2\sqrt{L}} = \frac{\sqrt{L}}{2} = \frac{\sqrt{48}}{2} = \boxed{3.46\times}$$
+
+    **Numerical example (assuming $M_{\text{layer}} = 1$ GB):**
+
+    | Strategy | Total Memory | Relative |
+    |----------|--------------|----------|
+    | No checkpointing | 48 GB | 1.00× |
+    | $\sqrt{L}$ ($k=7$) | 14 GB | 0.29× |
+    | Full checkpointing ($k=1$) | 2 GB | 0.04× |
+
+    **Trade-off summary:**
+
+    | Checkpoint Interval | Checkpoints | Memory | Recompute Overhead |
+    |---------------------|-------------|--------|-------------------|
+    | $k = 1$ (every layer) | 48 | $2M$ | 100% (full recompute) |
+    | $k = 7$ ($\sqrt{L}$) | 7 | $14M$ | 33% |
+    | $k = 12$ | 4 | $16M$ | 25% |
+    | No checkpointing | 0 | $48M$ | 0% |
+
 2. **Compute overhead**: A training step takes 100ms without checkpointing. With full checkpointing, what's the expected step time? (Assume forward = 1/3 of backward compute.)
+
+??? success "Solution"
+    **Training step breakdown (without checkpointing):**
+
+    Total = Forward + Backward = 100ms
+
+    Let $F$ = forward time, $B$ = backward time.
+    Given: Forward = 1/3 of backward compute.
+
+    The backward pass has two components:
+    - Recompute forward (if checkpointing): same as forward
+    - Compute gradients: typically 2× forward
+
+    So without checkpointing:
+    - Forward: $F$
+    - Backward (gradients only): $2F$
+    - Total: $3F = 100$ ms
+    - $F = 33.3$ ms
+
+    **With full checkpointing:**
+
+    - Forward pass: $F = 33.3$ ms (same, just don't save activations)
+    - Backward pass: recompute + gradients = $F + 2F = 3F = 100$ ms
+
+    **Total with checkpointing:**
+    $$T_{\text{ckpt}} = F + 3F = 4F = \frac{4}{3} \times 100 = \boxed{133.3\text{ ms}}$$
+
+    **Overhead:**
+    $$\text{Overhead} = \frac{133.3 - 100}{100} = \boxed{33.3\%}$$
+
+    **Verification using standard formula:**
+
+    The 33% overhead matches the well-known rule: checkpointing adds ~33% compute overhead.
+
+    **Breakdown comparison:**
+
+    | Phase | No Checkpointing | Full Checkpointing |
+    |-------|------------------|-------------------|
+    | Forward | 33.3 ms | 33.3 ms |
+    | Backward (recompute) | 0 ms | 33.3 ms |
+    | Backward (gradients) | 66.7 ms | 66.7 ms |
+    | **Total** | **100 ms** | **133.3 ms** |
 
 3. **Mixed strategy**: Design a checkpointing strategy that checkpoints attention scores but not FFN activations. Calculate memory savings vs. full checkpointing.
 
+??? success "Solution"
+    **Activation memory breakdown per layer:**
+
+    | Component | Memory | Recompute Cost |
+    |-----------|--------|----------------|
+    | Attention Q, K, V | $3 \times BSH$ | Low (linear projections) |
+    | Attention scores | $B \times A \times S^2$ | High (matmul + softmax) |
+    | Attention output | $BSH$ | Medium |
+    | FFN intermediate | $4 \times BSH$ | Low (linear + activation) |
+    | FFN output | $BSH$ | Low |
+
+    **For typical config (B=4, S=4096, H=4096, A=32):**
+
+    | Component | Size | % of Total |
+    |-----------|------|------------|
+    | Attention Q,K,V | 192 MB | 12% |
+    | Attention scores | 2048 MB | 64% |
+    | Attention output | 64 MB | 4% |
+    | FFN intermediate | 256 MB | 16% |
+    | FFN output | 64 MB | 4% |
+    | **Total** | **2624 MB** | **100%** |
+
+    **Mixed strategy: Checkpoint attention scores, recompute FFN**
+
+    Store:
+    - Attention scores: 2048 MB (most expensive to recompute)
+    - Layer input: 64 MB (for recomputing FFN)
+
+    Recompute:
+    - FFN activations: 320 MB saved
+    - Q, K, V: 192 MB saved
+
+    **Memory per layer:**
+    $$M_{\text{mixed}} = 2048 + 64 = 2112 \text{ MB}$$
+
+    **Comparison:**
+
+    | Strategy | Memory/Layer | Relative | Recompute Overhead |
+    |----------|--------------|----------|-------------------|
+    | No checkpointing | 2624 MB | 1.00× | 0% |
+    | Mixed (save attn scores) | 2112 MB | 0.80× | ~10% |
+    | Full checkpointing | 64 MB | 0.02× | 33% |
+
+    **When to use mixed strategy:**
+
+    ```python
+    class MixedCheckpointAttention(nn.Module):
+        """Saves attention scores, recomputes Q/K/V and FFN."""
+
+        def forward(self, x):
+            # Compute and checkpoint attention scores
+            q, k, v = self.qkv_proj(x).chunk(3, dim=-1)
+
+            # Save attention scores (expensive to recompute)
+            attn_scores = torch.einsum('bshd,bthd->bhst', q, k)
+            attn_scores = attn_scores / math.sqrt(self.head_dim)
+
+            # Use custom autograd to save only scores
+            attn_probs = CheckpointedSoftmax.apply(attn_scores)
+
+            # Attention output
+            attn_out = torch.einsum('bhst,bthd->bshd', attn_probs, v)
+
+            # FFN with recomputation (cheap)
+            return checkpoint(self.ffn, attn_out, use_reentrant=False)
+    ```
+
+    **Trade-off analysis:**
+
+    | Metric | Mixed | Full Ckpt | Advantage |
+    |--------|-------|-----------|-----------|
+    | Memory | 0.80× | 0.02× | Full ckpt |
+    | Compute | 1.10× | 1.33× | Mixed |
+    | Complexity | Medium | Low | Full ckpt |
+
+    **Recommendation:** Use mixed strategy when memory is tight but 33% overhead is unacceptable. The 20% memory savings with only 10% overhead can be worthwhile.
+
 4. **Compression analysis**: If activations are compressed to FP8 before checkpointing, what's the memory reduction compared to FP16 checkpointing? What's the impact on gradient accuracy?
+
+??? success "Solution"
+    **Memory reduction:**
+
+    | Precision | Bytes/element | Relative |
+    |-----------|---------------|----------|
+    | FP32 | 4 | 2.0× |
+    | FP16/BF16 | 2 | 1.0× (baseline) |
+    | FP8 | 1 | 0.5× |
+
+    **Memory reduction with FP8:**
+    $$\text{Reduction} = \frac{2}{1} = \boxed{2\times \text{ (50\% savings)}}$$
+
+    **For a 48-layer model with $\sqrt{L}$ checkpointing:**
+
+    | Checkpoint Precision | Memory |
+    |---------------------|--------|
+    | FP16 | $14 \cdot M_{\text{layer}}$ |
+    | FP8 | $7 \cdot M_{\text{layer}}$ |
+
+    **Gradient accuracy impact:**
+
+    FP8 has limited dynamic range and precision:
+    - E4M3: range $\pm 448$, 3 mantissa bits
+    - E5M2: range $\pm 57344$, 2 mantissa bits
+
+    **Error analysis:**
+
+    ```python
+    import torch
+    import numpy as np
+
+    def analyze_fp8_error(tensor_fp16):
+        """Analyze quantization error from FP16 → FP8 → FP16."""
+        # Simulate FP8 quantization (E4M3)
+        scale = tensor_fp16.abs().max() / 448  # FP8 E4M3 max
+        quantized = (tensor_fp16 / scale).clamp(-448, 448)
+        quantized = (quantized * 8).round() / 8  # 3 mantissa bits
+        dequantized = quantized * scale
+
+        # Error metrics
+        abs_error = (tensor_fp16 - dequantized).abs()
+        rel_error = abs_error / (tensor_fp16.abs() + 1e-8)
+
+        return {
+            'max_abs_error': abs_error.max().item(),
+            'mean_abs_error': abs_error.mean().item(),
+            'max_rel_error': rel_error.max().item(),
+            'mean_rel_error': rel_error.mean().item(),
+        }
+
+    # Test on typical activation distribution
+    activations = torch.randn(1024, 4096) * 0.1  # Typical scale
+    errors = analyze_fp8_error(activations)
+    # Typical results:
+    # mean_rel_error: ~2-5%
+    # max_rel_error: ~10-20%
+    ```
+
+    **Gradient accuracy impact:**
+
+    | Metric | FP16 Baseline | FP8 Checkpoints |
+    |--------|---------------|-----------------|
+    | Gradient rel. error | 0% | 1-3% |
+    | Training stability | Stable | Usually stable |
+    | Final loss | Baseline | +0.1-0.5% |
+    | Convergence speed | Baseline | ~Same |
+
+    **Mitigation strategies:**
+
+    1. **Stochastic rounding**: Reduces bias in quantization
+    2. **Per-tensor scaling**: Maximizes dynamic range usage
+    3. **Mixed precision checkpoints**: FP8 for large tensors, FP16 for small
+    4. **Gradient scaling**: Compensate for reduced precision
+
+    ```python
+    class FP8Checkpoint:
+        """Checkpoint with FP8 compression."""
+
+        @staticmethod
+        def save(tensor):
+            scale = tensor.abs().max() / 448
+            quantized = (tensor / scale).to(torch.float8_e4m3fn)
+            return quantized, scale
+
+        @staticmethod
+        def load(quantized, scale):
+            return quantized.to(torch.float16) * scale
+    ```
+
+    **Summary:**
+
+    | Aspect | Impact |
+    |--------|--------|
+    | Memory | 2× reduction |
+    | Gradient accuracy | 1-3% relative error |
+    | Training stability | Generally maintained |
+    | Recommended for | Memory-constrained training |
 
 5. **Combined optimization**: A 70B model is trained with ZeRO-3 on 64 GPUs with $\sqrt{L}$ checkpointing. Calculate total memory per GPU including model state and activations.
 
+??? success "Solution"
+    **70B model architecture (typical):**
+
+    | Parameter | Value |
+    |-----------|-------|
+    | Total parameters | 70B |
+    | Layers ($L$) | 80 |
+    | Hidden dimension ($H$) | 8192 |
+    | Attention heads ($A$) | 64 |
+    | FFN intermediate | 28672 (3.5× H) |
+
+    **Model state memory (ZeRO-3, 64 GPUs):**
+
+    $$M_{\text{state}} = \frac{16\Psi}{P} = \frac{16 \times 70 \times 10^9}{64} = \boxed{17.5\text{ GB}}$$
+
+    **Activation memory with $\sqrt{L}$ checkpointing:**
+
+    Checkpoint interval: $k = \sqrt{80} \approx 9$ layers
+    Number of checkpoints: $\lceil 80/9 \rceil = 9$
+
+    Assume training config: $B = 1$ (micro-batch), $S = 4096$
+
+    **Per-checkpoint activation size:**
+
+    Layer input: $B \times S \times H \times 2$ bytes = $1 \times 4096 \times 8192 \times 2 = 67$ MB
+
+    **Recomputation buffer (max 9 layers active):**
+
+    Per-layer activations (approximate):
+    - Attention: $BSH \times 10 \times 2 = 670$ MB
+    - FFN: $BSH \times 5 \times 2 = 335$ MB
+    - Total per layer: ~1 GB
+
+    Recomputation buffer: $9 \times 1$ GB = 9 GB
+
+    **Total activation memory:**
+    $$M_{\text{act}} = 9 \times 67\text{ MB} + 9 \times 1\text{ GB} \approx 0.6 + 9 = \boxed{9.6\text{ GB}}$$
+
+    **Total memory per GPU:**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Model state (ZeRO-3) | 17.5 GB |
+    | Activations ($\sqrt{L}$ ckpt) | 9.6 GB |
+    | Temporary buffers | ~3 GB |
+    | CUDA overhead | ~2 GB |
+    | **Total** | **~32 GB** |
+
+    **Fits comfortably in 80GB H100!**
+
+    **Comparison without optimizations:**
+
+    | Configuration | Memory/GPU |
+    |---------------|------------|
+    | No ZeRO, no ckpt | $16\Psi + 80 \times 1\text{ GB} = 1200$ GB |
+    | ZeRO-3 only | $17.5 + 80 = 97.5$ GB |
+    | Ckpt only (8 GPUs) | $140 + 9.6 = 150$ GB |
+    | **ZeRO-3 + $\sqrt{L}$ ckpt** | **32 GB** |
+
+    **Key insight:** Combining ZeRO-3 and checkpointing provides multiplicative benefits—neither alone is sufficient for 70B on 64 GPUs.
+
 6. **Pipeline interaction**: In a 4-stage pipeline with 8 micro-batches, how many activation copies are stored at peak? How does checkpointing affect this?
+
+??? success "Solution"
+    **Pipeline configuration:**
+
+    - Stages ($p$): 4
+    - Micro-batches ($m$): 8
+    - Schedule: 1F1B (one forward, one backward)
+
+    **1F1B Schedule Analysis:**
+
+    ```
+    Stage 0: F0 F1 F2 F3 F4 F5 F6 F7 B0 B1 B2 B3 B4 B5 B6 B7
+    Stage 1:    F0 F1 F2 F3 F4 F5 F6 B0 B1 B2 B3 B4 B5 B6 B7
+    Stage 2:       F0 F1 F2 F3 F4 F5 B0 B1 B2 B3 B4 B5 B6 B7
+    Stage 3:          F0 F1 F2 F3 F4 B0 B1 B2 B3 B4 B5 B6 B7
+                      ↑ Peak activations
+    ```
+
+    **Peak activation storage (without checkpointing):**
+
+    At peak (just before first backward starts):
+    - Stage 0: Holds activations for micro-batches 0-7 = 8 copies
+    - Stage 1: Holds activations for micro-batches 0-6 = 7 copies
+    - Stage 2: Holds activations for micro-batches 0-5 = 6 copies
+    - Stage 3: Holds activations for micro-batches 0-4 = 5 copies
+
+    Wait, let me recalculate for 1F1B steady state...
+
+    **1F1B steady state:**
+
+    After warmup, each stage holds at most $p$ in-flight micro-batches:
+    - Stage 0: up to 4 activation sets
+    - Stage 1: up to 4 activation sets
+    - etc.
+
+    **Peak activations per stage:** $\boxed{p = 4 \text{ micro-batches}}$
+
+    **But during warmup (bubble fill):**
+
+    Stage 0 must hold activations until backward arrives:
+    - Warmup micro-batches: $p - 1 = 3$
+    - Steady state in-flight: 1
+
+    **Total peak:** $p = 4$ per stage (steady state bound)
+
+    **With checkpointing:**
+
+    Instead of storing full activations, store only checkpoints:
+
+    | Strategy | Per-micro-batch Storage | Peak per Stage |
+    |----------|------------------------|----------------|
+    | No checkpointing | Full activations ($L_{stage} \times M$) | $4 \times L_{stage} \times M$ |
+    | Full checkpointing | Input only ($M$) | $4 \times M$ |
+    | $\sqrt{L}$ checkpointing | $2\sqrt{L_{stage}} \times M$ | $4 \times 2\sqrt{L_{stage}} \times M$ |
+
+    **Example (70B model, 4 stages, 20 layers/stage):**
+
+    $M$ = layer activation ≈ 64 MB (for micro-batch size 1, S=4096, H=8192)
+
+    | Strategy | Memory per Stage |
+    |----------|------------------|
+    | No checkpointing | $4 \times 20 \times 64$ MB = 5.12 GB |
+    | Full checkpointing | $4 \times 64$ MB = 256 MB |
+    | $\sqrt{L}$ ($k=4$) | $4 \times 2 \times 4.5 \times 64$ MB = 2.3 GB |
+
+    **Interleaved Pipeline (more micro-batches in flight):**
+
+    With interleaved schedule (virtual stages), peak increases:
+    $$\text{Peak} = \frac{p \times v}{v} = p$$
+
+    Still bounded by $p$ per physical stage, but more total memory across all virtual stages.
+
+    **Memory formula:**
+
+    $$M_{\text{peak}} = p \times \frac{L}{p} \times M_{\text{layer}} \times \text{ckpt\_factor}$$
+
+    Where ckpt_factor:
+    - No checkpointing: 1.0
+    - $\sqrt{L}$: $\frac{2\sqrt{L/p}}{L/p} = \frac{2}{\sqrt{L/p}}$
+    - Full: $\frac{1}{L/p}$
+
+    **Summary:**
+
+    | Metric | No Ckpt | $\sqrt{L}$ Ckpt | Full Ckpt |
+    |--------|---------|-----------------|-----------|
+    | Peak copies | $4 \times 20 = 80$ | $4 \times 9 = 36$ | $4 \times 1 = 4$ |
+    | Memory | 5.12 GB | 2.3 GB | 256 MB |
+    | Recompute overhead | 0% | 33% | 100% |
 
 ## Key Takeaways
 

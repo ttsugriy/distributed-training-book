@@ -156,6 +156,137 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
 1. Estimate the memory per GPU for a 13B model with TP=4, ZeRO-3 across 32 GPUs. Assume batch=8, sequence=4096, hidden=5120, layers=40.
 
+??? success "Solution"
+    **Parallelism configuration:**
+
+    - Total GPUs: 32
+    - TP = 4 (tensor parallel groups)
+    - DP = 32/4 = 8 (data parallel replicas)
+    - ZeRO-3 shards across DP dimension
+
+    **Static memory (ZeRO-3 shards across 32 GPUs):**
+
+    | Component | Formula | Per-GPU |
+    |-----------|---------|---------|
+    | Parameters | $\frac{2\Psi}{32}$ | $\frac{2 \times 13 \times 10^9}{32} = 0.81$ GB |
+    | Gradients | $\frac{2\Psi}{32}$ | 0.81 GB |
+    | Optimizer | $\frac{12\Psi}{32}$ | 4.87 GB |
+    | **Total Static** | | **6.49 GB** |
+
+    **Activation memory:**
+
+    Using formula: $M_{act}^{layer} \approx BSH \times (34 + 5\frac{AS}{H})$
+
+    Assuming 40 attention heads ($A = 40$):
+
+    $$BSH = 8 \times 4096 \times 5120 = 167.8\text{M}$$
+
+    $$34 + 5 \times \frac{40 \times 4096}{5120} = 34 + 160 = 194$$
+
+    $$M_{act}^{layer} = 167.8\text{M} \times 194 \text{ bytes} \approx 32.5 \text{ GB per layer}$$
+
+    **With TP=4**: Activations are distributed, reducing per-GPU cost by ~4×:
+    $$M_{act}^{layer, TP} \approx 8.1 \text{ GB per layer}$$
+
+    **With activation checkpointing** (checkpoint every 4 layers):
+    $$M_{act}^{total} = \frac{40}{4} \times 8.1 \approx 81 \text{ GB}$$
+
+    Wait—this exceeds GPU memory! Let's apply more aggressive checkpointing (every layer):
+    $$M_{act}^{total} \approx 2 \times 8.1 = 16.2 \text{ GB}$$
+
+    **Total memory per GPU:**
+
+    | Component | Memory |
+    |-----------|--------|
+    | Static (ZeRO-3) | 6.5 GB |
+    | Activations (TP=4, checkpointing) | ~15-20 GB |
+    | Temporary buffers | ~5 GB |
+    | **Total** | **~27-32 GB** |
+
+    Fits comfortably in 80GB H100.
+
 2. A training run achieves 150K tokens/s on 64 H100s for a 7B model. Calculate the MFU.
 
+??? success "Solution"
+    **FLOPs per token:**
+
+    $$F_{token} = 6\Psi = 6 \times 7 \times 10^9 = 42 \times 10^9 \text{ FLOPs/token}$$
+
+    **Achieved FLOPs/s:**
+
+    $$F_{achieved} = 42 \times 10^9 \times 150 \times 10^3 = 6.3 \times 10^{15} \text{ FLOP/s} = 6,300 \text{ TFLOP/s}$$
+
+    **Peak FLOPs/s (64 H100s):**
+
+    $$F_{peak} = 64 \times 1979 \text{ TFLOP/s} = 126,656 \text{ TFLOP/s}$$
+
+    **MFU:**
+
+    $$\text{MFU} = \frac{6,300}{126,656} = \boxed{4.97\% \approx 5\%}$$
+
+    **Analysis:** This is a very low MFU, indicating significant inefficiency. Possible causes:
+
+    | Issue | Likely Impact |
+    |-------|---------------|
+    | Small batch size | Underutilized compute |
+    | Excessive pipeline bubbles | Idle time between stages |
+    | Unoptimized kernels | Low SM utilization |
+    | Communication not overlapped | GPUs waiting for network |
+
+    **Expected MFU for well-optimized 7B training:** 40-50%
+
+    At 45% MFU, expected throughput would be:
+    $$\text{tokens/s} = \frac{0.45 \times 126,656 \times 10^{12}}{42 \times 10^9} = 1.36\text{M tokens/s}$$
+
+    The observed 150K is only 11% of this potential.
+
 3. You need to train a 30B model in 30 days on a budget of $2M. Estimate the minimum number of H100s required (at $4/hr) and the required MFU to meet the timeline.
+
+??? success "Solution"
+    **Budget constraint:**
+
+    $$\text{Max GPU-hours} = \frac{\$2,000,000}{\$4/\text{hr}} = 500,000 \text{ GPU-hours}$$
+
+    **Time constraint:**
+
+    $$T_{max} = 30 \text{ days} = 720 \text{ hours}$$
+
+    **GPU constraint from budget:**
+
+    $$P_{max} = \frac{500,000}{720} \approx 694 \text{ GPUs}$$
+
+    Round to practical value: **P = 640 GPUs** (or 512 for power-of-2)
+
+    **Training FLOPs (assuming Chinchilla-optimal 600B tokens):**
+
+    $$F_{total} = 6 \times 30 \times 10^9 \times 600 \times 10^9 = 1.08 \times 10^{23} \text{ FLOPs}$$
+
+    **Required throughput:**
+
+    $$F_{required} = \frac{1.08 \times 10^{23}}{720 \times 3600} = 4.17 \times 10^{16} \text{ FLOP/s}$$
+
+    **Peak throughput with 640 H100s:**
+
+    $$F_{peak} = 640 \times 1979 \times 10^{12} = 1.27 \times 10^{18} \text{ FLOP/s}$$
+
+    **Required MFU:**
+
+    $$\text{MFU}_{required} = \frac{4.17 \times 10^{16}}{1.27 \times 10^{18}} = \boxed{3.3\%}$$
+
+    **Conclusion:** This is easily achievable—well-optimized runs achieve 40-50% MFU.
+
+    **Alternative: Train for more tokens (2T)**
+
+    $$F_{total}^{2T} = 6 \times 30 \times 10^9 \times 2 \times 10^{12} = 3.6 \times 10^{23} \text{ FLOPs}$$
+
+    $$\text{MFU}_{required}^{2T} = \frac{3.6 \times 10^{23} / (720 \times 3600)}{1.27 \times 10^{18}} = 11\%$$
+
+    Still very achievable with standard optimization.
+
+    **Summary:**
+
+    | Scenario | Tokens | GPUs | Required MFU |
+    |----------|--------|------|--------------|
+    | Chinchilla (600B) | 600B | 640 | 3.3% |
+    | Extended (2T) | 2T | 640 | 11% |
+    | Budget-limited | 2T | 512 | 14% |
