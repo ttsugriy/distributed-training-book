@@ -78,14 +78,14 @@ This book introduces many specialized terms. Here's a preview of the core vocabu
 
 | Concept | Intuition | Detailed Coverage |
 |---------|-----------|-------------------|
-| **Data Parallelism** | Replicate the model across GPUs; each processes different data; gradients are averaged | Chapter 7 |
-| **Tensor Parallelism** | Split individual matrix operations across GPUs; requires fast interconnects | Chapter 11 |
-| **Pipeline Parallelism** | Divide layers across GPUs; data flows through stages | Chapter 12 |
-| **AllReduce** | A collective operation that sums values across all GPUs and distributes the result back to everyone | Chapter 4 |
-| **ZeRO** | Memory optimization that shards optimizer states, gradients, or parameters across data-parallel replicas | Chapter 8 |
-| **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 21 |
-| **MFU** (Model FLOP Utilization) | Fraction of theoretical peak FLOP/s actually achieved; the key efficiency metric | Chapter 6 |
-| **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 20 |
+| **Data Parallelism** | Replicate the model across GPUs; each processes different data; gradients are averaged | Chapter 14 |
+| **Tensor Parallelism** | Split individual matrix operations across GPUs; requires fast interconnects | Chapter 15 |
+| **Pipeline Parallelism** | Divide layers across GPUs; data flows through stages | Chapter 16 |
+| **AllReduce** | A collective operation that sums values across all GPUs and distributes the result back to everyone | Chapter 11 |
+| **ZeRO** | Memory optimization that shards optimizer states, gradients, or parameters across data-parallel replicas | Chapter 20 |
+| **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 31 |
+| **MFU** (Model FLOP Utilization) | Fraction of theoretical peak FLOP/s actually achieved; the key efficiency metric | Chapter 13 |
+| **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 30 |
 
 Don't worry if these don't fully click yet—each will become concrete through derivations and examples.
 
@@ -117,3 +117,64 @@ By the end of this book, you'll have:
 4. **Debugging intuition** to identify bottlenecks quickly
 
 Let's begin with the foundations.
+
+## Exercises
+
+1. Calculate the total memory required to train a 13B parameter model with mixed precision training using Adam optimizer. How many H100 GPUs (80GB each) would you need at minimum just to hold the model state?
+
+??? success "Solution"
+    **Memory breakdown for mixed precision with Adam:**
+
+    $$\text{Memory} = 2\Psi + 2\Psi + 12\Psi = 16\Psi \text{ bytes}$$
+
+    For 13B parameters:
+
+    $$\text{Memory} = 16 \times 13 \times 10^9 = 208 \text{ GB}$$
+
+    **Minimum GPUs needed:**
+
+    $$\text{GPUs} = \lceil \frac{208 \text{ GB}}{80 \text{ GB}} \rceil = 3 \text{ GPUs}$$
+
+    In practice, you'd need more to account for activations, batch data, and framework overhead. A typical choice would be 4-8 GPUs.
+
+2. You want to train a 7B parameter model on 2 trillion tokens. Using a single H100 (1979 TFLOP/s peak), how long would training take assuming 50% of peak utilization? Express your answer in days.
+
+??? success "Solution"
+    **Training time formula:**
+
+    $$T = \frac{6 \cdot N \cdot D}{F \cdot \eta}$$
+
+    Where $\eta$ is the utilization factor (0.5).
+
+    **Calculation:**
+
+    $$T = \frac{6 \times 7 \times 10^9 \times 2 \times 10^{12}}{1979 \times 10^{12} \times 0.5}$$
+
+    $$T = \frac{84 \times 10^{21}}{989.5 \times 10^{12}} = 84.9 \times 10^6 \text{ seconds}$$
+
+    **Converting to days:**
+
+    $$T = \frac{84.9 \times 10^6}{86400} \approx 983 \text{ days} \approx 2.7 \text{ years}$$
+
+    This is why we need hundreds of GPUs—to reduce this to weeks or months.
+
+3. A training run achieves 35% Model FLOP Utilization (MFU). If you're paying $2 per GPU-hour, what fraction of your compute budget is being "wasted" on inefficiency? If the total training cost is $10 million, how much money is lost to this inefficiency?
+
+??? success "Solution"
+    **Efficiency analysis:**
+
+    At 35% MFU, 65% of theoretical compute capacity is unused.
+
+    However, "waste" depends on what's achievable. State-of-the-art distributed training typically achieves 40-50% MFU due to fundamental overheads (communication, memory bandwidth limits, pipeline bubbles).
+
+    **If we assume 50% MFU is achievable:**
+
+    - Current efficiency: 35%
+    - Achievable efficiency: 50%
+    - Relative waste: $\frac{50\% - 35\%}{50\%} = 30\%$
+
+    **Cost of inefficiency:**
+
+    $$\text{Wasted cost} = \$10M \times 0.30 = \$3M$$
+
+    **Key insight:** Improving from 35% to 50% MFU would either save $3M or equivalently allow 43% more training for the same budget.

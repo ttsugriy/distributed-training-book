@@ -7,6 +7,10 @@ subtitle: "Principles, Practice, and the Future"
 We began with seven collective primitives and end with systems training trillion-parameter models across thousands of GPUs. The journey revealed that distributed training is not a collection of tricks but a coherent mathematical discipline.
 </div>
 
+<div class="investigation-question" markdown>
+**The Question**: What do LLaMA 3, DeepSeek-V3, and Mixtral have in common? Despite different architectures—dense transformer, MLA-based sparse MoE, and grouped-query sparse MoE—they all arrive at similar parallelism strategies. Why? The answer reveals the fundamental constraints that govern all distributed training.
+</div>
+
 ## The Unified Framework
 
 This book argued that distributed training has an underlying algebraic structure. Understanding this structure—rather than memorizing configurations—enables reasoning about systems you've never seen.

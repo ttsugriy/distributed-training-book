@@ -52,14 +52,16 @@ By the end of this book, you'll be able to:
 
 The book is structured in eight parts that build on each other:
 
-- **Part I: Foundations** establishes the mental models—roofline, communication costs, estimation
-- **Part II: Scaling Laws** connects compute budgets to model and data sizing
-- **Part III: The Algebra of Collectives** treats communication primitives as algebraic operations
-- **Part IV: Parallelism from Properties** derives each strategy from mathematical foundations
-- **Part V: Memory as a Dimension** covers techniques that trade communication for memory
-- **Part VI: Composition and Resilience** combines strategies and handles failures
-- **Part VII: Efficiency Frontiers** explores compression, reduced precision, and overlapping
-- **Part VIII: Synthesis** applies everything to real case studies
+| Part | Title | Chapters | Focus |
+|------|-------|----------|-------|
+| I | Foundations | 1–6 | Mental models—roofline, communication costs, estimation |
+| II | Scaling Laws | 7–10 | Compute budgets, model sizing, data sizing |
+| III | The Algebra of Collectives | 11–13 | Communication primitives as algebraic operations |
+| IV | Parallelism from Properties | 14–18 | Deriving each strategy from mathematical foundations |
+| V | Memory as a Dimension | 19–22 | Techniques that trade communication for memory |
+| VI | Composition and Resilience | 23–27 | Combining strategies and handling failures |
+| VII | Efficiency Frontiers | 28–31 | Compression, reduced precision, and overlapping |
+| VIII | Synthesis | 32–37 | Case studies and real-world applications |
 
 Read sequentially for the full derivation experience, or jump to specific chapters when you need them.
 

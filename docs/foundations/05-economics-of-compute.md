@@ -33,7 +33,7 @@ GPU cost typically dominates (80%+ of total).
 |-----|-----------|----------------|------|
 | H100 80GB | $4-5/hr | $2-3/hr | $1-2/hr |
 | A100 80GB | $2-3/hr | $1.50-2/hr | $0.50-1/hr |
-| H200 | ~$6/hr | TBD | Limited |
+| H200 | ~$6/hr | ~$4-5/hr | Limited |
 
 Spot instances can provide 2-3× cost reduction but require checkpoint resilience.
 
