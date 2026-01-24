@@ -11,6 +11,11 @@ Every bit costs bandwidth. Every mantissa bit costs compute. Mixed-precision tra
 **The Question**: FP32 has 23 mantissa bits. FP16 has 10. BF16 has 7. Yet all three train similar quality models. Why don't those 16 missing bits matter—and when do they?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 2 (arithmetic intensity and hardware capabilities)
+
+    **Key insight**: Training tolerates low precision in forward/backward passes because gradients are averaged over many samples. BF16's 8-bit exponent preserves dynamic range (critical for large gradients); FP32 master weights preserve precision across many small updates. FP8 pushes the frontier further with careful scaling.
+
 ## The Anatomy of Floating-Point
 
 To understand reduced precision, we must first understand what we're reducing.

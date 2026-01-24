@@ -11,6 +11,15 @@ Mistral AI demonstrated that architectural efficiency can rival scale. Through s
 **The Question**: Mistral 7B matches LLaMA 2 13B performance with half the parameters. Mixtral 8x7B matches LLaMA 2 70B while activating only 13B parameters. What architectural innovations enable this efficiency, and what are the distributed training implications?
 </div>
 
+!!! tip "New Concepts Introduced"
+    This case study introduces architectural innovations for efficiency:
+
+    - **Sliding Window Attention (SWA)**: Limits attention to a local window of tokens, reducing memory from O(n²) to O(n·w) where w is window size
+    - **Grouped-Query Attention (GQA)**: Shares key-value heads across multiple query heads, reducing KV cache by 4-8× with minimal quality loss
+    - **Sparse MoE at scale**: Mixtral's 8×7B and 8×22B demonstrate production sparse mixture-of-experts
+
+    These techniques combine multiplicatively—SWA + GQA together can reduce KV cache by 32×.
+
 ## The Mistral Architecture Philosophy
 
 Mistral AI's approach inverts the typical scaling narrative. Instead of asking "how do we train larger models?", they ask "how do we maximize quality per FLOP?" This leads to different architectural choices:

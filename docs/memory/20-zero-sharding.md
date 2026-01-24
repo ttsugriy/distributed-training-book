@@ -11,6 +11,11 @@ The memory equation from Chapter 19 reveals massive redundancy: every GPU stores
 **The Question**: With 8 GPUs, you have 8× the aggregate memory. But standard data parallelism still limits you to the memory of a single GPU. How do we achieve the full 8× without fundamentally changing the training algorithm?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 11 (AllGather, ReduceScatter), Chapter 19 (memory equation)
+
+    **Key insight**: Data parallelism stores P redundant copies of model state. ZeRO shards optimizer states (ZeRO-1), gradients (ZeRO-2), and parameters (ZeRO-3) across GPUs, trading extra AllGather/ReduceScatter communication for near-linear memory scaling.
+
 ## The Redundancy Problem
 
 In data parallel training, every GPU maintains:

@@ -11,6 +11,11 @@ A neural network is a composition of layers: $f = f_L \circ f_{L-1} \circ \cdots
 **The Question**: If we split a 32-layer model into 4 stages of 8 layers each, how much time is wasted to "pipeline bubbles"? Can we reduce it to zero?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 4 (α-β cost model for communication), Chapter 14 (data parallelism context)
+
+    **Key insight**: Pipeline parallelism exploits the sequential structure of neural networks—stages process different micro-batches concurrently. The bubble fraction $(P-1)/(M+P-1)$ shrinks with more micro-batches M, but activation memory grows. Interleaved schedules (1F1B) and ZeroBubble techniques push toward zero overhead.
+
 ## The Separability Property
 
 Neural networks compose functions sequentially:

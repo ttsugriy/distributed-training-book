@@ -72,6 +72,23 @@ We will derive—not just describe—each parallelism strategy from the mathemat
 | Sequence Parallelism | Decomposability | Attention computation |
 | Expert Parallelism | Sparsity | Conditional routing |
 
+## Concepts at a Glance
+
+This book introduces many specialized terms. Here's a preview of the core vocabulary—each concept receives full treatment in later chapters, but early familiarity helps:
+
+| Concept | Intuition | Detailed Coverage |
+|---------|-----------|-------------------|
+| **Data Parallelism** | Replicate the model across GPUs; each processes different data; gradients are averaged | Chapter 7 |
+| **Tensor Parallelism** | Split individual matrix operations across GPUs; requires fast interconnects | Chapter 11 |
+| **Pipeline Parallelism** | Divide layers across GPUs; data flows through stages | Chapter 12 |
+| **AllReduce** | A collective operation that sums values across all GPUs and distributes the result back to everyone | Chapter 4 |
+| **ZeRO** | Memory optimization that shards optimizer states, gradients, or parameters across data-parallel replicas | Chapter 8 |
+| **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 21 |
+| **MFU** (Model FLOP Utilization) | Fraction of theoretical peak FLOP/s actually achieved; the key efficiency metric | Chapter 6 |
+| **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 20 |
+
+Don't worry if these don't fully click yet—each will become concrete through derivations and examples.
+
 ## The Extended Roofline
 
 The original roofline model shows performance bounded by compute or memory bandwidth. For distributed training, we add a third ceiling: **network bandwidth**.

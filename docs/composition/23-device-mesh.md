@@ -11,6 +11,9 @@ A cluster of GPUs is not a flat collection—it's a structured topology with var
 **The Question**: You have 4096 GPUs organized as 512 nodes × 8 GPUs/node. How do you express "tensor parallel within node, data parallel across nodes"? What abstraction makes such compositions natural and correct?
 </div>
 
+!!! abstract "Building On: Parts III–V"
+    You now have all the individual pieces: **collectives** (Part III), **parallelism strategies**—DP, TP, PP, SP, EP (Part IV), and **memory optimizations** like ZeRO (Part V). This part teaches you to compose them. We'll use the device mesh abstraction to combine multiple strategies on the same cluster, matching each strategy to the appropriate level of the hardware hierarchy.
+
 ## From Flat to Structured
 
 Early distributed training treated GPUs as a flat list:

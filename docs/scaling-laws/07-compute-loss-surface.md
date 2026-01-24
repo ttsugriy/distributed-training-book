@@ -11,6 +11,9 @@ Loss is a function of two investments: model size and training data. Understandi
 **The Question**: You have a fixed compute budget C. Should you train a larger model on less data or a smaller model on more data? The loss surface tells us there's an optimal allocation—and most models before 2022 got it wrong.
 </div>
 
+!!! abstract "Building On: Part I Foundations"
+    This part assumes familiarity with the **three walls** (memory, time, cost) from Chapter 1, the **extended roofline** model from Chapter 2, and the **estimation mindset** from Chapter 6. We'll now ask: given that we must distribute training, how do we allocate our compute budget optimally between model size and training data?
+
 ## The Empirical Discovery
 
 In 2020, researchers at OpenAI made a remarkable observation: language model loss follows smooth, predictable power laws. Plot log-loss against log-parameters or log-tokens, and you get straight lines.

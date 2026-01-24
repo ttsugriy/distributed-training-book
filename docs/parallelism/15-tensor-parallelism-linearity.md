@@ -11,6 +11,11 @@ Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. T
 **The Question**: We want to shard a linear layer $Y = XW$ across 8 GPUs. Can we split $W$ column-wise? Row-wise? What about the bias? What about LayerNorm? What about GELU?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 11 (AllReduce, AllGather), Chapter 14 (data parallelism fundamentals)
+
+    **Key insight**: Linear operations (matrix multiplications) can be partitioned across GPUs with a final AllReduce. Non-linear operations (GELU, LayerNorm, Softmax) force synchronization points—understanding which operations are linear determines your communication pattern.
+
 ## The Linearity Property
 
 ### Definition

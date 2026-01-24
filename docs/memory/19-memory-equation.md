@@ -11,6 +11,9 @@ Training large models is fundamentally a memory problem. Before we can solve it,
 **The Question**: A 7B parameter model in fp16 is 14GB. But training it requires 120GB+ of memory. Where does the other 106GB go?
 </div>
 
+!!! abstract "Building On: Parts I and IV"
+    We introduced the **16Ψ memory rule** briefly in Chapter 1. Now we dissect it fully. This part also builds on **data parallelism** (Chapter 14)—understanding how gradients are distributed is essential for ZeRO's memory optimizations in the next chapter. The collectives from Part III (AllGather, ReduceScatter) will reappear as the mechanisms for memory-efficient sharding.
+
 ## The Memory Budget
 
 GPU memory during training holds four categories of data:

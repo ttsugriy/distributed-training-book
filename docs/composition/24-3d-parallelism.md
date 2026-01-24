@@ -11,6 +11,11 @@ No single parallelism strategy scales to thousands of GPUs. Data parallelism was
 **The Question**: You have 1024 GPUs and a 175B parameter model. DP alone: each GPU needs the full model—impossible. TP alone: 1024-way splits create 1023 communication barriers per layer. PP alone: 1023/1024 = 99.9% bubble overhead. How do you combine them to train efficiently?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapters 14–16 (DP, TP, PP fundamentals), Chapter 23 (device mesh abstraction)
+
+    **Key insight**: Each parallelism strategy has an optimal scale. TP works best within nodes (fast NVLink). PP spans nodes with minimal communication. DP scales the outer dimension. The canonical 3D composition: TP within nodes, PP across nodes, DP across replicas.
+
 ## The Limits of Single Strategies
 
 Each parallelism strategy has a natural scale where it excels:

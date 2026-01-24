@@ -11,6 +11,11 @@ The same logical operation—AllReduce—can be implemented many ways. Ring algo
 **The Question**: Why is ring AllReduce bandwidth-optimal? Can we prove it achieves the theoretical minimum communication volume? And when should we use tree algorithms instead?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 4 (α-β cost model), Chapter 11 (collective primitives)
+
+    **Key insight**: Ring algorithms achieve bandwidth-optimality for large messages; tree algorithms minimize latency for small messages. The crossover point from the α-β model tells you which to use.
+
 ## The Algorithm Design Space
 
 AllReduce takes $P$ input vectors and produces $P$ copies of their sum. The question: how do we move and combine this data?

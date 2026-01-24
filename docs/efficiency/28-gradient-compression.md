@@ -11,6 +11,9 @@ Communication costs dominate large-scale training. Gradient compression offers a
 **The Question**: You compress gradients to 1% of their original size, yet the model converges to the same quality. How is this possible? What information is truly necessary for convergence?
 </div>
 
+!!! abstract "Building On: Parts III–VI"
+    We established in Part III that **AllReduce costs** scale with model size and dominate large-scale training. Part IV showed how **data parallelism** requires gradient synchronization every step. Part VI taught composition. Now we ask: can we reduce the communication volume itself? This part explores techniques that push efficiency beyond what basic parallelism offers.
+
 ## The Communication Bottleneck
 
 In data-parallel training, each step requires:

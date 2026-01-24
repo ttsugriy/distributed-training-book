@@ -72,6 +72,15 @@ Messages smaller than 100KB are primarily latency-bound on InfiniBand.
 
 For collective operations, we extend the model with additional terms.
 
+!!! note "Preview: Collectives at a Glance"
+    We'll study collective operations in depth in Part III. For now, here's the intuition:
+
+    - **AllReduce**: Sum (or average) values from all GPUs and give everyone the result
+    - **ReduceScatter**: Sum values, but distribute different parts of the result to each GPU
+    - **AllGather**: Collect pieces from all GPUs and give everyone the full concatenation
+
+    The formulas below show how the α-β model applies to these operations. Don't worry about the details yet—focus on the structure: *latency terms grow with P, but bandwidth terms often don't*.
+
 ### AllReduce
 
 Optimal (ring) algorithm for $P$ processes with $n$ bytes each:

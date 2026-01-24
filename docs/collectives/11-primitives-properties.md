@@ -11,6 +11,9 @@ Every distributed training algorithm is built from a small set of collective ope
 **The Question**: Why is AllReduce = ReduceScatter ∘ AllGather? What properties must hold for this decomposition to be valid? What happens when these properties are violated?
 </div>
 
+!!! abstract "Building On: Parts I–II"
+    This part builds on the **network ceiling** concept from the extended roofline (Chapter 2), the **α-β cost model** (Chapter 4), and the **memory hierarchy** of clusters (Chapter 3). From Part II, we understand that training at scale requires massive data movement. Now we formalize the communication primitives that make this movement possible.
+
 ## The Seven Primitives
 
 Collective operations are the vocabulary of distributed systems. All distributed training communication can be expressed using these primitives.
@@ -108,6 +111,9 @@ P3: [D]              P3: [A B C D]
 ```
 
 **Use case**: Reconstructing full tensors in ZeRO-3.
+
+!!! info "What is ZeRO?"
+    **ZeRO (Zero Redundancy Optimizer)** is a memory optimization technique covered in Chapter 20. It shards optimizer states, gradients, and/or parameters across data-parallel GPUs instead of replicating them. ZeRO-3 shards all three, requiring AllGather to reconstruct parameters for forward/backward passes and ReduceScatter to distribute reduced gradients.
 
 **Volume**: Each process receives $(P-1) \cdot n/P$ bytes.
 

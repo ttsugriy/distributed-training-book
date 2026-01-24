@@ -11,6 +11,11 @@ Activations dominate memory in deep networks. A 7B model's parameters need ~14 G
 **The Question**: The backward pass needs activations from the forward pass. Storing them all requires O(L) memory for L layers. Can we reduce this to O(√L) or even O(1)? What's the compute cost of this trade-off?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 19 (memory equation breakdown)
+
+    **Key insight**: Activations dominate memory for large batch sizes. By checkpointing only at layer boundaries and recomputing intermediates during backward, you trade ~33% extra compute for dramatic memory savings—enabling larger batches and longer sequences.
+
 ## The Activation Memory Problem
 
 During backpropagation, computing gradients requires activations from the forward pass:
@@ -260,69 +265,6 @@ def select_checkpoints(layers: nn.ModuleList,
     return checkpoint_indices
 ```
 
-### Strategy 4: Attention-Specific Checkpointing
-
-Attention has unique memory patterns. The $O(S^2)$ attention scores dominate.
-
-```python
-class CheckpointedAttention(nn.Module):
-    """
-    Attention with selective recomputation.
-
-    Stores Q, K, V but recomputes attention scores.
-    Saves O(S²) memory per head.
-    """
-
-    def __init__(self, hidden_dim: int, num_heads: int):
-        super().__init__()
-        self.num_heads = num_heads
-        self.head_dim = hidden_dim // num_heads
-        self.scale = self.head_dim ** -0.5
-
-        self.qkv = nn.Linear(hidden_dim, 3 * hidden_dim)
-        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        B, S, H = x.shape
-
-        # Compute Q, K, V (stored)
-        qkv = self.qkv(x)
-        q, k, v = qkv.chunk(3, dim=-1)
-
-        # Reshape for multi-head
-        q = q.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
-        k = k.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
-        v = v.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
-
-        # Use checkpointing for attention computation
-        attn_output = torch.utils.checkpoint.checkpoint(
-            self._attention_forward,
-            q, k, v,
-            use_reentrant=False
-        )
-
-        # Output projection
-        output = attn_output.transpose(1, 2).reshape(B, S, H)
-        return self.out_proj(output)
-
-    def _attention_forward(self,
-                          q: torch.Tensor,
-                          k: torch.Tensor,
-                          v: torch.Tensor) -> torch.Tensor:
-        """Core attention computation (recomputed in backward)."""
-        # Attention scores: O(S²) memory NOT stored
-        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
-        attn_weights = F.softmax(scores, dim=-1)
-        return torch.matmul(attn_weights, v)
-```
-
-**Memory savings**:
-
-- Without checkpointing: $2 \times B \times n \times S^2$ bytes for scores + softmax
-- With checkpointing: Only Q, K, V stored ($6BSH$ bytes)
-
-For $S=2048$, $n=32$: saves $4 \times 32 \times 2048^2 \times 2 = 1.07$ GB per layer.
-
 ## PyTorch Checkpoint API
 
 PyTorch provides built-in checkpointing support.
@@ -413,6 +355,69 @@ hidden = checkpoint(
     preserve_rng_state=True  # Important for dropout
 )
 ```
+
+### Strategy 4: Attention-Specific Checkpointing
+
+Attention has unique memory patterns. The $O(S^2)$ attention scores dominate.
+
+```python
+class CheckpointedAttention(nn.Module):
+    """
+    Attention with selective recomputation.
+
+    Stores Q, K, V but recomputes attention scores.
+    Saves O(S²) memory per head.
+    """
+
+    def __init__(self, hidden_dim: int, num_heads: int):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = hidden_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.qkv = nn.Linear(hidden_dim, 3 * hidden_dim)
+        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, S, H = x.shape
+
+        # Compute Q, K, V (stored)
+        qkv = self.qkv(x)
+        q, k, v = qkv.chunk(3, dim=-1)
+
+        # Reshape for multi-head
+        q = q.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+        k = k.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+        v = v.view(B, S, self.num_heads, self.head_dim).transpose(1, 2)
+
+        # Use checkpointing for attention computation
+        attn_output = torch.utils.checkpoint.checkpoint(
+            self._attention_forward,
+            q, k, v,
+            use_reentrant=False
+        )
+
+        # Output projection
+        output = attn_output.transpose(1, 2).reshape(B, S, H)
+        return self.out_proj(output)
+
+    def _attention_forward(self,
+                          q: torch.Tensor,
+                          k: torch.Tensor,
+                          v: torch.Tensor) -> torch.Tensor:
+        """Core attention computation (recomputed in backward)."""
+        # Attention scores: O(S²) memory NOT stored
+        scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+        attn_weights = F.softmax(scores, dim=-1)
+        return torch.matmul(attn_weights, v)
+```
+
+**Memory savings**:
+
+- Without checkpointing: $2 \times B \times n \times S^2$ bytes for scores + softmax
+- With checkpointing: Only Q, K, V stored ($6BSH$ bytes)
+
+For $S=2048$, $n=32$: saves $4 \times 32 \times 2048^2 \times 2 = 1.07$ GB per layer.
 
 ## The Compute Cost Analysis
 

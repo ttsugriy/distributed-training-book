@@ -11,6 +11,15 @@ DeepSeek-V3 demonstrates that training cost can be reduced by an order of magnit
 **The Question**: DeepSeek claims to have trained a 671B parameter model for $5.5M—roughly 10× cheaper than comparable models. What architectural and systems innovations enabled this efficiency, and how do they map to our theoretical frameworks?
 </div>
 
+!!! tip "New Concepts Introduced"
+    This case study introduces several innovations not covered in earlier chapters:
+
+    - **Multi-head Latent Attention (MLA)**: Compresses key-value projections through a learned latent space, dramatically reducing KV cache memory
+    - **DualPipe**: Advanced pipeline parallelism that interleaves two pipelines to halve the bubble fraction
+    - **FP8 Training**: Uses 8-bit floating point for ~1.8× compute speedup with careful quantization
+
+    These techniques represent the current frontier of efficiency optimization.
+
 ## The DeepSeek-V3 Specification
 
 DeepSeek-V3's key specifications:

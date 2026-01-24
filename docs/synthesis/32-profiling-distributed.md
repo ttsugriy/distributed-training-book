@@ -11,6 +11,9 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 **The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOPS Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
 </div>
 
+!!! abstract "Building On: All Previous Parts"
+    This final part synthesizes everything. You understand **rooflines and estimation** (Part I), **optimal resource allocation** (Part II), **collective costs** (Part III), **parallelism strategies** (Part IV), **memory management** (Part V), **composition** (Part VI), and **efficiency techniques** (Part VII). Now we apply this knowledge: diagnose real systems, investigate bottlenecks, and analyze state-of-the-art training runs.
+
 ## The Profiling Imperative
 
 At scale, inefficiency compounds. A 10% inefficiency on one GPU becomes 640 GPU-hours wasted per day on 64 GPUs. Understanding *exactly* where time goes is essential.

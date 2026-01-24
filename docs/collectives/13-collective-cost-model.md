@@ -11,6 +11,11 @@ Armed with α-β analysis and algorithm knowledge, we can predict the cost of an
 **The Question**: Your AllReduce takes 500ms. Is that good or bad? How do you know if you're achieving near-optimal performance? What's the gap between theoretical and achieved, and where does the gap come from?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 4 (α-β model fundamentals), Chapter 12 (ring vs tree algorithms)
+
+    **Key insight**: Every collective has a predictable cost formula. Compare your measured times against these formulas to identify inefficiencies—the gap reveals whether you're limited by latency, bandwidth, or implementation overhead.
+
 ## The Complete Cost Formulas
 
 Using the α-β model, we can predict communication time for any collective.

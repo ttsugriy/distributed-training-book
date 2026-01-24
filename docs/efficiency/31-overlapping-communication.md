@@ -11,6 +11,11 @@ The fastest communication is communication you don't wait for. By overlapping da
 **The Question**: A training step has 100ms of compute and 50ms of communication. The naive approach takes 150ms. Perfect overlap would take 100ms. What determines where you land between these extremes?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 4 (α-β model), Chapter 14 (data parallelism and gradient synchronization)
+
+    **Key insight**: Gradients for later layers are ready first during backpropagation. By overlapping AllReduce with ongoing backward computation, you can hide most communication latency—the goal is max(compute, communication) instead of their sum.
+
 ## The Overlap Opportunity
 
 Consider a typical training iteration:

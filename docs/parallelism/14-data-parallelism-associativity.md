@@ -11,6 +11,9 @@ Data parallelism works because gradient accumulation is associative. This isn't 
 **The Question**: We compute gradients on different batches on different GPUs, then sum them. Why does this give us the same result as computing on the full batch? When does it fail?
 </div>
 
+!!! abstract "Building On: Part III Collectives"
+    This part assumes mastery of **collective operations**—especially AllReduce (Chapter 11), the **ring and tree algorithms** (Chapter 12), and **cost modeling** (Chapter 13). Each parallelism strategy we derive here will rely on specific collectives. Data parallelism, our first strategy, uses AllReduce to synchronize gradients.
+
 ## The Mathematical Foundation
 
 ### The Loss Function Structure

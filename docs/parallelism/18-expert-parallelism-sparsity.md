@@ -11,6 +11,25 @@ Mixture of Experts models activate only a subset of parameters per token. This s
 **The Question**: A model has 8 experts distributed across 8 GPUs. A token is routed to experts on GPUs 3 and 7. How does the token get there and back? What if all tokens want the same expert?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: Chapter 11 (AlltoAll primitive), Chapters 14–15 (data and tensor parallelism context)
+
+    **Key insight**: MoE achieves massive parameter counts with constant compute by activating only a few experts per token. The communication pattern is AlltoAll (tokens to experts, results back). Load balancing is critical—auxiliary losses and capacity factors prevent expert collapse.
+
+## What is Mixture of Experts?
+
+A standard transformer processes every token through the same feedforward network (FFN)—every parameter participates in every computation. **Mixture of Experts (MoE)** replaces this single FFN with multiple parallel FFNs called *experts*, plus a lightweight *router* (or *gate*) that decides which expert(s) process each token.
+
+The key insight: different tokens may benefit from different computations. Rather than forcing all tokens through identical weights, MoE lets the model learn to specialize:
+
+- The **router** examines each token and produces a score for each expert
+- Only the top-scoring expert(s) are activated—typically 1 or 2 out of many (8, 64, or even 128)
+- The selected expert(s) process the token and return their outputs, weighted by routing scores
+
+This creates a powerful asymmetry: the model can have many more parameters (more experts = more capacity) without proportionally increasing compute cost (only a few experts run per token). A model with 64 experts but top-2 routing has 32× more FFN parameters while using only 2× the FFN compute of a dense model.
+
+The challenge is distribution: when experts live on different GPUs, tokens must travel to the right expert and return. This chapter explores how that communication works and how to keep load balanced across experts.
+
 ## The Sparsity Property
 
 Dense neural networks have a fundamental property: every parameter participates in every computation. For a dense feedforward layer:
