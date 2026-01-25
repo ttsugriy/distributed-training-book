@@ -46,7 +46,7 @@ All parallelism strategies answer one question differently: **what do you replic
 | Data Parallel | Data | Model | AllReduce gradients |
 | Tensor Parallel | Model (intra-layer) | Data | AllReduce activations |
 | Pipeline Parallel | Model (inter-layer) | Data | Point-to-point activations |
-| Expert Parallel | Experts | Router, attention | AllToAll tokens |
+| Expert Parallel | Experts | Router, attention | AlltoAll tokens |
 | Sequence Parallel | Sequence | Model | AllGather/ReduceScatter |
 | Context Parallel | Context (attention) | Model | Ring attention |
 
@@ -91,8 +91,7 @@ Every successful system aligns parallelism hierarchy with hardware hierarchy:
 |----------------|---------------|---------------------|
 | Within GPU | Shared memory | None (sequential) |
 | GPU to GPU (NVLink) | ~900 GB/s | Tensor Parallel |
-| Node to Node (InfiniBand) | ~400 GB/s | Pipeline, Data Parallel |
-| Across racks | ~100 GB/s | Data Parallel (FSDP) |
+| Node to Node (InfiniBand) | ~50 GB/s | Pipeline, Data Parallel |
 
 LLaMA 3, DeepSeek-V3, and Mixtral all follow this pattern. Tensor parallelism stays within NVLink domains. Pipeline parallelism crosses nodes when necessary. Data parallelism handles the widest communication domain.
 
@@ -114,7 +113,7 @@ Every high-efficiency system overlaps communication with computation:
 - AllGather parameters during forward pass
 - ReduceScatter gradients during backward pass
 - Prefetch pipeline stages asynchronously
-- AllToAll expert routing overlapped with local compute
+- AlltoAll expert routing overlapped with local compute
 
 The goal is simple: **no GPU should ever wait for the network**. The implementation is complex: bucketing, stream management, and careful dependency tracking.
 
@@ -254,34 +253,34 @@ Early systems (Alpa, FlexFlow, TensorFlow's DTensor) show promise, but manual tu
 
 For practitioners, we recommend building proficiency in layers:
 
-### Layer 1: Fundamentals (Chapters 1-9)
+### Layer 1: Fundamentals (Chapters 1-13)
 
-- Collective primitives and their properties
+- Roofline models and basic concepts
 - The alpha-beta communication model
-- Memory equation and its components
+- Collective primitives and their properties
 - Scaling laws and critical batch size
 
 **Can you**: Estimate training time given model size and hardware? Calculate memory requirements for a 70B model on 80GB GPUs?
 
-### Layer 2: Core Strategies (Chapters 10-20)
+### Layer 2: Parallelism Strategies (Chapters 14-22)
 
 - Data parallelism (DDP and FSDP)
 - Tensor parallelism for attention and FFN
 - Pipeline parallelism with 1F1B scheduling
-- 3D/4D parallelism composition
+- Memory optimization and activation checkpointing
 
 **Can you**: Configure FSDP for a given model? Explain why TP=8 is common for 8-GPU nodes? Calculate pipeline bubble fraction?
 
-### Layer 3: Advanced Techniques (Chapters 21-30)
+### Layer 3: Composition & Resilience (Chapters 23-31)
 
-- Mixed precision training
-- Activation checkpointing
-- Quantization for training
+- 3D/4D/5D parallelism composition
+- Device mesh abstractions
 - Fault tolerance and checkpointing
+- Mixed precision and efficiency frontiers
 
 **Can you**: Debug a loss spike from mixed precision? Choose checkpointing granularity given memory constraints? Design a fault-tolerant training pipeline?
 
-### Layer 4: Synthesis (Chapters 31-37)
+### Layer 4: Synthesis (Chapters 32-37)
 
 - Communication-computation overlap
 - Profiling and optimization

@@ -164,7 +164,7 @@ class ShardingSpec:
     │    └───┘  └───┘  └───┘  └───┘  │    │    on Disk    │
     │       ▲      │      │      │   │    └───────────────┘
     │       └──────┴──────┴──────┘   │
-    │           All-Gather           │
+    │           AllGather           │
     └─────────────────────────────────┘
 ```
 
@@ -288,9 +288,11 @@ class ParallelCheckpointer:
 For a checkpoint of size $C$ bytes across $P$ ranks with filesystem bandwidth $B$:
 
 **Gather-then-Write**:
+
 $$T_{\text{gather}} = \frac{C \cdot (P-1)}{B_{\text{network}}} + \frac{C}{B_{\text{disk}}}$$
 
 **Parallel Write** (with $P$ parallel paths):
+
 $$T_{\text{parallel}} = \frac{C/P}{B_{\text{disk}}/P} = \frac{C}{B_{\text{disk}}}$$
 
 Wait—parallel write with $P$ paths doesn't help if total bandwidth is fixed. But parallel filesystems like Lustre/GPFS provide **aggregate bandwidth scaling**:
@@ -298,6 +300,7 @@ Wait—parallel write with $P$ paths doesn't help if total bandwidth is fixed. B
 $$B_{\text{aggregate}} = \min(P, N_{\text{OSTs}}) \cdot B_{\text{per-OST}}$$
 
 With enough OSTs (Object Storage Targets):
+
 $$T_{\text{parallel}} = \frac{C}{P \cdot B_{\text{per-OST}}}$$
 
 This scales linearly with ranks!
@@ -427,12 +430,15 @@ class AsyncCheckpointer:
 ### Overhead Analysis
 
 **Synchronous checkpoint time**:
+
 $$T_{\text{sync}} = T_{\text{copy}} + T_{\text{write}}$$
 
 **Asynchronous overhead** (time training is blocked):
+
 $$T_{\text{async}} = T_{\text{copy}}$$
 
 With pinned memory and CUDA streams:
+
 $$T_{\text{copy}} = \frac{C}{B_{\text{PCIe}}} \approx \frac{C}{25 \text{ GB/s}}$$
 
 For a 100GB checkpoint shard:
@@ -454,14 +460,17 @@ Let:
 - $f$: checkpoint frequency (checkpoints per step)
 
 **Total time with checkpointing**:
+
 $$T_{\text{total}} = N_{\text{steps}} \cdot T_{\text{step}} \cdot (1 + f \cdot T_{\text{ckpt}}/T_{\text{step}})$$
 
 **Expected work lost per failure**:
+
 $$W_{\text{lost}} = \frac{T_{\text{step}}}{2f}$$
 
 (On average, failure occurs halfway between checkpoints.)
 
 **Expected restarts**:
+
 $$\mathbb{E}[\text{restarts}] = \lambda \cdot T_{\text{total}}$$
 
 ### Optimal Checkpoint Frequency
@@ -475,6 +484,7 @@ Taking derivative with respect to $f$ and setting to zero:
 $$\frac{d T_{\text{expected}}}{df} = N \cdot T_{\text{step}} \cdot \left(\frac{T_{\text{ckpt}}}{T_{\text{step}}} - \frac{\lambda}{2f^2}\right) = 0$$
 
 Solving:
+
 $$f^* = \sqrt{\frac{\lambda \cdot T_{\text{step}}}{2 \cdot T_{\text{ckpt}}}}$$
 
 ### Numerical Example

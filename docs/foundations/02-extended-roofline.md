@@ -35,7 +35,7 @@ $$I_{\text{net}} = \frac{\text{FLOPs}}{\text{Bytes communicated}}$$
 
 This third ceiling often dominates. Consider AllReduce of a 10GB gradient tensor:
 
-- Communication: ~20GB total traffic (reduce-scatter + all-gather)
+- Communication: ~20GB total traffic (ReduceScatter + AllGather)
 - At 400 Gbps InfiniBand: $\frac{20 \times 8}{400} = 0.4$ seconds
 - Compute for same step might be 0.1 seconds
 

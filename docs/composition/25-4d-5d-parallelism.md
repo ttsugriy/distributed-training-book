@@ -42,6 +42,7 @@ Mixture-of-Experts models have different memory characteristics:
 $$M_{\text{experts}} = \frac{E \times \text{ExpertSize}}{T \times P}$$
 
 For a 1T MoE with 128 experts:
+
 $$M_{\text{experts}} = \frac{128 \times 8\text{B} \times 2}{8 \times 16} = 16\text{ GB just for expert parameters}$$
 
 Plus routing creates dynamic load imbalance.
@@ -394,9 +395,11 @@ Standard MoE Layer:
 ```
 
 Memory per expert:
+
 $$M_{\text{expert}} = 2 \times H \times 4H \times 2 \text{ bytes (FP16)} = 16H^2$$
 
 For H=12288, E=128:
+
 $$M_{\text{all\_experts}} = 128 \times 16 \times 12288^2 \approx 310\text{ GB}$$
 
 ### EP Operation
@@ -787,12 +790,15 @@ class FiveDMesh:
 Per-GPU memory with 5D parallelism:
 
 **Parameters**:
+
 $$M_{\text{params}} = \frac{N_{\text{dense}}}{T \times P} + \frac{N_{\text{expert}}}{T \times P \times E}$$
 
 **Optimizer States**:
+
 $$M_{\text{optimizer}} = 4 \times M_{\text{params}}$$
 
 **Activations**:
+
 $$M_{\text{activations}} = \frac{B \times S \times H}{T \times C} \times L_{\text{stage}} \times k_{\text{buffer}}$$
 
 **Example**: 1T MoE (200B dense + 800B experts), 128K context, 16K GPUs

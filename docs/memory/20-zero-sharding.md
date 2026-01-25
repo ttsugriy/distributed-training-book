@@ -176,7 +176,7 @@ Standard data parallelism: $\frac{4(P-1)N}{P}$ bytes (AllReduce only)
 
 But wait—we can be smarter.
 
-### Fused AllReduce-Scatter + AllGather
+### Fused ReduceScatter + AllGather
 
 Instead of AllReduce → AllGather, use:
 1. ReduceScatter gradients (each GPU gets gradient shard)
@@ -211,7 +211,7 @@ def backward_with_gradient_sharding(loss, model, rank, world_size):
     # Standard backward to compute all gradients
     loss.backward()
 
-    # For each parameter, reduce-scatter the gradient
+    # For each parameter, ReduceScatter the gradient
     for name, param in model.named_parameters():
         if param.grad is None:
             continue
@@ -222,7 +222,7 @@ def backward_with_gradient_sharding(loss, model, rank, world_size):
         # Compute shard boundaries
         shard_size = (grad_flat.numel() + world_size - 1) // world_size
 
-        # Reduce-scatter: each GPU gets sum of its shard
+        # ReduceScatter: each GPU gets sum of its shard
         output_shard = torch.zeros(shard_size, device=grad_flat.device)
         dist.reduce_scatter_tensor(output_shard, grad_flat)
 
@@ -275,7 +275,7 @@ ReduceScatter each parameter individually is inefficient. Use bucketing:
 
 ```python
 class GradientBucket:
-    """Accumulate gradients into buckets for efficient reduce-scatter."""
+    """Accumulate gradients into buckets for efficient ReduceScatter."""
 
     def __init__(self, bucket_size_mb: float = 25.0):
         self.bucket_size = int(bucket_size_mb * 1024 * 1024)
@@ -295,14 +295,14 @@ class GradientBucket:
         self.current_size += grad_size
 
     def _flush_bucket(self):
-        """Concatenate and reduce-scatter the current bucket."""
+        """Concatenate and ReduceScatter the current bucket."""
         if not self.current_bucket:
             return
 
         # Flatten all gradients in bucket
         flat_grads = torch.cat([p.grad.view(-1) for p in self.current_bucket])
 
-        # Reduce-scatter
+        # ReduceScatter
         shard_size = (flat_grads.numel() + world_size - 1) // world_size
         output = torch.zeros(shard_size, device=flat_grads.device)
         dist.reduce_scatter_tensor(output, flat_grads)
@@ -380,6 +380,7 @@ Now we pay for parameter gathering:
 - ReduceScatter gradients: $\frac{(P-1) \cdot 2N_l}{P}$ bytes
 
 **Total per step**:
+
 $$V_{ZeRO-3} = 3 \cdot \frac{(P-1)}{P} \cdot 2N = \frac{6(P-1)N}{P}$$
 
 Standard data parallelism: $\frac{4(P-1)N}{P}$ bytes
@@ -452,7 +453,7 @@ class ZeROParameter:
 
     @property
     def grad_shard(self) -> Optional[torch.Tensor]:
-        """Get gradient shard after reduce-scatter."""
+        """Get gradient shard after ReduceScatter."""
         return self.shard.grad
 
 class ZeROLinear(nn.Module):

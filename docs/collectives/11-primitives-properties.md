@@ -254,9 +254,11 @@ After ReduceScatter, process $j$ holds $y_j$ of size $n/P$.
 Each process receives $[y_0, y_1, ..., y_{P-1}]$.
 
 **Result**:
+
 $$[y_0, y_1, ..., y_{P-1}] = \left[\bigoplus_{i} x_i^{(0)}, \bigoplus_{i} x_i^{(1)}, ..., \bigoplus_{i} x_i^{(P-1)}\right]$$
 
 By commutativity and associativity:
+
 $$= \bigoplus_{i} x_i$$
 
 This equals the result of AllReduce. $\square$

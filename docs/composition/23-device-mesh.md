@@ -682,7 +682,7 @@ def redistribute(
 
     - AllGather (shard → replicate)
     - Scatter or chunk (replicate → shard)
-    - AllToAll (reshard to different dimension)
+    - AlltoAll (reshard to different dimension)
     """
     if current_spec.mesh is not target_spec.mesh:
         raise ValueError("Redistribution requires same mesh")
@@ -698,7 +698,7 @@ def redistribute(
         if curr.type == tgt.type:
             # Same placement, no communication needed
             if curr.type == PlacementType.SHARD and curr.tensor_dim != tgt.tensor_dim:
-                # Reshard to different dimension - requires AllToAll
+                # Reshard to different dimension - requires AlltoAll
                 result = _reshard_alltoall(result, curr.tensor_dim, tgt.tensor_dim, group, mesh_size)
         elif curr.type == PlacementType.SHARD and tgt.type == PlacementType.REPLICATE:
             # Shard → Replicate: AllGather
@@ -730,10 +730,10 @@ def _reshard_alltoall(
     group: dist.ProcessGroup,
     world_size: int
 ) -> torch.Tensor:
-    """Reshard from one dimension to another using AllToAll."""
+    """Reshard from one dimension to another using AlltoAll."""
     # Implementation depends on specific requirements
     # This is a simplified placeholder
-    raise NotImplementedError("AllToAll resharding")
+    raise NotImplementedError("AlltoAll resharding")
 ```
 
 ## Mapping Parallelism to Mesh
@@ -1293,11 +1293,11 @@ mesh = auto_mesh(topology, dp_degree=64, tp_degree=8, pp_degree=1)
     | After AllGather | $M \times N$ (8× increase) |
     | After Chunk | $\frac{M}{8} \times N$ |
 
-    **Alternative: AllToAll (fused operation)**
+    **Alternative: AlltoAll (fused operation)**
 
-    AllToAll can do this redistribution directly:
+    AlltoAll can do this redistribution directly:
 
-    $$T_{AllToAll} \approx T_{AllGather} = 10 \text{ ms}$$
+    $$T_{AlltoAll} \approx T_{AllGather} = 10 \text{ ms}$$
 
     Same cost, but lower peak memory (no intermediate full replica).
 

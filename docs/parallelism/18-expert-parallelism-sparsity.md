@@ -136,6 +136,7 @@ Select the $k$ experts with highest routing scores:
 $$S = \{i : g_i \text{ is among top-}k\text{ values}\}$$
 
 Renormalize weights:
+
 $$\tilde{g}_i = \frac{g_i}{\sum_{j \in S} g_j} \text{ for } i \in S$$
 
 **Typical values**: $k = 1$ (Switch Transformer) or $k = 2$ (GShard, original MoE).
@@ -766,6 +767,7 @@ How do gradients flow through the discrete expert selection?
 ### The Differentiability Problem
 
 Top-k selection is non-differentiable:
+
 $$\frac{\partial \text{TopK}(g)}{\partial g} = \text{undefined}$$
 
 We can't backpropagate through the selection operation.
@@ -775,9 +777,11 @@ We can't backpropagate through the selection operation.
 Use the selected weights, which are differentiable:
 
 **Forward**:
+
 $$y = \sum_{i \in S} \tilde{g}_i \cdot E_i(x)$$
 
 **Backward**:
+
 $$\frac{\partial L}{\partial g_i} = \tilde{g}_i \cdot \frac{\partial L}{\partial E_i(x)} \cdot E_i(x)$$
 
 The gradient flows through the routing weights $\tilde{g}_i$, not the selection.

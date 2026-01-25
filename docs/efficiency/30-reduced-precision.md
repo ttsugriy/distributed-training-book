@@ -159,6 +159,7 @@ class MixedPrecisionOptimizer:
 **Why FP32 master weights?**
 
 Weight updates can be tiny:
+
 $$\Delta w = \eta \cdot g \approx 10^{-4} \times 10^{-3} = 10^{-7}$$
 
 In FP16 with weights $\sim 1$:
@@ -588,11 +589,13 @@ For memory-bound operations, reduced precision provides proportional speedup.
 Consider a layer: $y = Wx + b$
 
 With FP16 compute:
+
 $$\hat{y} = \text{fl}(Wx) + b + \epsilon$$
 
 where $|\epsilon| \lesssim n \cdot u \cdot |W||x|$ and $u = 2^{-11}$ for FP16.
 
 Through $L$ layers:
+
 $$|\epsilon_L| \lesssim L \cdot n \cdot u \cdot \prod_{i=1}^L |W_i|$$
 
 **Implications**:
@@ -604,9 +607,11 @@ $$|\epsilon_L| \lesssim L \cdot n \cdot u \cdot \prod_{i=1}^L |W_i|$$
 ### Catastrophic Cancellation
 
 When subtracting nearly equal numbers:
+
 $$\text{fl}(a - b) \approx (a - b)(1 + \delta)$$
 
 If $a \approx b$, relative error explodes:
+
 $$\frac{|\hat{y} - y|}{|y|} \approx \frac{|a|}{|a - b|} \cdot u$$
 
 This occurs in:
@@ -618,11 +623,13 @@ This occurs in:
 ### Overflow in Softmax
 
 Standard softmax implementation overflows:
+
 $$\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_j e^{x_j}}$$
 
 For FP16 with $x = 12$: $e^{12} \approx 163000 > 65504$ (overflow!)
 
 **Solution**: Subtract maximum before exponentiation:
+
 $$\text{softmax}(x_i) = \frac{e^{x_i - \max(x)}}{\sum_j e^{x_j - \max(x)}}$$
 
 ```python

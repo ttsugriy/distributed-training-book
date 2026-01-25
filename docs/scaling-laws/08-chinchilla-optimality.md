@@ -45,9 +45,11 @@ Three independent methods converged on the same answer:
 ### Method 1: Fixed Model, Varying Data
 
 For each model size $N$, fit:
+
 $$L(D) = \frac{B}{D^\beta} + L_\infty(N)$$
 
 Extract $L_\infty(N)$ for each size, then fit:
+
 $$L_\infty(N) = \frac{A}{N^\alpha}$$
 
 ### Method 2: IsoFLOP Curves
@@ -72,6 +74,7 @@ Loss
 ### Method 3: Parametric Fitting
 
 Fit all data simultaneously to:
+
 $$L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + E$$
 
 With Lagrange constraint $C = 6ND$, derive optimal scaling.
@@ -96,6 +99,7 @@ Wait—that's less than 1, not 20. What gives?
 **The resolution**: The values above are for the multiplicative form. The commonly quoted "20:1" comes from a different parameterization and fitting procedure.
 
 More precisely, from the paper:
+
 $$N_{\text{opt}} = 0.6225 \cdot C^{0.4957}$$
 $$D_{\text{opt}} = 1.8421 \cdot C^{0.5043}$$
 
@@ -106,6 +110,7 @@ At $C = 10^{21}$ FLOPs:
 - Ratio: $D/N \approx 21$
 
 The **20:1 rule** is a useful approximation:
+
 $$D_{\text{optimal}} \approx 20 \cdot N$$
 
 ## Computing Optimal Allocations
@@ -139,12 +144,14 @@ How "wrong" were pre-Chinchilla models?
 - Compute: $C = 6ND = 3.15 \times 10^{23}$
 
 Chinchilla-optimal for this compute:
+
 $$N^* = \sqrt{\frac{3.15 \times 10^{23}}{120}} \approx 51B$$
 $$D^* = 20 \times 51B = 1.02T$$
 
 GPT-3 used **3.4× too many parameters** and **3.4× too few tokens**.
 
 The loss penalty:
+
 $$\Delta L \approx \frac{A}{N_{\text{GPT-3}}^\alpha} + \frac{B}{D_{\text{GPT-3}}^\beta} - \frac{A}{N^{*\alpha}} - \frac{B}{D^{*\beta}}$$
 
 Chinchilla achieved GPT-3's loss with ~4× less compute.
@@ -156,6 +163,7 @@ Chinchilla achieved GPT-3's loss with ~4× less compute.
 - Compute: $C = 5.04 \times 10^{23}$
 
 Chinchilla-optimal:
+
 $$N^* \approx 65B, \quad D^* \approx 1.3T$$
 
 Gopher was **4.3× overparameterized**.
@@ -257,6 +265,7 @@ MoE models have different scaling:
 - More total parameters can improve loss at fixed compute
 
 Scaling law for MoE:
+
 $$L(N_{\text{active}}, N_{\text{total}}, D) = \frac{A}{N_{\text{total}}^{\alpha_1} N_{\text{active}}^{\alpha_2}} + \frac{B}{D^\beta} + E$$
 
 ### Repeat Tokens

@@ -742,6 +742,7 @@ With PCIe Gen4 (32 GB/s) and A100 (312 TFLOPS fp16):
 $$\frac{12H^2 \cdot 2}{32 \times 10^9} \leq \frac{24BSH^2}{312 \times 10^{12}}$$
 
 Solving:
+
 $$BS \geq \frac{312 \times 10^{12} \cdot 24}{32 \times 10^9 \cdot 24} \approx 406$$
 
 With batch size 1 and sequence 2048, overlap is achievable.
@@ -1036,7 +1037,7 @@ Memory requirements:
 Strategy:
 1. ZeRO-3 across 8 GPUs: 350GB / 8 = 44GB parameters per GPU
 2. Optimizer offload to CPU: 1.4TB / 8 = 175GB per GPU's share → CPU
-3. Gradient offload: Reduce-Scatter to CPU, optimizer step on CPU
+3. Gradient offload: ReduceScatter to CPU, optimizer step on CPU
 4. Activations: Checkpointing (no offload needed)
 
 Result: Training possible with 80GB GPUs that couldn't hold even the parameters alone.
@@ -1058,6 +1059,7 @@ TP reduces per-GPU memory; offloading reduces further:
 $$\text{Memory per GPU} = \frac{\text{Total}}{TP \times \text{ZeRO Stage Factor}} + \text{Activations}$$
 
 With TP=8 and ZeRO-3 on a 175B model:
+
 $$= \frac{350 \text{ GB}}{8 \times 8} + \text{Activations} = 5.5 \text{ GB} + \text{Activations}$$
 
 ### Offloading + Pipeline Parallelism

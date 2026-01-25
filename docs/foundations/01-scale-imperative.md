@@ -83,7 +83,7 @@ This book introduces many specialized terms. Here's a preview of the core vocabu
 | **Pipeline Parallelism** | Divide layers across GPUs; data flows through stages | Chapter 16 |
 | **AllReduce** | A collective operation that sums values across all GPUs and distributes the result back to everyone | Chapter 11 |
 | **ZeRO** | Memory optimization that shards optimizer states, gradients, or parameters across data-parallel replicas | Chapter 20 |
-| **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 31 |
+| **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 21 |
 | **MFU** (Model FLOP Utilization) | Fraction of theoretical peak FLOP/s actually achieved; the key efficiency metric | Chapter 13 |
 | **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 30 |
 

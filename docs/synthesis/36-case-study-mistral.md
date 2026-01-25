@@ -51,6 +51,7 @@ where $w$ is the window size.
 $$\text{KV cache} = 2 \cdot B \cdot n \cdot h \cdot d \cdot 2 \text{ bytes}$$
 
 For $n = 32768$, $B = 1$, $h = 32$, $d = 128$:
+
 $$= 2 \cdot 1 \cdot 32768 \cdot 32 \cdot 128 \cdot 2 = 512 \text{ MB}$$
 
 **Sliding Window Attention** (window size $w$):
@@ -58,6 +59,7 @@ $$= 2 \cdot 1 \cdot 32768 \cdot 32 \cdot 128 \cdot 2 = 512 \text{ MB}$$
 $$\text{KV cache} = 2 \cdot B \cdot w \cdot h \cdot d \cdot 2 \text{ bytes}$$
 
 For $w = 4096$:
+
 $$= 2 \cdot 1 \cdot 4096 \cdot 32 \cdot 128 \cdot 2 = 64 \text{ MB}$$
 
 **8× memory reduction** for this configuration.
@@ -117,6 +119,7 @@ With $L$ layers and window size $w$, the effective receptive field grows:
 $$\text{Effective context} = L \cdot w$$
 
 For Mistral 7B with $L = 32$ layers and $w = 4096$:
+
 $$\text{Effective context} = 32 \times 4096 = 131072 \text{ tokens}$$
 
 Information propagates through the network even though each layer only sees $w$ tokens.
@@ -808,7 +811,7 @@ class MixtralMemoryAnalyzer:
         tokens_moved = n_tokens * self.d_model * 2 * 2  # Input + output, bytes
         all_to_all_per_layer = tokens_moved / self.ep  # Per GPU
 
-        # Gradient sync: FSDP all-gather and reduce-scatter
+        # Gradient sync: FSDP AllGather and ReduceScatter
         params = self.parameter_count()
         non_expert_params = (params['attention'] + params['router'] +
                             params['norms'] + params['embeddings'])
@@ -851,7 +854,7 @@ Per forward pass (one micro-batch):
 Backward pass: same pattern in reverse
 
 After backward:
-└── FSDP gradient sync (reduce-scatter + all-gather)
+└── FSDP gradient sync (ReduceScatter + AllGather)
 ```
 
 ## Inference Optimization

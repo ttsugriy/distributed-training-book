@@ -76,9 +76,11 @@ Each GPU $i$ holds:
 - Shard $b_i$ of bias
 
 Computes:
+
 $$Y_i = XW_i + b_i$$
 
 The results are column-partitioned:
+
 $$Y = [Y_1 | Y_2 | \cdots | Y_P]$$
 
 ### Why It Works
@@ -92,9 +94,11 @@ $$X[W_1 | W_2] = [XW_1 | XW_2]$$
 Let $X \in \mathbb{R}^{m \times n}$, $W_1 \in \mathbb{R}^{n \times k_1}$, $W_2 \in \mathbb{R}^{n \times k_2}$.
 
 The $(i, j)$ entry of $XW_1$ for $j \leq k_1$:
+
 $$(XW_1)_{ij} = \sum_{\ell=1}^{n} X_{i\ell} (W_1)_{\ell j}$$
 
 The $(i, j)$ entry of $X[W_1 | W_2]$ for $j \leq k_1$:
+
 $$(X[W_1 | W_2])_{ij} = \sum_{\ell=1}^{n} X_{i\ell} [W_1 | W_2]_{\ell j} = \sum_{\ell=1}^{n} X_{i\ell} (W_1)_{\ell j}$$
 
 Identical. $\square$
@@ -104,6 +108,7 @@ Identical. $\square$
 **Forward pass**: No communication needed. Each GPU computes independently.
 
 **Backward pass**: Gradient w.r.t. $X$ requires AllReduce:
+
 $$\frac{\partial L}{\partial X} = \frac{\partial L}{\partial Y} W^T = \sum_{i=1}^{P} \frac{\partial L}{\partial Y_i} W_i^T$$
 
 ### Diagram
@@ -163,6 +168,7 @@ where each $W_i \in \mathbb{R}^{(d_{in}/P) \times d_{out}}$.
 ### The Computation
 
 Requires input split along columns:
+
 $$X = [X_1 | X_2 | \cdots | X_P]$$
 
 Each GPU $i$ holds:
@@ -171,6 +177,7 @@ Each GPU $i$ holds:
 - Shard $W_i$ of weights
 
 Computes partial result:
+
 $$Z_i = X_i W_i$$
 
 Note: $X_i \in \mathbb{R}^{m \times (d_{in}/P)}$ and $W_i \in \mathbb{R}^{(d_{in}/P) \times d_{out}}$, so $Z_i \in \mathbb{R}^{m \times d_{out}}$.
@@ -186,9 +193,11 @@ Each GPU has a partial sum $Z_i$. AllReduce computes $\sum_i Z_i$ on all GPUs.
 **Proof**:
 
 For partitioned multiplication:
+
 $$XW = [X_1 | X_2 | \cdots | X_P] \begin{bmatrix} W_1 \\ W_2 \\ \vdots \\ W_P \end{bmatrix}$$
 
 The $(i, j)$ entry:
+
 $$(XW)_{ij} = \sum_{k=1}^{d_{in}} X_{ik} W_{kj} = \sum_{p=1}^{P} \sum_{k \in \text{shard } p} X_{ik} W_{kj}$$
 
 $$= \sum_{p=1}^{P} (X_p W_p)_{ij} \quad \square$$
@@ -263,6 +272,7 @@ Shoeybi et al. (2019) introduced an elegant pattern combining column and row par
 ### MLP Block
 
 Standard Transformer MLP:
+
 $$\text{MLP}(X) = \text{GeLU}(X W_1) W_2$$
 
 With Megatron parallelism:
@@ -302,6 +312,7 @@ flowchart TB
 GELU is applied element-wise. Each element of $Y$ is computed by one GPU.
 
 Even though:
+
 $$\text{GeLU}(Y_1 + Y_2) \neq \text{GeLU}(Y_1) + \text{GeLU}(Y_2)$$
 
 We're not splitting elements—we're splitting the tensor along the hidden dimension. Each GPU computes GeLU on its complete slice:
@@ -313,6 +324,7 @@ This is valid because GeLU is applied independently to each element.
 ### Attention Block
 
 Transformer attention:
+
 $$\text{Attention}(X) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right) V$$
 
 Where $Q = XW^Q$, $K = XW^K$, $V = XW^V$.
@@ -392,34 +404,43 @@ For a Transformer with:
 - Batch size $b$
 
 Each AllReduce synchronizes the activation tensor:
+
 $$V_{\text{AR}} = 2 \cdot \frac{P-1}{P} \cdot b \cdot s \cdot d \cdot \text{sizeof}(\text{dtype})$$
 
 Two AllReduces per layer:
+
 $$V_{\text{layer}} = 4 \cdot \frac{P-1}{P} \cdot b \cdot s \cdot d \cdot \text{sizeof}(\text{dtype})$$
 
 For FP16 and large $P$:
+
 $$V_{\text{layer}} \approx 8bsd \text{ bytes}$$
 
 ### Time per Layer
 
 Using α-β model:
+
 $$T_{\text{comm}} = 2 \times \left( 2(P-1)\alpha + 2\frac{P-1}{P} \cdot \frac{bsd}{\beta} \right)$$
 
 For large tensors (bandwidth-dominated):
+
 $$T_{\text{comm}} \approx \frac{8bsd}{\beta}$$
 
 ### Compute-Communication Ratio
 
 Compute per layer (forward only):
+
 $$C_{\text{layer}} \approx 4 \cdot b \cdot s \cdot d^2 + 2 \cdot b \cdot s^2 \cdot d$$
 
 For $s \ll d$ (typical for LLMs):
+
 $$C_{\text{layer}} \approx 4bsd^2$$
 
 Ratio:
+
 $$R = \frac{C/P}{T_{\text{comm}}} = \frac{4bsd^2 / (P \cdot F)}{8bsd / \beta} = \frac{d \cdot \beta}{2PF}$$
 
 For H100 ($F = 2 \times 10^{15}$ FLOP/s), NVLink ($\beta = 900$ GB/s), $d = 8192$:
+
 $$R = \frac{8192 \times 900 \times 10^9}{2P \times 2 \times 10^{15}} = \frac{8192 \times 900}{4P \times 10^6} \approx \frac{1.8}{P}$$
 
 For $P = 8$: $R \approx 0.23$ — communication-bound!
@@ -431,9 +452,11 @@ For $P = 8$: $R \approx 0.23$ — communication-bound!
 ### The Challenge
 
 LayerNorm:
+
 $$\text{LN}(X) = \gamma \cdot \frac{X - \mu}{\sigma} + \beta$$
 
 where:
+
 $$\mu = \frac{1}{d} \sum_{i=1}^{d} X_i, \quad \sigma = \sqrt{\frac{1}{d} \sum_{i=1}^{d} (X_i - \mu)^2}$$
 
 Computing $\mu$ and $\sigma$ requires the full hidden dimension—can't be done on sharded activations.
@@ -455,9 +478,11 @@ This is the Megatron-LM approach.
 Compute partial statistics on each shard, AllReduce to get global statistics.
 
 GPU $i$ computes:
+
 $$\mu_i = \frac{1}{d/P} \sum_{j \in \text{shard } i} X_j, \quad s_i = \sum_{j \in \text{shard } i} X_j^2$$
 
 AllReduce to get:
+
 $$\mu = \frac{1}{P} \sum_i \mu_i, \quad \sigma = \sqrt{\frac{1}{d} \sum_i s_i - \mu^2}$$
 
 Then normalize locally with global statistics.
@@ -469,6 +494,7 @@ Then normalize locally with global statistics.
 ### The Challenge
 
 Dropout applies a random mask:
+
 $$\text{Dropout}(X) = \frac{X \odot M}{1-p}$$
 
 where $M$ is a binary mask with $P(M_i = 1) = 1 - p$.

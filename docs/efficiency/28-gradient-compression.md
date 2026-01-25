@@ -26,6 +26,7 @@ For a model with $N$ parameters in FP32:
 - For GPT-3 (175B parameters): 1.4 TB per step
 
 At 400 Gbps inter-node bandwidth:
+
 $$T_{\text{comm}} = \frac{1.4 \times 10^{12} \times 8}{400 \times 10^9} = 28 \text{ seconds}$$
 
 This is unacceptable. Compression is essential.
@@ -183,6 +184,7 @@ class QSGDQuantizer:
 ```
 
 **Variance analysis**:
+
 $$\mathbb{E}[||Q_s(g) - g||^2] \leq \min\left(\frac{d}{s^2}, \frac{\sqrt{d}}{s}\right) ||g||^2$$
 
 Higher $s$ → more levels → lower variance → better convergence.
@@ -413,6 +415,7 @@ class ErrorFeedbackCompressor:
 With error feedback, Top-K sparsification converges at the same rate as full-precision SGD, up to a constant factor.
 
 **Proof sketch**: The error feedback ensures that all gradient information is eventually transmitted. Let $e_t$ be the error at step $t$. Then:
+
 $$\sum_{t=1}^T ||e_t||^2 \leq ||g_1||^2 + ||g_2||^2 + ... + ||g_T||^2$$
 
 The accumulated error is bounded by the total gradient magnitude.
@@ -528,9 +531,11 @@ class DeepGradientCompressor:
 ### Compression Error Bound
 
 For a compressor $C$ with reconstruction $D$, define the compression error:
+
 $$\epsilon = g - D(C(g))$$
 
 A compressor is $\delta$-contractive if:
+
 $$\mathbb{E}[||\epsilon||^2] \leq \delta^2 ||g||^2$$
 
 **Examples**:
@@ -542,6 +547,7 @@ $$\mathbb{E}[||\epsilon||^2] \leq \delta^2 ||g||^2$$
 ### Convergence with Compression
 
 **Theorem**: For $\delta$-contractive compression with error feedback, SGD converges at rate:
+
 $$\mathbb{E}[f(w_T) - f(w^*)] = O\left(\frac{1}{\sqrt{T}}\right)$$
 
 The same rate as uncompressed SGD!
@@ -730,6 +736,7 @@ class PowerSGDOptimizer:
 ```
 
 **Compression ratio**: For $m \times n$ matrix with rank $r$:
+
 $$\rho = \frac{r(m + n)}{mn}$$
 
 For $m = n = 4096$ and $r = 4$: $\rho = 0.002$ (500× compression!).

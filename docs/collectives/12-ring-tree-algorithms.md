@@ -175,12 +175,15 @@ flowchart TB
 **Total steps**: $2(P-1)$ (ReduceScatter + AllGather)
 
 **Total per process**:
+
 $$\text{Send} = \text{Recv} = 2(P-1) \cdot \frac{n}{P} = 2 \cdot \frac{P-1}{P} \cdot n$$
 
 **Time using α-β model**:
+
 $$T_{\text{ring}} = 2(P-1) \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 For large $P$:
+
 $$T_{\text{ring}} \approx 2P\alpha + \frac{2n}{\beta}$$
 
 ### Bandwidth Optimality Proof
@@ -218,6 +221,7 @@ P0 ⟷ P1 ⟷ P2 ⟷ P3 ⟷ P0
 **Benefit**: Utilizes both directions of full-duplex links.
 
 **Time**:
+
 $$T_{\text{bidir}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 Half the steps of unidirectional ring.
@@ -314,6 +318,7 @@ Step 2: Each sends to partner
 - Time: $\log_2 P \cdot (\alpha + n/\beta)$
 
 **Total**:
+
 $$T_{\text{tree}} = 2 \log_2 P \cdot \alpha + 2 \log_2 P \cdot \frac{n}{\beta}$$
 
 ### Latency Optimality
@@ -355,6 +360,7 @@ Solving for $n$:
 $$n^* = \frac{2\alpha\beta(P-1 - \log_2 P)}{2\log_2 P - 2(P-1)/P}$$
 
 For large $P$:
+
 $$n^* \approx \frac{\alpha\beta \cdot P}{\log_2 P - 1}$$
 
 **Example**: $P = 64$, $\alpha = 1\mu s$, $\beta = 100$ GB/s
@@ -413,7 +419,7 @@ Step 1: P0 sends second half [B] to P1
         P1: reduces received B with local D → [C, B+D]
 ```
 
-Actually, the Rabenseifner algorithm for reduce-scatter:
+Actually, the Rabenseifner algorithm for ReduceScatter:
 
 ```
 Step k (of log₂P steps):

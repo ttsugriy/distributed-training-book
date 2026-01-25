@@ -64,6 +64,7 @@ $$n^* = \alpha \cdot \beta$$
 Below this size, latency dominates. Above it, bandwidth dominates.
 
 **Example** (InfiniBand, α=2μs, β=50 GB/s):
+
 $$n^* = 2 \times 10^{-6} \times 50 \times 10^{9} = 100\text{ KB}$$
 
 Messages smaller than 100KB are primarily latency-bound on InfiniBand.
@@ -88,6 +89,7 @@ Optimal (ring) algorithm for $P$ processes with $n$ bytes each:
 $$T_{\text{AllReduce}}(n, P) = 2(P-1)\alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
 
 As $P \to \infty$:
+
 $$T_{\text{AllReduce}} \approx 2P\alpha + \frac{2n}{\beta}$$
 
 The latency term grows with $P$, but the bandwidth term is independent of $P$ (for ring algorithm).
@@ -115,9 +117,11 @@ Same cost as AllGather, but different communication pattern.
 ### Batch Small Messages
 
 Sending $k$ small messages of size $m$ each:
+
 $$T_{\text{small}} = k\alpha + \frac{km}{\beta}$$
 
 Sending one large message of size $km$:
+
 $$T_{\text{large}} = \alpha + \frac{km}{\beta}$$
 
 Savings: $(k-1)\alpha$

@@ -648,7 +648,7 @@ class ZeRO1WithOverlap:
         self.update_stream = torch.cuda.Stream()
 
     def backward_and_step(self, loss):
-        """Overlapped backward, reduce-scatter, and optimizer step."""
+        """Overlapped backward, ReduceScatter, and optimizer step."""
         handles = []
 
         # Backward pass
@@ -672,7 +672,7 @@ class ZeRO1WithOverlap:
                 )
                 handles.append((handle, bucket_params, output))
 
-        # As reduce-scatters complete, apply optimizer on update stream
+        # As ReduceScatters complete, apply optimizer on update stream
         for handle, bucket_params, reduced_grad in handles:
             handle.wait()
 
@@ -1356,22 +1356,22 @@ prof.export_chrome_trace("overlap_trace.json")
 
     $$\boxed{\text{Typical overlap fraction: 50-80\% depending on compute/comm ratio}}$$
 
-4. **Prefetch depth**: For ZeRO-3 with 24 layers, how many layers should you prefetch to hide all-gather latency if each all-gather takes 2ms and each layer compute takes 8ms?
+4. **Prefetch depth**: For ZeRO-3 with 24 layers, how many layers should you prefetch to hide AllGather latency if each AllGather takes 2ms and each layer compute takes 8ms?
 
 ??? success "Solution"
     **Configuration:**
 
     - Layers: $L = 24$
-    - All-gather time per layer: $T_{\text{gather}} = 2\text{ms}$
+    - AllGather time per layer: $T_{\text{gather}} = 2\text{ms}$
     - Compute time per layer: $T_{\text{compute}} = 8\text{ms}$
 
     **Prefetch analysis:**
 
-    To completely hide all-gather latency, the all-gather for layer $i+k$ must complete before layer $i+k$ starts computing.
+    To completely hide AllGather latency, the AllGather for layer $i+k$ must complete before layer $i+k$ starts computing.
 
     **Timing constraint:**
 
-    If we prefetch $k$ layers ahead, we have $k \times T_{\text{compute}}$ time to complete the all-gather.
+    If we prefetch $k$ layers ahead, we have $k \times T_{\text{compute}}$ time to complete the AllGather.
 
     For full overlap:
 

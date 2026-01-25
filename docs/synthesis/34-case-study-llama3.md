@@ -68,12 +68,15 @@ The actual training took approximately 54 days, suggesting:
 Applying the memory equation from Chapter 19:
 
 **Model parameters (BF16)**:
+
 $$M_{\text{params}} = 405 \times 10^9 \times 2 \text{ bytes} = 810 \text{ GB}$$
 
 **Optimizer state (AdamW)**:
+
 $$M_{\text{opt}} = 405 \times 10^9 \times (4 + 4) \text{ bytes} = 3,240 \text{ GB}$$
 
 **Gradients (BF16)**:
+
 $$M_{\text{grad}} = 405 \times 10^9 \times 2 \text{ bytes} = 810 \text{ GB}$$
 
 **Total without sharding**: 4,860 GB (61 GPUs minimum!)
@@ -110,13 +113,16 @@ LLaMA 3 405B architecture:
 ### Per-Layer Memory
 
 **Attention block**:
+
 $$M_{\text{attn}} = 4 \times d_{\text{model}}^2 = 4 \times 16384^2 \times 2 = 2.15 \text{ GB}$$
 
 Wait—this uses GQA with 8 KV heads, so:
+
 $$M_{QKV} = d_{\text{model}} \times (d_{\text{model}} + 2 \times \frac{d_{\text{model}} \times n_{\text{kv}}}{n_{\text{heads}}}) \times 2$$
 $$= 16384 \times (16384 + 2 \times \frac{16384 \times 8}{128}) \times 2 = 16384 \times (16384 + 2048) \times 2 \approx 0.61 \text{ GB}$$
 
 **FFN block** (SwiGLU has 3 matrices):
+
 $$M_{\text{ffn}} = 3 \times d_{\text{model}} \times d_{\text{ffn}} \times 2 = 3 \times 16384 \times 53248 \times 2 \approx 5.24 \text{ GB}$$
 
 **Per layer total**: ~6 GB
@@ -130,6 +136,7 @@ For a single forward pass with batch size $B$ and sequence length $S$:
 $$M_{\text{act}} = L \times (2 \times B \times S \times d_{\text{model}} + B \times S \times d_{\text{ffn}})$$
 
 With $B=1$, $S=8192$, $L=126$:
+
 $$M_{\text{act}} = 126 \times (2 \times 8192 \times 16384 + 8192 \times 53248) \times 2 \text{ bytes}$$
 $$\approx 126 \times (268M + 436M) \times 2 \approx 177 \text{ GB per sequence}$$
 
@@ -144,15 +151,19 @@ LLaMA 3 uses TP=8, matching the 8 GPUs per node connected via NVLink.
 **Why 8?** Applying the alpha-beta analysis from Chapter 4:
 
 For TP across NVLink (900 GB/s bidirectional on H100):
+
 $$T_{\text{comm}} = \alpha + \frac{4 \times B \times S \times d_{\text{model}}}{8 \times \beta}$$
 
 For $B=1$, $S=8192$, $d=16384$:
+
 $$\text{Data per AllReduce} = 4 \times 1 \times 8192 \times 16384 = 537 \text{ MB}$$
 
 With ring AllReduce:
+
 $$T_{\text{NVLink}} = \frac{2 \times (8-1)/8 \times 537\text{MB}}{900 \text{ GB/s}} \approx 1.0 \text{ ms}$$
 
 If we extended TP to 16 (across nodes via IB):
+
 $$T_{\text{IB}} = \frac{2 \times (16-1)/16 \times 537\text{MB}}{50 \text{ GB/s}} \approx 20 \text{ ms}$$
 
 The 20× slowdown from crossing the node boundary makes TP>8 prohibitive.
@@ -160,9 +171,11 @@ The 20× slowdown from crossing the node boundary makes TP>8 prohibitive.
 ### Pipeline Parallelism: 16 Stages
 
 With 126 layers and 16 pipeline stages:
+
 $$\text{Layers per stage} = \lceil 126/16 \rceil = 8 \text{ layers}$$
 
 **Memory per stage**:
+
 $$M_{\text{stage}} = 8 \times 6\text{ GB} = 48 \text{ GB}$$
 
 This leaves ~32 GB for activations, optimizer states (sharded), and working memory.
@@ -170,9 +183,11 @@ This leaves ~32 GB for activations, optimizer states (sharded), and working memo
 **Pipeline bubble analysis** (Chapter 16):
 
 For 1F1B schedule with micro-batch count $m$:
+
 $$\text{Bubble fraction} = \frac{p-1}{m}$$
 
 With $p=16$ and $m=64$ micro-batches:
+
 $$\text{Bubble} = \frac{15}{64} \approx 23\%$$
 
 This represents a significant efficiency loss, but is necessary for memory constraints.
@@ -194,12 +209,15 @@ $$DP = \frac{16384}{8 \times 16} = 128$$
 **AllGather cost per layer** (FSDP reconstructs before compute):
 
 For one layer (~6 GB / TP):
+
 $$\text{Data per AllGather} = \frac{6\text{ GB}}{8} = 750 \text{ MB}$$
 
 Across 128 DP ranks (using hierarchical NCCL):
+
 $$T_{\text{AllGather}} = \alpha \log_2(128) + \frac{127/128 \times 750\text{MB}}{50 \text{ GB/s}} \approx 15 \text{ ms}$$
 
 With 126 layers and overlap:
+
 $$\text{Theoretical comm time} = 126 \times 15 \text{ ms} = 1.89 \text{ s}$$
 
 This must be overlapped with compute to achieve reasonable efficiency.
@@ -211,17 +229,21 @@ This must be overlapped with compute to achieve reasonable efficiency.
 Let's compute total communication per step:
 
 **Tensor Parallelism** (per layer, 2 AllReduce):
+
 $$V_{\text{TP}} = 126 \times 2 \times 2 \times \frac{7}{8} \times B \times S \times d / TP$$
 $$= 126 \times 2 \times 2 \times 0.875 \times B \times S \times 16384 / 8 \times 2 \text{ bytes}$$
 
 For $BS = 1M$ tokens (distributed):
+
 $$V_{\text{TP}} = 126 \times 4 \times 0.875 \times \frac{1M}{128} \times 2048 \times 2 \approx 14.2 \text{ GB per rank}$$
 
 **Pipeline Parallelism** (point-to-point):
+
 $$V_{\text{PP}} = 2 \times \text{microbatches} \times B_{\mu} \times S \times d \times 2$$
 $$= 2 \times 64 \times \text{tokens per } \mu\text{batch} \times 16384 \times 2$$
 
 **Data Parallelism** (ReduceScatter + AllGather per layer):
+
 $$V_{\text{DP}} = 2 \times \frac{127}{128} \times \frac{810\text{ GB}}{8} \approx 200 \text{ GB per rank}$$
 
 ### Bandwidth Requirements
@@ -239,17 +261,21 @@ This is well within the 50 GB/s IB capability, allowing significant overlap.
 Computing MFU for LLaMA 3 405B:
 
 **Forward FLOPs per token**:
+
 $$F_{\text{fwd}} = 2 \times N \times 2 = 4N = 4 \times 405 \times 10^9 = 1.62 \times 10^{12}$$
 
 (Factor of 2 for forward, factor of 2 for backward = 4× total, but we count 6× including backward activations)
 
 **Per step with 1M tokens**:
+
 $$F_{\text{step}} = 6 \times 405 \times 10^9 \times 10^6 = 2.43 \times 10^{18} \text{ FLOPs}$$
 
 **Hardware peak**:
+
 $$F_{\text{peak}} = 16384 \times 1979 \times 10^{12} = 3.24 \times 10^{19} \text{ FLOPS}$$
 
 If step takes 0.3 seconds:
+
 $$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 0.3} \approx 0.25 = 25\%$$
 
 ### Efficiency Breakdown
@@ -281,6 +307,7 @@ LLaMA 3 started with smaller batch sizes and ramped up:
 | 8T-15T tokens | 8M-16M |
 
 **Why?** From Chapter 10, critical batch size increases during training:
+
 $$B_{\text{crit}} \propto \frac{\text{tr}(\Sigma)}{\text{tr}(H)}$$
 
 Early: high gradient noise (large $\Sigma$) → small $B_{\text{crit}}$
@@ -328,16 +355,19 @@ At 16,384 GPUs, failures are constant. Meta reported:
 | Software (OOM, timeout) | ~5-10/day |
 
 **Expected failures per training**:
+
 $$N_{\text{failures}} = 54 \text{ days} \times 10 \text{ failures/day} = 540 \text{ failures}$$
 
 ### Checkpointing Strategy
 
 **Checkpoint size**:
+
 $$C_{\text{ckpt}} = 810\text{ GB (params)} + 3240\text{ GB (opt)} = 4.05 \text{ TB}$$
 
 **Checkpoint frequency**: Every 1,000 steps
 
 **Checkpoint time** (to parallel filesystem):
+
 $$T_{\text{ckpt}} = \frac{4.05 \text{ TB}}{16384 \text{ GPUs} \times 5 \text{ GB/s}} \approx 50 \text{ seconds}$$
 
 With asynchronous checkpointing, this overlaps with training.
@@ -389,9 +419,11 @@ LLaMA 3 was trained on 8K context, then extended to 128K.
 ### The Challenge
 
 **Memory scaling with sequence length**:
+
 $$M_{\text{attn}} = O(B \times L \times S^2)$$
 
 For $S = 128K$:
+
 $$M_{\text{attn}} = 126 \times 128 \times 8192 \times 128000^2 \times 2 / \text{TP} \rightarrow \text{Explodes!}$$
 
 ### Context Parallelism
@@ -399,6 +431,7 @@ $$M_{\text{attn}} = 126 \times 128 \times 8192 \times 128000^2 \times 2 / \text{
 Solution: Shard the sequence across GPUs.
 
 With CP=4:
+
 $$S_{\text{local}} = \frac{128000}{4} = 32000$$
 
 Each GPU handles 32K tokens, with ring attention for cross-segment dependencies.
@@ -412,9 +445,11 @@ GPU 1: Q[32K:64K] × K[0:32K] → send K to GPU 2
 ```
 
 **Additional communication per layer**:
+
 $$V_{\text{CP}} = 2 \times (CP-1) \times B \times S/CP \times d_k \times n_{kv}$$
 
 For GQA with 8 KV heads:
+
 $$V_{\text{CP}} = 2 \times 3 \times B \times 32000 \times 128 \times 8 \times 2 \approx 0.4 \text{ GB}$$
 
 This is manageable with NVLink within the node.
@@ -426,6 +461,7 @@ LLaMA 3 uses RoPE (Rotary Position Embeddings) which need adjustment for longer 
 $$\text{RoPE}(x, m) = x \odot \cos(m\theta) + \text{rotate}(x) \odot \sin(m\theta)$$
 
 For positions beyond training length, the frequency is adjusted:
+
 $$\theta_i' = \theta_i \times \text{scale}^{-2i/d}$$
 
 where scale = 8 for 8K→128K extension.

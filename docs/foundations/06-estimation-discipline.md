@@ -33,28 +33,35 @@ For a transformer with:
 - $A$ attention heads
 
 Total parameters:
+
 $$\Psi \approx 12LH^2 + 2VH$$
 
 Memory for parameters (mixed precision):
+
 $$M_{\text{params}} = 2\Psi \text{ bytes (FP16)}$$
 
 Memory for optimizer (Adam, FP32):
+
 $$M_{\text{opt}} = 12\Psi \text{ bytes (params + momentum + variance)}$$
 
 Total static memory:
+
 $$M_{\text{static}} = 2\Psi + 2\Psi + 12\Psi = 16\Psi$$
 
 ### Activation Memory
 
 Per-layer activation memory (without checkpointing):
+
 $$M_{\text{act}}^{\text{layer}} \approx BSH \cdot (34 + 5\frac{AS}{H})$$
 
 Where $B$ = batch, $S$ = sequence, $H$ = hidden, $A$ = heads.
 
 Total activation memory:
+
 $$M_{\text{act}} = L \cdot M_{\text{act}}^{\text{layer}}$$
 
 With activation checkpointing (recompute every $k$ layers):
+
 $$M_{\text{act}}^{\text{ckpt}} = \frac{L}{k} \cdot M_{\text{act}}^{\text{layer}}$$
 
 ### Quick Estimation Table
@@ -73,12 +80,15 @@ This immediately tells us: 70B requires ≥14 H100s just for static memory.
 ### FLOPs per Token
 
 Forward pass:
+
 $$F_{\text{fwd}} \approx 2\Psi$$
 
 Backward pass:
+
 $$F_{\text{bwd}} \approx 4\Psi$$
 
 Total per token:
+
 $$F_{\text{total}} = 6\Psi$$
 
 ### Time per Step
@@ -92,6 +102,7 @@ Where:
 - P = number of GPUs
 
 **Example**: 70B model, batch=1M tokens, 128 H100s, 45% MFU:
+
 $$T_{\text{step}} = \frac{6 \times 70 \times 10^9 \times 10^6}{0.45 \times 1979 \times 10^{12} \times 128} = 3.67 \text{ seconds}$$
 
 ### Tokens per Second
@@ -103,6 +114,7 @@ $$\text{Tokens/s} = \frac{B \cdot S}{T_{\text{step}}} = \frac{10^6}{3.67} \appro
 $$T_{\text{train}} = \frac{D}{B \cdot S} \times T_{\text{step}} = \frac{D \times 6\Psi}{\text{MFU} \times F_{\text{peak}} \times P}$$
 
 For 2T tokens:
+
 $$T_{\text{train}} = \frac{2 \times 10^{12}}{272,000} \approx 7.35 \times 10^6 \text{ seconds} \approx 85 \text{ days}$$
 
 ## Communication Estimation
@@ -112,9 +124,11 @@ $$T_{\text{train}} = \frac{2 \times 10^{12}}{272,000} \approx 7.35 \times 10^6 \
 AllReduce volume per step: $2\Psi$ bytes
 
 AllReduce time (ring, P GPUs, bandwidth $\beta$):
+
 $$T_{\text{AR}} = \frac{2\Psi}{\beta} \times \frac{P-1}{P}$$
 
 For 70B across 128 GPUs at 50 GB/s:
+
 $$T_{\text{AR}} = \frac{140 \times 10^9}{50 \times 10^9} \times \frac{127}{128} \approx 2.8 \text{ seconds}$$
 
 ### Tensor Parallelism
@@ -122,6 +136,7 @@ $$T_{\text{AR}} = \frac{140 \times 10^9}{50 \times 10^9} \times \frac{127}{128} 
 AllReduce per layer: $2 \times B \times S \times H$ bytes
 
 For 8-way TP, B=4, S=4096, H=8192:
+
 $$T_{\text{TP}}^{\text{layer}} = \frac{2 \times 4 \times 4096 \times 8192}{900 \times 10^9} \approx 0.3 \text{ ms}$$
 
 Total per step (80 layers, 2 AllReduce each): ~48ms
@@ -129,6 +144,7 @@ Total per step (80 layers, 2 AllReduce each): ~48ms
 ### Pipeline Parallelism
 
 Bubble fraction:
+
 $$\text{Bubble} = \frac{p - 1}{m + p - 1}$$
 
 Where $p$ = pipeline stages, $m$ = micro-batches.

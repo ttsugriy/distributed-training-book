@@ -55,9 +55,11 @@ $$T_{\text{step}} = T_{\text{forward}} + T_{\text{backward}} + T_{\text{comm}} +
 The goal: minimize $T_{\text{step}}$ while maintaining model quality.
 
 With perfect overlap:
+
 $$T_{\text{step}} = \max(T_{\text{compute}}, T_{\text{comm}})$$
 
 Without overlap:
+
 $$T_{\text{step}} = T_{\text{compute}} + T_{\text{comm}}$$
 
 Profiling reveals where you are on this spectrum.

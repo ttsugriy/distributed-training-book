@@ -39,9 +39,11 @@ For comparison, a dense 671B model would require ~10× more compute.
 ### The Efficiency Advantage
 
 **Dense model equivalent FLOPs**:
+
 $$C_{\text{dense}} = 6 \times 671 \times 10^9 \times 14.8 \times 10^{12} \approx 5.96 \times 10^{25} \text{ FLOPs}$$
 
 **MoE effective FLOPs** (only activated parameters compute):
+
 $$C_{\text{MoE}} = 6 \times 37 \times 10^9 \times 14.8 \times 10^{12} \approx 3.3 \times 10^{24} \text{ FLOPs}$$
 
 The sparsity provides ~18× compute reduction, though communication and load balancing add overhead.
@@ -49,9 +51,11 @@ The sparsity provides ~18× compute reduction, though communication and load bal
 ## Multi-head Latent Attention (MLA)
 
 Standard multi-head attention has KV cache proportional to:
+
 $$M_{\text{KV}} = 2 \times n_{\text{heads}} \times d_{\text{head}} \times S \times B$$
 
 For a 128-head model with $d_{\text{head}} = 128$:
+
 $$M_{\text{KV}} = 2 \times 128 \times 128 \times S \times B = 32768 \times S \times B \text{ bytes (FP16)}$$
 
 At 128K context, this becomes prohibitive.
@@ -70,9 +74,11 @@ Where:
 - $d_c \ll d$: Latent dimension (typically $d/4$ to $d/8$)
 
 **KV cache with MLA**:
+
 $$M_{\text{KV-MLA}} = d_c \times S \times B$$
 
 With $d_c = d/4$:
+
 $$\text{Compression ratio} = \frac{2 \times n_{\text{heads}} \times d_{\text{head}}}{d_c} = \frac{2d}{d/4} = 8\times$$
 
 ### RoPE Integration
@@ -147,9 +153,11 @@ For DeepSeek-V3 with:
 - $d_{\text{rope}} = 64$
 
 **Standard KV cache per layer**:
+
 $$M_{\text{std}} = 2 \times 128 \times 128 \times S \times 2 = 65536S \text{ bytes}$$
 
 **MLA cache per layer**:
+
 $$M_{\text{MLA}} = (512 + 64) \times S \times 2 = 1152S \text{ bytes}$$
 
 **Compression**: $65536 / 1152 \approx 57\times$ reduction!
@@ -174,9 +182,11 @@ Standard MoE uses large experts (often matching FFN size). DeepSeek uses 4× sma
 **Communication volume comparison**:
 
 Standard MoE (8 large experts, 2 activated):
+
 $$V_{\text{std}} = 2 \times B \times S \times d_{\text{model}} \times 2 = 4BSd$$
 
 Fine-grained MoE (256 experts, 8 activated):
+
 $$V_{\text{fine}} = 8 \times B \times S \times d_{\text{model}} \times 2 = 16BSd$$
 
 More tokens dispatched, but each is the same size. The key insight: **better load balancing** due to more fine-grained routing decisions.
@@ -324,6 +334,7 @@ class FP8Linear(nn.Module):
 FP8 requires careful scaling to prevent overflow/underflow:
 
 **Per-tensor scaling**:
+
 $$x_{\text{fp8}} = \text{round}\left(\frac{x}{\text{scale}}\right), \quad \text{scale} = \frac{\max|x|}{\text{FP8\_MAX}}$$
 
 **Block-wise scaling** (DeepSeek approach):
@@ -566,13 +577,16 @@ def expert_forward(tokens, routing_indices, routing_weights):
 ### Communication Volume
 
 **Per layer All-to-All**:
+
 $$V_{\text{A2A}} = 2 \times (n-1)/n \times B \times S \times d_{\text{model}} \times \text{top-k}/n_{\text{experts}}$$
 
 With 2048 GPUs, $B \times S = 4M$ tokens, $d=7168$, top-k=8, 256 experts:
+
 $$V_{\text{A2A}} = 2 \times 0.9995 \times 4M \times 7168 \times 8/256 \times 2 \text{ bytes}$$
 $$\approx 3.5 \text{ GB per rank per layer}$$
 
 For 60 layers:
+
 $$V_{\text{total}} = 60 \times 3.5 = 210 \text{ GB per rank per step}$$
 
 This requires high-bandwidth networking and careful overlap.
@@ -629,10 +643,12 @@ config = {
 $$F = 6 \times N_{\text{active}} \times T_{\text{batch}} = 6 \times 37\text{B} \times 4\text{M} = 8.9 \times 10^{17}$$
 
 **Hardware capacity**:
+
 $$F_{\text{peak}} = 2048 \times 3200 \times 10^{12} = 6.55 \times 10^{18} \text{ FP8 FLOPS}$$
 
 **With overhead (bubble, communication)**:
 If step time is 0.6 seconds:
+
 $$\text{MFU} = \frac{8.9 \times 10^{17}}{6.55 \times 10^{18} \times 0.6} \approx 0.23 = 23\%$$
 
 ### Where Efficiency Is Lost
@@ -647,9 +663,11 @@ $$\text{MFU} = \frac{8.9 \times 10^{17}}{6.55 \times 10^{18} \times 0.6} \approx
 ### Cost Breakdown
 
 At $\$2$/H800-hour:
+
 $$\text{Cost} = 2.788\text{M hours} \times \$2 = \$5.58\text{M}$$
 
 Compared to dense training:
+
 $$\text{Dense equivalent} = \frac{5.96 \times 10^{25}}{6.55 \times 10^{18} \times 0.3} \times 2048 \approx 100\text{M hours}$$
 
 The MoE sparsity provides ~36× compute efficiency, reduced to ~18× accounting for communication overhead.

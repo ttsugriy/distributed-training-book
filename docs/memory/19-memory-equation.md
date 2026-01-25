@@ -208,6 +208,7 @@ Attention scores scale quadratically with sequence length:
 $$M_{\text{attention}} = L \cdot B \cdot A \cdot S^2 \cdot b_a$$
 
 **Example**: L=32, B=1, A=32, S=8192, bf16:
+
 $$32 \times 1 \times 32 \times 8192^2 \times 2 = 137.4 \text{ GB}$$
 
 Just for attention scores! This is why long-context training requires Flash Attention and sequence parallelism.
@@ -308,9 +309,11 @@ Training configuration:
 - Sequence length: $S = 2048$
 
 **Model state memory**:
+
 $$M_{\text{model}} = 16 \times 7 \times 10^9 = 112 \text{ GB}$$
 
 **Activation memory**:
+
 $$M_{\text{act}} = 2 \times 32 \times 1 \times 2048 \times 4096 \times (11 + 2048/128)$$
 $$= 2 \times 32 \times 2048 \times 4096 \times 27$$
 $$= 2 \times 7.25 \times 10^9 \text{ bytes} = 14.5 \text{ GB}$$
@@ -326,9 +329,11 @@ This exceeds the 80GB of an A100! Hence the need for memory optimization techniq
 ### Scaling with Model Size
 
 Model state scales linearly with parameters:
+
 $$M_{\text{model}} \propto N$$
 
 Activation memory scales with $N$ as well (since $H \propto \sqrt{N}$ and $L \propto \sqrt{N}$ typically):
+
 $$M_{\text{act}} \propto L \cdot H \propto N$$
 
 **Total memory scales linearly with model size** (for fixed batch and sequence).
@@ -338,6 +343,7 @@ $$M_{\text{act}} \propto L \cdot H \propto N$$
 Model state is independent of batch size.
 
 Activation memory scales linearly with batch:
+
 $$M_{\text{act}} \propto B$$
 
 **Doubling batch size approximately doubles activation memory.**
@@ -347,6 +353,7 @@ $$M_{\text{act}} \propto B$$
 Model state is independent of sequence length.
 
 Activation memory has a quadratic component:
+
 $$M_{\text{act}} \propto S + S^2$$
 
 **Long sequences are memory-expensive.** At S=8192, the quadratic term dominates.

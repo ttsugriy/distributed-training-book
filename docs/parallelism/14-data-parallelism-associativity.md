@@ -155,12 +155,15 @@ Let $\Psi$ be the number of model parameters (in elements, not bytes).
 **AllReduce volume**: Each parameter's gradient must be synchronized.
 
 Using ring AllReduce:
+
 $$V = 2 \cdot \frac{P-1}{P} \cdot \Psi \cdot \text{sizeof}(\text{dtype})$$
 
 For 32-bit floats:
+
 $$V = 8 \cdot \frac{P-1}{P} \cdot \Psi \text{ bytes}$$
 
 As $P \to \infty$:
+
 $$V \to 8\Psi \text{ bytes}$$
 
 ### Communication Time
@@ -216,6 +219,7 @@ With perfect overlap:
 $$T_P = \max(T_{\text{compute}}, T_{\text{comm}})$$
 
 **Compute-bound regime** ($T_{\text{compute}} > T_{\text{comm}}$):
+
 $$E(P) = \frac{T_{\text{compute}}}{P \cdot T_{\text{compute}}} = \frac{1}{P} \cdot P = 1$$
 
 Perfect scaling! But this assumes:
@@ -223,6 +227,7 @@ Perfect scaling! But this assumes:
 2. No additional overhead
 
 **Communication-bound regime** ($T_{\text{comm}} > T_{\text{compute}}$):
+
 $$E(P) = \frac{T_{\text{compute}}}{P \cdot T_{\text{comm}}} = \frac{R}{P}$$
 
 Efficiency degrades as $P$ increases.
@@ -325,9 +330,11 @@ print(a + (b + c))  # = 0.0  (c absorbed into b)
 Different AllReduce implementations use different reduction orders:
 
 **Ring AllReduce**:
+
 $$g = (\cdots((g_0 + g_1) + g_2) + \cdots + g_{P-1})$$
 
 **Tree AllReduce** (binary tree):
+
 $$g = ((g_0 + g_1) + (g_2 + g_3)) + ((g_4 + g_5) + (g_6 + g_7))$$
 
 These give slightly different results for the same inputs!
@@ -456,11 +463,13 @@ where $p$ is the sampling probability.
 Reduce precision of gradients:
 
 **1-bit SGD**: Sign of gradient only:
+
 $$\tilde{g}_i = \text{sign}(g_i) \cdot \|g\|_1 / d$$
 
 **TernGrad**: Three values $\{-1, 0, +1\}$
 
 **QSGD**: Stochastic quantization to $s$ levels:
+
 $$Q_s(g_i) = \|g\|_2 \cdot \text{sign}(g_i) \cdot \xi_i(s)$$
 
 where $\xi_i(s)$ is a stochastic quantization function.
@@ -537,6 +546,7 @@ Keep local batch size $b$ constant, add more GPUs:
 - Communication: increases with $P$ (latency term)
 
 **Efficiency**:
+
 $$E_{\text{weak}}(P) = \frac{T_1}{T_P} = \frac{T_c}{T_c + T_r(P)}$$
 
 where $T_r(P) = 2(P-1)\alpha + 2\frac{P-1}{P} \cdot \Psi/\beta$.
@@ -550,6 +560,7 @@ Keep total batch size $B$ constant, add more GPUs:
 - Communication: approximately constant (bandwidth term dominates)
 
 **Efficiency**:
+
 $$E_{\text{strong}}(P) = \frac{T_1}{P \cdot T_P} = \frac{T_c(1)}{P \cdot (T_c(1)/P + T_r)}$$
 
 As $P$ increases, $T_c/P$ becomes small compared to $T_r$, and efficiency drops.

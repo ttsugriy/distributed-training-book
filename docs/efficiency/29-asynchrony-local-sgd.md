@@ -38,9 +38,11 @@ Worker compute times vary due to:
 Let $T_i \sim \text{Distribution}$ be worker $i$'s compute time.
 
 For $P$ workers with i.i.d. times:
+
 $$\mathbb{E}[\max_i T_i] > \mathbb{E}[T_i]$$
 
 The gap grows with $P$. For exponential distribution:
+
 $$\mathbb{E}[\max_i T_i] = H_P \cdot \mathbb{E}[T_i]$$
 
 Where $H_P = 1 + 1/2 + ... + 1/P \approx \ln P$ is the harmonic number.
@@ -196,11 +198,13 @@ Worker $i$ computes $g_i = \nabla L(w^{(t-\tau_i)}, x_i)$ but applies to $w^{(t)
 **Staleness** $\tau_i$ is the number of updates since worker pulled weights.
 
 With $P$ workers and equal compute times:
+
 $$\mathbb{E}[\tau] = P - 1$$
 
 **Convergence impact**: Stale gradients introduce bias.
 
 For smooth non-convex functions:
+
 $$\mathbb{E}[||w^{(T)} - w^*||^2] = O\left(\frac{1}{\sqrt{T}}\right) + O(\tau^2 \eta^2 G^2)$$
 
 Where:
@@ -210,6 +214,7 @@ Where:
 - $G$ = gradient bound
 
 **Key insight**: Must reduce learning rate to compensate for staleness:
+
 $$\eta_{\text{async}} = \frac{\eta_{\text{sync}}}{\tau}$$
 
 This partially negates the throughput advantage!
@@ -483,6 +488,7 @@ Where:
 **Key insight**: $H$ can be much larger than 1 while maintaining convergence!
 
 **Optimal $H$**: Balance communication savings against drift penalty:
+
 $$H^* = O\left(\sqrt{\frac{T}{\sigma^2}}\right)$$
 
 As training progresses ($T$ increases), can use larger $H$.

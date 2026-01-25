@@ -83,6 +83,7 @@ Where $S_0$ is steps at baseline batch $B_0$.
 Doubling batch size → halving steps → same wall-clock time per step → 2× faster training.
 
 **Total compute stays constant**:
+
 $$C = S \cdot B \cdot (\text{FLOPs per sample}) = \text{constant}$$
 
 ## The Diminishing Returns Regime
@@ -94,11 +95,13 @@ $$\text{Steps}(B) = S_{\min} + \frac{S_{\text{noise}}}{B}$$
 Where $S_{\min}$ is the minimum steps regardless of batch size (curvature limit).
 
 As $B \to \infty$:
+
 $$\text{Steps}(B) \to S_{\min}$$
 
 You can't reduce steps below $S_{\min}$ no matter how large the batch.
 
 **Compute waste**:
+
 $$\text{Wasted compute} = (B - B_{\text{crit}}) \cdot S(B) \cdot (\text{FLOPs per sample})$$
 
 ## Learning Rate Scaling
@@ -119,9 +122,11 @@ $$\eta(B) = \eta_0 \cdot \frac{B}{B_0}$$
 **Derivation**: Consider the update over $k$ steps with batch $B_0$ vs 1 step with batch $kB_0$:
 
 Small batch:
+
 $$\Delta w = -\eta_0 \sum_{i=1}^k g_i \approx -k\eta_0 \bar{g}$$
 
 Large batch:
+
 $$\Delta w' = -\eta' \cdot g_{kB_0} \approx -\eta' \bar{g}$$
 
 For equivalence: $\eta' = k\eta_0$
@@ -178,6 +183,7 @@ Warmup allows the model to "find its footing" before taking large steps.
 ### Warmup Duration
 
 Rule of thumb:
+
 $$T_{\text{warmup}} \approx \frac{B}{B_0} \cdot T_0$$
 
 Where $T_0$ is warmup steps at baseline batch.
@@ -201,6 +207,7 @@ $$\phi = \frac{||w_l||}{||\nabla w_l|| + \lambda ||w_l||}$$
 **Intuition**: Scale the learning rate by the ratio of weight norm to gradient norm. Prevents any layer from updating too much relative to its current scale.
 
 The update becomes:
+
 $$w_l \leftarrow w_l - \eta \cdot \phi_l \cdot (\nabla w_l + \lambda w_l)$$
 
 **LARS enabled training ImageNet with batch size 32K in 1 hour** (vs. days with standard SGD).
@@ -240,6 +247,7 @@ Larger batch sizes enable data parallelism across more GPUs. But returns diminis
 ### Scaling Efficiency
 
 Define scaling efficiency:
+
 $$E(B) = \frac{S(B_0)/S(B)}{B/B_0}$$
 
 - $E = 1$: Perfect scaling (linear speedup)
@@ -306,6 +314,7 @@ Benefits:
 ### Adaptive Scaling
 
 Monitor gradient noise scale:
+
 $$\text{noise scale} = \frac{||\text{Var}(\nabla L)||}{||\mathbb{E}[\nabla L]||^2}$$
 
 When noise scale drops, safe to increase batch size.

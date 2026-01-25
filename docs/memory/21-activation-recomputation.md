@@ -437,9 +437,11 @@ Let:
 - $c$: fraction of layers checkpointed
 
 **Without checkpointing**:
+
 $$C_{\text{total}} = F + B = F + 2F = 3F$$
 
 **With checkpointing (fraction $c$)**:
+
 $$C_{\text{total}} = F + cF + B = F(1 + c + 2) = F(3 + c)$$
 
 **Compute overhead**: $c \cdot F$, or $\frac{c}{3}$ relative increase.

@@ -20,6 +20,7 @@ As models process longer contexts—documents, codebases, video—the sequence l
 For a transformer layer:
 
 **Activation memory per layer**:
+
 $$M_{\text{act}} = 2 \cdot b \cdot S \cdot H + b \cdot S \cdot S \cdot n_h$$
 
 Where:
@@ -30,6 +31,7 @@ Where:
 The attention matrix scales as $O(S^2)$.
 
 **Example**: $S = 128K$, $b = 1$, $n_h = 32$, fp16:
+
 $$M_{\text{attn}} = 1 \times 32 \times 128K \times 128K \times 2 = 1 \text{ TB}$$
 
 No single GPU can hold this.
@@ -96,9 +98,11 @@ Rank T-1: tokens (T-1)S/T to S - 1
 ### Communication Pattern
 
 **Before column-parallel layer** (needs full sequence for each rank):
+
 $$\text{AllGather along sequence} \to (b, S, H)$$
 
 **After row-parallel layer** (output is partial, sum across):
+
 $$\text{ReduceScatter along sequence} \to (b, S/T, H)$$
 
 ```
@@ -136,9 +140,11 @@ $$\text{ReduceScatter along sequence} \to (b, S/T, H)$$
 ### Memory Savings
 
 **Without sequence parallelism**:
+
 $$M_{\text{LN+Dropout}} = 2 \cdot b \cdot S \cdot H \text{ (replicated)}$$
 
 **With sequence parallelism**:
+
 $$M_{\text{LN+Dropout}} = 2 \cdot b \cdot \frac{S}{T} \cdot H$$
 
 Savings factor: $T$ (the tensor parallelism degree).
@@ -233,6 +239,7 @@ Milakov & Gimelshein (2018) showed softmax can be computed incrementally.
 **The insight**: Track the running maximum and sum.
 
 For numerical stability:
+
 $$\text{softmax}(x)_i = \frac{e^{x_i - m}}{\sum_j e^{x_j - m}}$$
 
 where $m = \max_j x_j$.
@@ -244,6 +251,7 @@ $$m_{AB} = \max(m_A, m_B)$$
 $$\text{sum}_{AB} = \text{sum}_A \cdot e^{m_A - m_{AB}} + \text{sum}_B \cdot e^{m_B - m_{AB}}$$
 
 **Output update**:
+
 $$\text{out}_{AB} = \frac{\text{out}_A \cdot \text{sum}_A \cdot e^{m_A - m_{AB}} + \text{out}_B \cdot \text{sum}_B \cdot e^{m_B - m_{AB}}}{\text{sum}_{AB}}$$
 
 ### Associativity of Online Softmax
@@ -255,6 +263,7 @@ Let $(m, s, o)$ represent the state (max, sum, output). The combination operatio
 $$(m_1, s_1, o_1) \oplus (m_2, s_2, o_2) = (m_{12}, s_{12}, o_{12})$$
 
 is associative:
+
 $$((m_1, s_1, o_1) \oplus (m_2, s_2, o_2)) \oplus (m_3, s_3, o_3) = (m_1, s_1, o_1) \oplus ((m_2, s_2, o_2) \oplus (m_3, s_3, o_3))$$
 
 **Proof sketch**: The max operation is associative. The sum and output updates are weighted averages with weights determined by exponentiated differences from the global max. The final result depends only on all inputs, not on combination order. $\square$
@@ -387,6 +396,7 @@ Each step:
 - Receive from previous rank: same
 
 **Total communication per attention layer**:
+
 $$C = 2(P-1) \cdot \frac{S}{P} \cdot H \cdot \text{sizeof} = 2 \cdot \frac{P-1}{P} \cdot S \cdot H \cdot \text{sizeof}$$
 
 **Critical feature**: Communication overlaps with computation.
@@ -403,6 +413,7 @@ While computing attention with current K, V:
 $$\text{Overlap} = \min\left(1, \frac{T_{\text{compute}}}{T_{\text{comm}}}\right)$$
 
 Where:
+
 $$T_{\text{compute}} = \frac{2 \cdot (S/P)^2 \cdot H}{F_{\text{FLOPS}}}$$
 $$T_{\text{comm}} = \frac{2 \cdot (S/P) \cdot H \cdot \text{sizeof}}{\text{bandwidth}}$$
 
@@ -418,6 +429,7 @@ For large sequences, compute dominates and overlap is nearly perfect.
 - Output accumulator: $b \cdot \frac{S}{P} \cdot H$
 
 **Total**:
+
 $$M \approx 5 \cdot b \cdot \frac{S}{P} \cdot H + b \cdot n_h \cdot \left(\frac{S}{P}\right)^2$$
 
 The quadratic term is now $(S/P)^2$ instead of $S^2$ — a factor of $P^2$ reduction.
@@ -515,11 +527,13 @@ def all_to_all(x, dim_scatter, dim_gather, group):
 ### Communication Analysis
 
 **AlltoAll volume** (each direction):
+
 $$C = (P-1) \cdot \frac{S}{P} \cdot \frac{H}{P} \cdot b = \frac{(P-1) \cdot S \cdot H \cdot b}{P^2}$$
 
 Per attention layer: 4 AlltoAll operations (Q, K, V in; output out).
 
 **Total**:
+
 $$C_{\text{total}} = 4 \cdot \frac{(P-1) \cdot S \cdot H \cdot b}{P^2}$$
 
 ### Ring vs Ulysses Comparison

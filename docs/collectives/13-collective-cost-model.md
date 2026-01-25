@@ -23,6 +23,7 @@ Using the α-β model, we can predict communication time for any collective.
 ### Point-to-Point Operations
 
 **Send/Recv**:
+
 $$T = \alpha + \frac{n}{\beta}$$
 
 This is the foundation. All collective costs derive from compositions of point-to-point operations.
@@ -30,9 +31,11 @@ This is the foundation. All collective costs derive from compositions of point-t
 ### Broadcast and Reduce
 
 **Broadcast** (tree algorithm):
+
 $$T_{\text{broadcast}} = \log_2 P \cdot \alpha + \log_2 P \cdot \frac{n}{\beta}$$
 
 **Reduce** (tree algorithm):
+
 $$T_{\text{reduce}} = \log_2 P \cdot \alpha + \log_2 P \cdot \frac{n}{\beta}$$
 
 **Note**: Both use tree algorithms because they have single source/destination.
@@ -40,27 +43,33 @@ $$T_{\text{reduce}} = \log_2 P \cdot \alpha + \log_2 P \cdot \frac{n}{\beta}$$
 ### Scatter and Gather
 
 **Scatter** (binomial tree):
+
 $$T_{\text{scatter}} = \log_2 P \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 The bandwidth term improves because at each level, data size halves.
 
 **Gather** (binomial tree):
+
 $$T_{\text{gather}} = \log_2 P \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 ### AllReduce
 
 **Ring algorithm** (optimal for large messages):
+
 $$T_{\text{AllReduce}}^{\text{ring}} = 2(P-1) \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 **Tree algorithm** (optimal for small messages):
+
 $$T_{\text{AllReduce}}^{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot \frac{n}{\beta}$$
 
 **Recursive halving-doubling** (best of both for power-of-2 P):
+
 $$T_{\text{AllReduce}}^{\text{RHD}} = 2\log_2 P \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 ### AllGather
 
 **Ring algorithm**:
+
 $$T_{\text{AllGather}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 Where $n$ is the total output size (each process contributes $n/P$).
@@ -68,6 +77,7 @@ Where $n$ is the total output size (each process contributes $n/P$).
 ### ReduceScatter
 
 **Ring algorithm**:
+
 $$T_{\text{ReduceScatter}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 Where $n$ is the total input size (each process outputs $n/P$).
@@ -75,6 +85,7 @@ Where $n$ is the total input size (each process outputs $n/P$).
 ### AlltoAll
 
 **Pairwise exchange**:
+
 $$T_{\text{AlltoAll}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 Where $n$ is the total data per process (sends $n/P$ to each other process).
@@ -124,9 +135,11 @@ The correction factor depends on the collective:
 AllReduce of 1 GB across 8 GPUs takes 50ms.
 
 **Algorithmic bandwidth**:
+
 $$\text{algbw} = \frac{10^9 \text{ bytes}}{0.05 \text{ s}} = 20 \text{ GB/s}$$
 
 **Bus bandwidth**:
+
 $$\text{busbw} = 20 \times \frac{2(8-1)}{8} = 20 \times \frac{14}{8} = 35 \text{ GB/s}$$
 
 If your NIC is 400 Gbps = 50 GB/s, you're achieving 70% of peak—good performance!
@@ -156,6 +169,7 @@ Only $n/G$ bytes cross the network per GPU!
 $$T_3 = (G-1) \cdot \alpha_{\text{NV}} + \frac{G-1}{G} \cdot \frac{n}{\beta_{\text{NV}}}$$
 
 **Total**:
+
 $$T_{\text{hier}} = T_1 + T_2 + T_3$$
 
 ### Numerical Example
@@ -168,17 +182,21 @@ $$T_{\text{hier}} = T_1 + T_2 + T_3$$
 - $\alpha_{\text{net}} = 5 \mu s$, $\beta_{\text{net}} = 50$ GB/s (400 GbE)
 
 **Phase 1 (intra-node RS)**:
+
 $$T_1 = 7 \times 10^{-6} + \frac{7}{8} \times \frac{2 \times 10^9}{3 \times 10^{11}} = 7\mu s + 5.8\text{ms} = 5.81\text{ms}$$
 
 **Phase 2 (inter-node AR of 256 MB per GPU)**:
+
 $$T_2 = 14 \times 5 \times 10^{-6} + \frac{14}{8} \times \frac{2.5 \times 10^8}{5 \times 10^{10}} = 70\mu s + 8.75\text{ms} = 8.82\text{ms}$$
 
 **Phase 3 (intra-node AG)**:
+
 $$T_3 = 7 \times 10^{-6} + \frac{7}{8} \times \frac{2 \times 10^9}{3 \times 10^{11}} = 5.81\text{ms}$$
 
 **Total hierarchical**: $T_{\text{hier}} = 5.81 + 8.82 + 5.81 = 20.44$ ms
 
 **Compare to flat ring** (64 GPUs, bottleneck is network):
+
 $$T_{\text{flat}} = 126 \times 5\mu s + \frac{126}{64} \times \frac{2 \times 10^9}{5 \times 10^{10}} = 0.63\text{ms} + 78.75\text{ms} = 79.38\text{ms}$$
 
 **Hierarchical is 3.9× faster** because only 1/8 of data crosses the slow network!
@@ -353,14 +371,17 @@ $$T_{\text{PP}} = 2 \times \left( \alpha + \frac{n_{\text{activation}}}{\beta} \
 - 80 layers, 8 micro-batches
 
 **TP communication** (8 GPUs, NVLink β = 300 GB/s):
+
 $$T_{\text{TP}} = 80 \times 4 \times \left( 14 \times 1\mu s + \frac{14}{8} \times \frac{64 \times 10^6}{3 \times 10^{11}} \right)$$
 $$= 320 \times (14\mu s + 0.37\text{ms}) = 123\text{ms}$$
 
 **DP communication** (8 GPUs, network β = 50 GB/s):
+
 $$T_{\text{DP}} = 14 \times 5\mu s + \frac{14}{8} \times \frac{17.5 \times 10^9}{5 \times 10^{10}}$$
 $$= 70\mu s + 612.5\text{ms} = 612.6\text{ms}$$
 
 **PP communication** (8 stages, 8 μbatches):
+
 $$T_{\text{PP}} = 8 \times 2 \times \left( 5\mu s + \frac{64 \times 10^6}{5 \times 10^{10}} \right) = 16 \times 1.28\text{ms} = 20.5\text{ms}$$
 
 **Total communication estimate**: 123 + 613 + 21 = **757 ms**
@@ -378,6 +399,7 @@ Hide $T_{\text{comm}}$ behind $T_{\text{compute}}$:
 $$T_{\text{total}} = \max(T_{\text{compute}}, T_{\text{comm}})$$
 
 Instead of:
+
 $$T_{\text{total}} = T_{\text{compute}} + T_{\text{comm}}$$
 
 ### Reduce Message Size
@@ -395,6 +417,7 @@ $$T_{\text{total}} = T_{\text{compute}} + T_{\text{comm}}$$
 ### Reduce Parallelism Degree
 
 If $P$ is large and messages are small:
+
 $$T \approx P \cdot \alpha \gg \frac{n}{\beta}$$
 
 Consider: smaller DP group, more TP/PP.

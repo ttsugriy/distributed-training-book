@@ -63,6 +63,7 @@ $$C \approx 6ND$$
 - Total per token: ~$6N$ FLOPs
 
 For $D$ tokens:
+
 $$C = 6ND \text{ FLOPs}$$
 
 This creates a **constraint surface** in $(N, D, C)$ space. For fixed $C$, we get a hyperbola:
@@ -76,6 +77,7 @@ $$D = \frac{C}{6N}$$
 **Method**: Lagrange multipliers
 
 The Lagrangian:
+
 $$\mathcal{L} = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + \lambda(C - 6ND)$$
 
 Taking partial derivatives:
@@ -85,17 +87,21 @@ $$\frac{\partial \mathcal{L}}{\partial N} = -\frac{A\alpha}{N^{\alpha+1}} - 6\la
 $$\frac{\partial \mathcal{L}}{\partial D} = -\frac{B\beta}{D^{\beta+1}} - 6\lambda N = 0$$
 
 From the first equation:
+
 $$\lambda = -\frac{A\alpha}{6DN^{\alpha+1}}$$
 
 Substituting into the second:
+
 $$\frac{B\beta}{D^{\beta+1}} = \frac{A\alpha N}{DN^{\alpha+1}} = \frac{A\alpha}{N^\alpha D}$$
 
 Therefore:
+
 $$\frac{B\beta}{D^\beta} = \frac{A\alpha}{N^\alpha}$$
 
 This says: **at the optimum, the marginal contribution to loss reduction from parameters equals that from data**.
 
 Rearranging:
+
 $$\frac{N^\alpha}{D^\beta} = \frac{A\alpha}{B\beta}$$
 
 ## The Optimal Allocation
@@ -113,6 +119,7 @@ If $\alpha = \beta$ (as Chinchilla suggests):
 $$N^* \propto C^{0.5}, \quad D^* \propto C^{0.5}$$
 
 The optimal ratio:
+
 $$\frac{D^*}{N^*} = \frac{B\beta}{A\alpha}$$
 
 For Chinchilla parameters: $D^*/N^* \approx 20$
@@ -195,6 +202,7 @@ Where MFU (Model FLOP Utilization) is typically 30-50%.
 $$C = 6 \times 70 \times 10^9 \times 1.4 \times 10^{12} = 5.9 \times 10^{23} \text{ FLOPs}$$
 
 On 1000 H100s at 40% MFU:
+
 $$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 10^{15} \times 0.4} \approx 17 \text{ days}$$
 
 ## Beyond Simple Scaling

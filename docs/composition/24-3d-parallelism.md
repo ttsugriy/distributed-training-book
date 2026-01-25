@@ -29,6 +29,7 @@ Each parallelism strategy has a natural scale where it excels:
 $$\text{Memory per GPU} = M_{\text{model}} + M_{\text{optimizer}} + M_{\text{activation}}$$
 
 For a 175B model with Adam optimizer in mixed precision:
+
 $$M_{\text{model}} + M_{\text{optimizer}} = 175\text{B} \times (2 + 8) = 1.75\text{ TB}$$
 
 No GPU can hold this.
@@ -40,9 +41,11 @@ No GPU can hold this.
 **Weakness**: Communication scales with hidden dimension.
 
 For $P$ GPUs, each linear layer requires:
+
 $$\text{Communication} = O(P \times H \times \text{batch}) \text{ per forward and backward}$$
 
 With $P = 1024$, AllReduce latency dominates:
+
 $$T_{\text{allreduce}} = 2(P-1) \alpha + \frac{2(P-1)}{P\beta} \cdot n$$
 
 The $2046\alpha$ latency term destroys throughput.
@@ -54,9 +57,11 @@ The $2046\alpha$ latency term destroys throughput.
 **Weakness**: Pipeline bubbles.
 
 With $P$ stages and micro-batch count $M$:
+
 $$\text{Bubble fraction} = \frac{P - 1}{P + M - 1}$$
 
 With $P = 1024$ and $M = 4$:
+
 $$\text{Bubble fraction} = \frac{1023}{1027} = 99.6\%$$
 
 ## The 3D Composition
@@ -260,12 +265,15 @@ DP Group (ranks across nodes):
 With 3D parallelism, memory is distributed:
 
 **Model Parameters** (sharded by TP and PP):
+
 $$M_{\text{params}} = \frac{\Psi \times 2}{T \times P}$$
 
 **Optimizer States** (sharded by TP and PP):
+
 $$M_{\text{optimizer}} = \frac{\Psi \times 8}{T \times P}$$
 
 **Activations** (sharded by TP, multiplied by pipeline depth):
+
 $$M_{\text{activations}} = \frac{B \times L_{\text{stage}} \times H}{T} \times k_{\text{buffer}}$$
 
 Where $k_{\text{buffer}}$ accounts for in-flight micro-batches.
@@ -275,12 +283,15 @@ Where $k_{\text{buffer}}$ accounts for in-flight micro-batches.
 Configuration: DP=32, PP=8, TP=4.
 
 **Parameters per GPU**:
+
 $$\frac{175\text{B} \times 2}{4 \times 8} = \frac{350\text{GB}}{32} = 10.9\text{ GB}$$
 
 **Optimizer per GPU**:
+
 $$\frac{175\text{B} \times 8}{4 \times 8} = \frac{1.4\text{TB}}{32} = 43.8\text{ GB}$$
 
 **Activations per GPU** (with $B=32$ micro-batches in flight):
+
 $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 
 **Total**: 10.9 + 43.8 + 24 ≈ **79 GB** (fits in 80GB A100).
@@ -290,6 +301,7 @@ $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 ### Compute Time
 
 Forward and backward pass time (per micro-batch):
+
 $$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu}}{P \times \text{FLOPS}_{\text{GPU}}}$$
 
 Where $B_{\mu}$ is micro-batch size.
@@ -297,17 +309,21 @@ Where $B_{\mu}$ is micro-batch size.
 ### Communication Time
 
 **TP Communication** (per layer, both forward and backward):
+
 $$T_{\text{TP}} = 4 \times L_{\text{stage}} \times \left(\alpha + \frac{2(T-1)}{T} \times \frac{H \times B_{\mu}}{\beta_{\text{NVLink}}}\right)$$
 
 **PP Communication** (per micro-batch):
+
 $$T_{\text{PP}} = 2 \times \left(\alpha + \frac{H \times B_{\mu}}{\beta_{\text{IB}}}\right)$$
 
 **DP Communication** (once per step):
+
 $$T_{\text{DP}} = \frac{2(D-1)}{D} \times \frac{\Psi/(T \times P)}{\beta_{\text{IB}}}$$
 
 ### Pipeline Efficiency
 
 With 1F1B schedule and $M$ micro-batches:
+
 $$\eta_{\text{pipeline}} = \frac{M}{M + P - 1}$$
 
 ### Total Step Time
@@ -727,9 +743,11 @@ Megatron-LM trains large models with 3D parallelism:
 - Total: ~54 GB (fits 80GB A100)
 
 **Pipeline efficiency**:
+
 $$\eta = \frac{32}{32 + 16 - 1} = \frac{32}{47} = 68\%$$
 
 **TP communication** (per layer):
+
 $$T_{\text{TP}} = 2 \times \left(\alpha + \frac{7}{8} \times \frac{12288 \times 2048 \times 2}{600 \times 10^9}\right) \approx 0.07\text{ ms}$$
 
 **Overall MFU**: ~45-50% on A100 cluster.
@@ -745,6 +763,7 @@ $$T_{\text{TP}} = 2 \times \left(\alpha + \frac{7}{8} \times \frac{12288 \times 
 | Microbatches | 70 |
 
 **Pipeline efficiency**:
+
 $$\eta = \frac{70}{70 + 35 - 1} = \frac{70}{104} = 67\%$$
 
 ## Interleaved Pipeline Stages
@@ -772,6 +791,7 @@ Rank 3: [Layer 18-23] + [Layer 42-47]
 ### Interleaved Benefits
 
 **Reduced bubble**:
+
 $$\text{Bubble} = \frac{P - 1}{P + M - 1} \to \frac{P/v - 1}{P/v + M - 1}$$
 
 With $v$ virtual stages per rank.

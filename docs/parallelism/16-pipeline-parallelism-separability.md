@@ -114,12 +114,15 @@ Where:
 Let $t_F$ and $t_B$ be the time for forward and backward passes per stage (assumed equal across stages for now).
 
 **Total time for one batch**:
+
 $$T_{\text{total}} = P \cdot t_F + P \cdot t_B = P(t_F + t_B)$$
 
 **Useful computation per stage**:
+
 $$T_{\text{useful}} = t_F + t_B$$
 
 **Bubble fraction**:
+
 $$\text{Bubble} = 1 - \frac{T_{\text{useful}}}{T_{\text{total}}} = 1 - \frac{1}{P} = \frac{P-1}{P}$$
 
 **For $P = 4$**: 75% idle time. This is catastrophic.
@@ -572,6 +575,7 @@ Each stage sends activations to the next stage:
 **Backward**: Stage $i+1$ → Stage $i$
 
 **Activation tensor size**:
+
 $$\text{Size} = b \cdot S \cdot H \cdot \text{sizeof(dtype)}$$
 
 Where:
@@ -591,14 +595,17 @@ $$\text{Size} = 1 \times 2048 \times 4096 \times 2 = 16 \text{ MB}$$
 - 1 receive (backward gradient)
 
 **Total per minibatch**:
+
 $$\text{Volume} = 2 \cdot (P-1) \cdot m \cdot b \cdot S \cdot H \cdot \text{sizeof}$$
 
 ### Comparison with Data Parallelism
 
 Data parallelism AllReduce volume:
+
 $$\text{Volume}_{\text{DP}} = 2 \cdot \frac{P-1}{P} \cdot \Psi \cdot \text{sizeof}$$
 
 Pipeline parallelism volume:
+
 $$\text{Volume}_{\text{PP}} = 2 \cdot (P-1) \cdot m \cdot b \cdot S \cdot H \cdot \text{sizeof}$$
 
 For large models with many parameters $\Psi$:
@@ -977,6 +984,7 @@ class ZeroBubbleScheduler:
 $$\text{Throughput} = \frac{m \cdot b \cdot S}{T_{\text{batch}}}$$
 
 Where:
+
 $$T_{\text{batch}} = (m + P - 1) \cdot t_{\text{stage}} \cdot (1 + \text{overhead})$$
 
 ### Scaling Efficiency
