@@ -90,10 +90,10 @@ flowchart TB
     G2 -.->|DP| G6
     G3 -.->|DP| G7
 
-    style G0 fill:#4a9eff,stroke:#0066cc,color:white
-    style G1 fill:#4a9eff,stroke:#0066cc,color:white
-    style G2 fill:#4a9eff,stroke:#0066cc,color:white
-    style G3 fill:#4a9eff,stroke:#0066cc,color:white
+    style G0 fill:#3b82f6,stroke:#2563eb,color:white
+    style G1 fill:#3b82f6,stroke:#2563eb,color:white
+    style G2 fill:#3b82f6,stroke:#2563eb,color:white
+    style G3 fill:#3b82f6,stroke:#2563eb,color:white
     style G4 fill:#2ecc71,stroke:#27ae60,color:white
     style G5 fill:#2ecc71,stroke:#27ae60,color:white
     style G6 fill:#2ecc71,stroke:#27ae60,color:white

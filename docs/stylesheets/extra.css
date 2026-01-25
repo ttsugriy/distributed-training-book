@@ -109,3 +109,61 @@
 .definition strong {
   color: #7c3aed;
 }
+
+/* Mermaid diagram styling */
+.mermaid {
+  background: transparent !important;
+  text-align: center;
+}
+
+/* Light mode Mermaid colors */
+[data-md-color-scheme="default"] .mermaid {
+  --mermaid-font-family: var(--md-text-font-family);
+}
+
+/* Override default gray subgraph backgrounds */
+[data-md-color-scheme="default"] .mermaid .cluster rect {
+  fill: rgba(37, 99, 235, 0.08) !important;
+  stroke: rgba(37, 99, 235, 0.3) !important;
+}
+
+[data-md-color-scheme="default"] .mermaid .cluster span {
+  color: var(--md-default-fg-color) !important;
+}
+
+/* Dark mode Mermaid colors */
+[data-md-color-scheme="slate"] .mermaid .cluster rect {
+  fill: rgba(96, 165, 250, 0.12) !important;
+  stroke: rgba(96, 165, 250, 0.3) !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .cluster span {
+  color: var(--md-default-fg-color) !important;
+}
+
+/* Node styling - use a warmer, more varied palette */
+[data-md-color-scheme="default"] .mermaid .node rect,
+[data-md-color-scheme="default"] .mermaid .node circle,
+[data-md-color-scheme="default"] .mermaid .node polygon {
+  stroke-width: 2px !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid .node rect,
+[data-md-color-scheme="slate"] .mermaid .node circle,
+[data-md-color-scheme="slate"] .mermaid .node polygon {
+  stroke-width: 2px !important;
+}
+
+/* Gantt chart styling */
+.mermaid .section {
+  fill: rgba(37, 99, 235, 0.1) !important;
+}
+
+/* Edge/link styling */
+.mermaid .flowchart-link {
+  stroke: var(--md-default-fg-color--light) !important;
+}
+
+.mermaid marker path {
+  fill: var(--md-default-fg-color--light) !important;
+}

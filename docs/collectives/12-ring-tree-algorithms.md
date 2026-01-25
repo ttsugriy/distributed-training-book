@@ -46,10 +46,10 @@ flowchart LR
         P3 --> P0
     end
 
-    style P0 fill:#4a9eff,stroke:#0066cc,color:white
-    style P1 fill:#4a9eff,stroke:#0066cc,color:white
-    style P2 fill:#4a9eff,stroke:#0066cc,color:white
-    style P3 fill:#4a9eff,stroke:#0066cc,color:white
+    style P0 fill:#3b82f6,stroke:#2563eb,color:white
+    style P1 fill:#3b82f6,stroke:#2563eb,color:white
+    style P2 fill:#3b82f6,stroke:#2563eb,color:white
+    style P3 fill:#3b82f6,stroke:#2563eb,color:white
 ```
 
 ### Phase 1: ReduceScatter via Ring
