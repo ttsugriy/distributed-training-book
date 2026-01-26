@@ -65,7 +65,7 @@ Below this size, latency dominates. Above it, bandwidth dominates.
 
 **Example** (InfiniBand, α=2μs, β=50 GB/s):
 
-$$n^* = 2 \times 10^{-6} \times 50 \times 10^{9} = 100\text{ KB}$$
+$$n^* = 2 \times 10^{-6} \times 50 \times 10^{9} = 100 \times 10^{3} \text{ B} = 100 \text{ KB}$$
 
 Messages smaller than 100KB are primarily latency-bound on InfiniBand.
 
@@ -269,11 +269,11 @@ def measure_bandwidth(size_bytes, warmup=10, trials=100):
 
     **NVLink crossover:**
 
-    $$n^*_{NVLink} = 1 \times 10^{-6} \times 900 \times 10^9 = 900 \text{ KB}$$
+    $$n^*_{NVLink} = 1 \times 10^{-6} \times 900 \times 10^9 = 900 \times 10^{3} \text{ B} = 900 \text{ KB}$$
 
     **InfiniBand crossover:**
 
-    $$n^*_{IB} = 2 \times 10^{-6} \times 50 \times 10^9 = 100 \text{ KB}$$
+    $$n^*_{IB} = 2 \times 10^{-6} \times 50 \times 10^9 = 100 \times 10^{3} \text{ B} = 100 \text{ KB}$$
 
     **Comparison:**
 
