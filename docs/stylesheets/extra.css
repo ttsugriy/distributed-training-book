@@ -167,3 +167,275 @@
 .mermaid marker path {
   fill: var(--md-default-fg-color--light) !important;
 }
+
+/* ========================================
+   Interactive Algorithm Stepper
+   ======================================== */
+
+.algorithm-stepper {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: var(--md-code-bg-color);
+  border-radius: 12px;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.algorithm-stepper:focus {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+.stepper-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.stepper-controls button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--md-primary-fg-color);
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.stepper-controls button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.stepper-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.step-indicator {
+  font-family: var(--md-code-font-family);
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  min-width: 100px;
+  text-align: center;
+}
+
+.algorithm-stepper .step {
+  display: none;
+}
+
+.algorithm-stepper .step.active {
+  display: block;
+  animation: stepFadeIn 0.3s ease-out;
+}
+
+@keyframes stepFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ========================================
+   Ring AllReduce Animation
+   ======================================== */
+
+.ring-animation {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.ring-animation svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.ring-animation .phase-label {
+  font-family: var(--md-code-font-family);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--md-primary-fg-color);
+  margin-bottom: 1rem;
+}
+
+/* Ring node styling */
+.ring-node {
+  transition: fill 0.5s ease;
+}
+
+/* Data packet animation around ring */
+.data-packet {
+  animation: rotateRing 8s linear infinite;
+  transform-origin: center;
+}
+
+@keyframes rotateRing {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pause animation on hover for inspection */
+.ring-animation:hover .data-packet {
+  animation-play-state: paused;
+}
+
+/* ========================================
+   Color Palette for Visualizations
+   GPU ownership colors (consistent across all diagrams)
+   ======================================== */
+
+:root {
+  /* GPU colors - 4-way parallelism */
+  --gpu-0: #3498db;  /* Blue */
+  --gpu-1: #e74c3c;  /* Red */
+  --gpu-2: #2ecc71;  /* Green */
+  --gpu-3: #f39c12;  /* Orange */
+  --gpu-4: #9b59b6;  /* Purple */
+  --gpu-5: #1abc9c;  /* Teal */
+  --gpu-6: #e91e63;  /* Pink */
+  --gpu-7: #00bcd4;  /* Cyan */
+
+  /* Semantic colors */
+  --color-replicated: #6b7280;     /* Gray - data on all GPUs */
+  --color-partial: #fbbf24;        /* Yellow - partial sum */
+  --color-complete: #10b981;       /* Green - complete result */
+  --color-communication: #ef4444;  /* Red - data in transit */
+}
+
+/* ========================================
+   Pipeline Parallelism Bubble Diagram
+   ======================================== */
+
+.pipeline-animation {
+  margin: 2rem 0;
+  overflow-x: auto;
+}
+
+.pipeline-animation .stage {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem;
+  border-radius: 4px;
+  font-family: var(--md-code-font-family);
+  font-size: 0.8rem;
+  animation: pipelinePulse 2s ease-in-out infinite;
+}
+
+.pipeline-animation .stage.active {
+  animation: pipelineActive 0.5s ease-out;
+}
+
+.pipeline-animation .stage.bubble {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(128, 128, 128, 0.1),
+    rgba(128, 128, 128, 0.1) 4px,
+    rgba(128, 128, 128, 0.2) 4px,
+    rgba(128, 128, 128, 0.2) 8px
+  );
+  color: var(--md-default-fg-color--light);
+}
+
+@keyframes pipelinePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes pipelineActive {
+  from {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   Tensor Partition Visualization
+   ======================================== */
+
+.tensor-viz {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tensor-viz .partition {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-family: var(--md-code-font-family);
+  font-size: 0.85rem;
+  color: white;
+  text-align: center;
+  min-width: 80px;
+}
+
+.tensor-viz .partition.gpu-0 { background: var(--gpu-0); }
+.tensor-viz .partition.gpu-1 { background: var(--gpu-1); }
+.tensor-viz .partition.gpu-2 { background: var(--gpu-2); }
+.tensor-viz .partition.gpu-3 { background: var(--gpu-3); }
+
+.tensor-viz .partition.replicated {
+  background: var(--color-replicated);
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.tensor-viz .partition.partial {
+  background: var(--color-partial);
+  color: #1f2937;
+}
+
+.tensor-viz .partition.complete {
+  background: var(--color-complete);
+}
+
+/* ========================================
+   Communication Arrow Styling
+   ======================================== */
+
+.comm-diagram .arrow-local {
+  stroke: var(--md-default-fg-color);
+  stroke-width: 2;
+}
+
+.comm-diagram .arrow-allreduce {
+  stroke: var(--color-communication);
+  stroke-width: 2;
+  stroke-dasharray: 8, 4;
+  animation: arrowFlow 1s linear infinite;
+}
+
+.comm-diagram .arrow-allgather {
+  stroke: var(--md-primary-fg-color);
+  stroke-width: 2;
+  stroke-dasharray: 4, 4;
+  animation: arrowFlow 1s linear infinite;
+}
+
+@keyframes arrowFlow {
+  from {
+    stroke-dashoffset: 12;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}

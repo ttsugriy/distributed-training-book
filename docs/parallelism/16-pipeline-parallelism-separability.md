@@ -59,6 +59,95 @@ $$\frac{\partial L}{\partial h_i} = \frac{\partial L}{\partial h_{i+1}} \cdot \f
 
 Each stage can compute its gradient given only the gradient from the next stage.
 
+<div class="algorithm-stepper" markdown>
+<div class="stepper-controls">
+<button class="stepper-prev">← Previous</button>
+<span class="step-indicator">Step 1 of 6</span>
+<button class="stepper-next">Next →</button>
+<button class="stepper-play">▶ Play</button>
+</div>
+
+<div class="step active" markdown>
+**Pipeline Setup** — Model split into 4 stages across 4 GPUs
+
+<div class="tensor-viz">
+<div class="partition gpu-0">GPU 0<br/>Layers 1-8</div>
+<div class="partition gpu-1">GPU 1<br/>Layers 9-16</div>
+<div class="partition gpu-2">GPU 2<br/>Layers 17-24</div>
+<div class="partition gpu-3">GPU 3<br/>Layers 25-32</div>
+</div>
+
+Each GPU holds 1/P of the model. Data flows left→right (forward) and right→left (backward).
+</div>
+
+<div class="step" markdown>
+**Forward Phase Begins** — Batch enters Stage 0
+
+<div class="tensor-viz">
+<div class="partition gpu-0" style="border: 3px solid #fbbf24;">GPU 0<br/><strong>F₀</strong> 🔥</div>
+<div class="partition" style="background: #374151;">GPU 1<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 2<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 3<br/>idle</div>
+</div>
+
+Only GPU 0 is working. **3 out of 4 GPUs are idle** — this is the "bubble."
+</div>
+
+<div class="step" markdown>
+**Forward Propagates** — Activations flow through stages
+
+<div class="tensor-viz">
+<div class="partition" style="background: #374151;">GPU 0<br/>idle</div>
+<div class="partition gpu-1" style="border: 3px solid #fbbf24;">GPU 1<br/><strong>F₁</strong> 🔥</div>
+<div class="partition" style="background: #374151;">GPU 2<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 3<br/>idle</div>
+</div>
+
+GPU 0 finished forward, sent activations to GPU 1. Still 75% idle.
+</div>
+
+<div class="step" markdown>
+**Forward Continues** — Stages 2 and 3
+
+<div class="tensor-viz">
+<div class="partition" style="background: #374151;">GPU 0<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 1<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 2<br/>idle</div>
+<div class="partition gpu-3" style="border: 3px solid #fbbf24;">GPU 3<br/><strong>F₃</strong> 🔥</div>
+</div>
+
+Finally Stage 3 computes. Loss is calculated. Now backward can begin.
+</div>
+
+<div class="step" markdown>
+**Backward Phase** — Gradients flow right→left
+
+<div class="tensor-viz">
+<div class="partition" style="background: #374151;">GPU 0<br/>idle</div>
+<div class="partition" style="background: #374151;">GPU 1<br/>idle</div>
+<div class="partition gpu-2" style="border: 3px solid #ef4444;">GPU 2<br/><strong>B₂</strong> 🔥</div>
+<div class="partition" style="background: #374151;">GPU 3<br/>done</div>
+</div>
+
+Gradients propagate backward. Same bubble problem — only one GPU active at a time.
+</div>
+
+<div class="step" markdown>
+**Complete** — One batch done, but...
+
+<div class="tensor-viz">
+<div class="partition complete">GPU 0<br/>✓ done</div>
+<div class="partition complete">GPU 1<br/>✓ done</div>
+<div class="partition complete">GPU 2<br/>✓ done</div>
+<div class="partition complete">GPU 3<br/>✓ done</div>
+</div>
+
+**Problem**: Each GPU only worked 2 out of 8 time slots = **75% bubble overhead!**
+
+**Solution**: Pipeline multiple micro-batches so all GPUs stay busy.
+</div>
+</div>
+
 ## The Pipeline Bubble Problem
 
 With $P$ pipeline stages and a single batch, we face a fundamental inefficiency.

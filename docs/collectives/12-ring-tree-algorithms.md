@@ -52,6 +52,106 @@ flowchart LR
     style P3 fill:#3b82f6,stroke:#2563eb,color:white
 ```
 
+<div class="algorithm-stepper" markdown>
+<div class="stepper-controls">
+<button class="stepper-prev">← Previous</button>
+<span class="step-indicator">Step 1 of 7</span>
+<button class="stepper-next">Next →</button>
+<button class="stepper-play">▶ Play</button>
+</div>
+
+<div class="step active" markdown>
+**Initial State** — Each GPU holds its own data partitioned into 4 chunks
+
+<div class="tensor-viz">
+<div class="partition gpu-0">P0: A₀ A₁ A₂ A₃</div>
+<div class="partition gpu-1">P1: B₀ B₁ B₂ B₃</div>
+<div class="partition gpu-2">P2: C₀ C₁ C₂ C₃</div>
+<div class="partition gpu-3">P3: D₀ D₁ D₂ D₃</div>
+</div>
+
+Each process will end up owning one chunk of the final reduced result.
+</div>
+
+<div class="step" markdown>
+**ReduceScatter Step 1** — Each GPU sends one chunk clockwise, receives from counterclockwise neighbor, and reduces
+
+<div class="tensor-viz">
+<div class="partition gpu-0">P0: <strong>A₀+D₀</strong> A₁ A₂ A₃</div>
+<div class="partition gpu-1">P1: B₀ <strong>B₁+A₁</strong> B₂ B₃</div>
+<div class="partition gpu-2">P2: C₀ C₁ <strong>C₂+B₂</strong> C₃</div>
+<div class="partition gpu-3">P3: D₀ D₁ D₂ <strong>D₃+C₃</strong></div>
+</div>
+
+P3→P0 (chunk 0), P0→P1 (chunk 1), P1→P2 (chunk 2), P2→P3 (chunk 3)
+</div>
+
+<div class="step" markdown>
+**ReduceScatter Step 2** — Continue sending the chunk just reduced
+
+<div class="tensor-viz">
+<div class="partition gpu-0">P0: <strong>A₀+D₀+C₀</strong> A₁ A₂ A₃</div>
+<div class="partition gpu-1">P1: B₀ <strong>B₁+A₁+D₁</strong> B₂ B₃</div>
+<div class="partition gpu-2">P2: C₀ C₁ <strong>C₂+B₂+A₂</strong> C₃</div>
+<div class="partition gpu-3">P3: D₀ D₁ D₂ <strong>D₃+C₃+B₃</strong></div>
+</div>
+
+Partial sums now contain 3 contributions each.
+</div>
+
+<div class="step" markdown>
+**ReduceScatter Step 3 (Final)** — After P-1=3 steps, each GPU owns one fully reduced chunk
+
+<div class="tensor-viz">
+<div class="partition complete">P0: <strong>Σ₀</strong> · · ·</div>
+<div class="partition complete">P1: · <strong>Σ₁</strong> · ·</div>
+<div class="partition complete">P2: · · <strong>Σ₂</strong> ·</div>
+<div class="partition complete">P3: · · · <strong>Σ₃</strong></div>
+</div>
+
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ. Each GPU holds 1/P of the complete result.
+</div>
+
+<div class="step" markdown>
+**AllGather Step 1** — Each GPU sends its reduced chunk clockwise
+
+<div class="tensor-viz">
+<div class="partition complete">P0: Σ₀ · · <strong>Σ₃</strong></div>
+<div class="partition complete">P1: <strong>Σ₀</strong> Σ₁ · ·</div>
+<div class="partition complete">P2: · <strong>Σ₁</strong> Σ₂ ·</div>
+<div class="partition complete">P3: · · <strong>Σ₂</strong> Σ₃</div>
+</div>
+
+No reduction needed — just store the received chunk.
+</div>
+
+<div class="step" markdown>
+**AllGather Step 2** — Continue propagating chunks around the ring
+
+<div class="tensor-viz">
+<div class="partition complete">P0: Σ₀ · <strong>Σ₂</strong> Σ₃</div>
+<div class="partition complete">P1: Σ₀ Σ₁ · <strong>Σ₃</strong></div>
+<div class="partition complete">P2: <strong>Σ₀</strong> Σ₁ Σ₂ ·</div>
+<div class="partition complete">P3: · <strong>Σ₁</strong> Σ₂ Σ₃</div>
+</div>
+
+Each GPU now has 3 of 4 chunks.
+</div>
+
+<div class="step" markdown>
+**AllGather Step 3 (Complete)** — All GPUs have the full reduced result
+
+<div class="tensor-viz">
+<div class="partition complete">P0: Σ₀ Σ₁ Σ₂ Σ₃</div>
+<div class="partition complete">P1: Σ₀ Σ₁ Σ₂ Σ₃</div>
+<div class="partition complete">P2: Σ₀ Σ₁ Σ₂ Σ₃</div>
+<div class="partition complete">P3: Σ₀ Σ₁ Σ₂ Σ₃</div>
+</div>
+
+**Total steps**: 2(P-1) = 6 steps. **Data per GPU**: 2·(P-1)/P·n ≈ 2n bytes (bandwidth-optimal).
+</div>
+</div>
+
 ### Phase 1: ReduceScatter via Ring
 
 Partition each process's data into $P$ chunks. In $P-1$ steps, each process:
