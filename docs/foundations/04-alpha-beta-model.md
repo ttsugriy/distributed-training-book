@@ -76,11 +76,104 @@ For collective operations, we extend the model with additional terms.
 !!! note "Preview: Collectives at a Glance"
     We'll study collective operations in depth in Part III. For now, here's the intuition:
 
-    - **AllReduce**: Sum (or average) values from all GPUs and give everyone the result
-    - **ReduceScatter**: Sum values, but distribute different parts of the result to each GPU
-    - **AllGather**: Collect pieces from all GPUs and give everyone the full concatenation
+    - **AllReduce**: Every GPU contributes a value → everyone receives the sum
+    - **ReduceScatter**: Every GPU contributes a value → each GPU receives 1/P of the reduced result
+    - **AllGather**: Each GPU has one piece → everyone receives the complete concatenation
+    - **AllToAll**: Each GPU sends *different* data to each other GPU (a "transpose" across processes)
 
     The formulas below show how the α-β model applies to these operations. Don't worry about the details yet—focus on the structure: *latency terms grow with P, but bandwidth terms often don't*.
+
+#### Visual Patterns
+
+These diagrams show what each collective does, not how it's implemented. We'll explore ring and tree algorithms in [Chapter 12](../collectives/12-ring-tree-algorithms.md).
+
+<div class="collective-patterns" markdown>
+
+**AllReduce** — Combine and broadcast:
+
+```mermaid
+flowchart LR
+    subgraph before [Before]
+        direction TB
+        A0[GPU 0: a]
+        A1[GPU 1: b]
+        A2[GPU 2: c]
+        A3[GPU 3: d]
+    end
+    subgraph after [After]
+        direction TB
+        B0["GPU 0: Σ"]
+        B1["GPU 1: Σ"]
+        B2["GPU 2: Σ"]
+        B3["GPU 3: Σ"]
+    end
+    before -- "Σ = a+b+c+d" --> after
+```
+
+**ReduceScatter** — Combine and distribute pieces:
+
+```mermaid
+flowchart LR
+    subgraph before [Before]
+        direction TB
+        A0["GPU 0: [a₀ a₁ a₂ a₃]"]
+        A1["GPU 1: [b₀ b₁ b₂ b₃]"]
+        A2["GPU 2: [c₀ c₁ c₂ c₃]"]
+        A3["GPU 3: [d₀ d₁ d₂ d₃]"]
+    end
+    subgraph after [After]
+        direction TB
+        B0["GPU 0: Σ₀"]
+        B1["GPU 1: Σ₁"]
+        B2["GPU 2: Σ₂"]
+        B3["GPU 3: Σ₃"]
+    end
+    before -- "Σᵢ = aᵢ+bᵢ+cᵢ+dᵢ" --> after
+```
+
+**AllGather** — Collect pieces into whole:
+
+```mermaid
+flowchart LR
+    subgraph before [Before]
+        direction TB
+        A0[GPU 0: A]
+        A1[GPU 1: B]
+        A2[GPU 2: C]
+        A3[GPU 3: D]
+    end
+    subgraph after [After]
+        direction TB
+        B0["GPU 0: [A B C D]"]
+        B1["GPU 1: [A B C D]"]
+        B2["GPU 2: [A B C D]"]
+        B3["GPU 3: [A B C D]"]
+    end
+    before -- "concatenate" --> after
+```
+
+**AllToAll** — Transpose across processes:
+
+```mermaid
+flowchart LR
+    subgraph before [Before]
+        direction TB
+        A0["GPU 0: [a₀ a₁ a₂ a₃]"]
+        A1["GPU 1: [b₀ b₁ b₂ b₃]"]
+        A2["GPU 2: [c₀ c₁ c₂ c₃]"]
+        A3["GPU 3: [d₀ d₁ d₂ d₃]"]
+    end
+    subgraph after [After]
+        direction TB
+        B0["GPU 0: [a₀ b₀ c₀ d₀]"]
+        B1["GPU 1: [a₁ b₁ c₁ d₁]"]
+        B2["GPU 2: [a₂ b₂ c₂ d₂]"]
+        B3["GPU 3: [a₃ b₃ c₃ d₃]"]
+    end
+    before -- "transpose" --> after
+```
+
+</div>
 
 ### AllReduce
 
@@ -102,15 +195,42 @@ The latency term grows with $P$, but the bandwidth term is independent of $P$ (f
 | AllGather | $(P-1)\alpha$ | $\frac{P-1}{P} \cdot \frac{n}{\beta}$ |
 | **Total** | $2(P-1)\alpha$ | $\frac{2(P-1)}{P} \cdot \frac{n}{\beta}$ |
 
+### ReduceScatter
+
+$$T_{\text{ReduceScatter}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
+Each GPU starts with a tensor of size $n$. After ReduceScatter, each GPU holds $1/P$ of the *reduced* result—chunk $i$ on GPU $i$ contains the sum of all GPUs' chunk $i$. This is the first half of ring AllReduce.
+
 ### AllGather
 
 $$T_{\text{AllGather}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
-### AlltoAll
+Each GPU starts with a piece of size $n/P$ and ends with the complete tensor of size $n$. The ring algorithm passes each piece around the ring, requiring $P-1$ steps. AllGather is the inverse of ReduceScatter and the second half of ring AllReduce.
 
-$$T_{\text{AlltoAll}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+### AllToAll
 
-Same cost as AllGather, but different communication pattern.
+$$T_{\text{AllToAll}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
+AllToAll performs a *transpose* across processes. Each GPU has $P$ chunks of data, one destined for each GPU (including itself). After AllToAll, each GPU has received the chunks that were addressed to it from all other GPUs.
+
+Think of it as a matrix transpose where rows are source GPUs and columns are destination GPUs:
+
+| | → GPU 0 | → GPU 1 | → GPU 2 | → GPU 3 |
+|---------|---------|---------|---------|---------|
+| **GPU 0 has** | a₀ | a₁ | a₂ | a₃ |
+| **GPU 1 has** | b₀ | b₁ | b₂ | b₃ |
+| **GPU 2 has** | c₀ | c₁ | c₂ | c₃ |
+| **GPU 3 has** | d₀ | d₁ | d₂ | d₃ |
+
+After AllToAll, GPU $j$ holds column $j$: the chunks that were in position $j$ on every GPU.
+
+**Why the same cost as AllGather?** Despite the different semantics, each GPU sends $(P-1)/P$ of its data (everything except the chunk it keeps) and receives $(P-1)/P$ from others. The total data movement is identical.
+
+**Use cases:**
+
+- **Expert parallelism** (MoE models like Mixtral, Switch Transformer): Route tokens to their assigned experts across GPUs, then AllToAll again to return results
+- **Sequence parallelism ↔ Tensor parallelism transitions**: Transform data layouts when switching between parallelism strategies
+- **FFT and other transpose-heavy algorithms**: Redistribute data for the next computation phase
 
 ## Implications for Algorithm Design
 
