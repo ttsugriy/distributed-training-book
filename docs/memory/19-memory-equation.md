@@ -315,7 +315,9 @@ $$M_{\text{model}} = 16 \times 7 \times 10^9 = 112 \text{ GB}$$
 **Activation memory**:
 
 $$M_{\text{act}} = 2 \times 32 \times 1 \times 2048 \times 4096 \times (11 + 2048/128)$$
+
 $$= 2 \times 32 \times 2048 \times 4096 \times 27$$
+
 $$= 2 \times 7.25 \times 10^9 \text{ bytes} = 14.5 \text{ GB}$$
 
 **Temporary + fragmentation**: ~10-15 GB

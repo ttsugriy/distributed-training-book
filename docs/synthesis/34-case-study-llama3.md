@@ -119,6 +119,7 @@ $$M_{\text{attn}} = 4 \times d_{\text{model}}^2 = 4 \times 16384^2 \times 2 = 2.
 Wait—this uses GQA with 8 KV heads, so:
 
 $$M_{QKV} = d_{\text{model}} \times (d_{\text{model}} + 2 \times \frac{d_{\text{model}} \times n_{\text{kv}}}{n_{\text{heads}}}) \times 2$$
+
 $$= 16384 \times (16384 + 2 \times \frac{16384 \times 8}{128}) \times 2 = 16384 \times (16384 + 2048) \times 2 \approx 0.61 \text{ GB}$$
 
 **FFN block** (SwiGLU has 3 matrices):
@@ -138,6 +139,7 @@ $$M_{\text{act}} = L \times (2 \times B \times S \times d_{\text{model}} + B \ti
 With $B=1$, $S=8192$, $L=126$:
 
 $$M_{\text{act}} = 126 \times (2 \times 8192 \times 16384 + 8192 \times 53248) \times 2 \text{ bytes}$$
+
 $$\approx 126 \times (268M + 436M) \times 2 \approx 177 \text{ GB per sequence}$$
 
 This explains why activation checkpointing is essential.
@@ -231,6 +233,7 @@ Let's compute total communication per step:
 **Tensor Parallelism** (per layer, 2 AllReduce):
 
 $$V_{\text{TP}} = 126 \times 2 \times 2 \times \frac{7}{8} \times B \times S \times d / TP$$
+
 $$= 126 \times 2 \times 2 \times 0.875 \times B \times S \times 16384 / 8 \times 2 \text{ bytes}$$
 
 For $BS = 1M$ tokens (distributed):
@@ -240,6 +243,7 @@ $$V_{\text{TP}} = 126 \times 4 \times 0.875 \times \frac{1M}{128} \times 2048 \t
 **Pipeline Parallelism** (point-to-point):
 
 $$V_{\text{PP}} = 2 \times \text{microbatches} \times B_{\mu} \times S \times d \times 2$$
+
 $$= 2 \times 64 \times \text{tokens per } \mu\text{batch} \times 16384 \times 2$$
 
 **Data Parallelism** (ReduceScatter + AllGather per layer):

@@ -65,6 +65,7 @@ At 128K context, this becomes prohibitive.
 MLA compresses KV projections through a learned latent space:
 
 $$c_t^{KV} = W^{DKV} h_t$$
+
 $$k_t = W^{UK} c_t^{KV}, \quad v_t = W^{UV} c_t^{KV}$$
 
 Where:
@@ -583,6 +584,7 @@ $$V_{\text{A2A}} = 2 \times (n-1)/n \times B \times S \times d_{\text{model}} \t
 With 2048 GPUs, $B \times S = 4M$ tokens, $d=7168$, top-k=8, 256 experts:
 
 $$V_{\text{A2A}} = 2 \times 0.9995 \times 4M \times 7168 \times 8/256 \times 2 \text{ bytes}$$
+
 $$\approx 3.5 \text{ GB per rank per layer}$$
 
 For 60 layers:

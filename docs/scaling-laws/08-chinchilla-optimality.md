@@ -101,6 +101,7 @@ Wait—that's less than 1, not 20. What gives?
 More precisely, from the paper:
 
 $$N_{\text{opt}} = 0.6225 \cdot C^{0.4957}$$
+
 $$D_{\text{opt}} = 1.8421 \cdot C^{0.5043}$$
 
 At $C = 10^{21}$ FLOPs:
@@ -146,6 +147,7 @@ How "wrong" were pre-Chinchilla models?
 Chinchilla-optimal for this compute:
 
 $$N^* = \sqrt{\frac{3.15 \times 10^{23}}{120}} \approx 51B$$
+
 $$D^* = 20 \times 51B = 1.02T$$
 
 GPT-3 used **3.4× too many parameters** and **3.4× too few tokens**.

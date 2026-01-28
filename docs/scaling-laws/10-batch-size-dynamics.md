@@ -219,6 +219,7 @@ $$w_l \leftarrow w_l - \eta \cdot \phi_l \cdot (\nabla w_l + \lambda w_l)$$
 Layer-wise Adaptive Moments for Batch training—combines LARS with Adam:
 
 $$m_l^{(t)} = \beta_1 m_l^{(t-1)} + (1-\beta_1) \nabla w_l$$
+
 $$v_l^{(t)} = \beta_2 v_l^{(t-1)} + (1-\beta_2) (\nabla w_l)^2$$
 
 $$\hat{m}_l = \frac{m_l}{1-\beta_1^t}, \quad \hat{v}_l = \frac{v_l}{1-\beta_2^t}$$

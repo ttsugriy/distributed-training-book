@@ -373,11 +373,13 @@ $$T_{\text{PP}} = 2 \times \left( \alpha + \frac{n_{\text{activation}}}{\beta} \
 **TP communication** (8 GPUs, NVLink β = 300 GB/s):
 
 $$T_{\text{TP}} = 80 \times 4 \times \left( 14 \times 1\mu s + \frac{14}{8} \times \frac{64 \times 10^6}{3 \times 10^{11}} \right)$$
+
 $$= 320 \times (14\mu s + 0.37\text{ms}) = 123\text{ms}$$
 
 **DP communication** (8 GPUs, network β = 50 GB/s):
 
 $$T_{\text{DP}} = 14 \times 5\mu s + \frac{14}{8} \times \frac{17.5 \times 10^9}{5 \times 10^{10}}$$
+
 $$= 70\mu s + 612.5\text{ms} = 612.6\text{ms}$$
 
 **PP communication** (8 stages, 8 μbatches):

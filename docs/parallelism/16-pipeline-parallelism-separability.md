@@ -46,7 +46,9 @@ After the initial "fill" phase, all stages work simultaneously.
 Let $h_i$ denote the hidden state (activation) at stage $i$:
 
 $$h_0 = x$$
+
 $$h_i = f_i(h_{i-1}) \quad \text{for } i = 1, \ldots, L$$
+
 $$y = h_L$$
 
 The backward pass computes gradients:
