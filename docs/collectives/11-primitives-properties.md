@@ -151,6 +151,8 @@ P3: [D0 D1 D2 D3]    P3: [A3 B3 C3 D3]
 
 ## Summary Table
 
+The following table uses the α-β cost model (see Chapter 4), where $P$ = number of processes, $n$ = message size in bytes, $\alpha$ = latency per message, and $\beta$ = bandwidth in bytes/second.
+
 | Primitive | Input/Output | Data Movement | Optimal Complexity |
 |-----------|--------------|---------------|-------------------|
 | Broadcast | 1 → N copies | root → all | $\alpha \log P + n/\beta$ |
