@@ -21,7 +21,7 @@ Where $\epsilon_B$ is the noise with variance:
 
 $$\text{Var}(\epsilon_B) = \frac{\sigma^2}{B}$$
 
-Larger batch → lower noise → more reliable gradient direction.
+Here $\sigma^2$ is the per-sample gradient variance (a property of the data and model). Larger batch → lower noise → more reliable gradient direction.
 
 But here's the key insight: **noise isn't always bad**.
 

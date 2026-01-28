@@ -46,13 +46,12 @@ These aren't gradual improvements. Below threshold: 0% accuracy. Above: 80%+ acc
 
 **Mathematical model**: Let capability $c$ depend on loss via:
 
-$$P(c | L) = \sigma\left(\frac{L_c - L}{\tau}\right)$$
+$$P(c | L) = \text{sigmoid}\left(\frac{L_c - L}{\tau}\right) = \frac{1}{1 + e^{-(L_c - L)/\tau}}$$
 
 Where:
 
 - $L_c$: critical loss threshold for capability $c$
 - $\tau$: transition sharpness
-- $\sigma$: sigmoid function
 
 As $\tau \to 0$, the transition becomes a step function.
 
@@ -136,7 +135,7 @@ Gradient noise prevents convergence to the true minimum.
 
 $$L \approx L_{\text{opt}}(B, \eta) = \frac{\sigma^2}{B \cdot f(\eta)}$$
 
-Where $B$ is batch size and $\eta$ is learning rate.
+Where $\sigma^2$ is the variance of per-sample gradients, $B$ is batch size, $\eta$ is learning rate, and $f(\eta)$ captures learning rate effects.
 
 *Symptoms*:
 
@@ -378,13 +377,13 @@ This suggests capabilities have **nested phase structures**: easier variants eme
 ??? success "Solution"
     **Using the emergence model:**
 
-    $$P(c | L) = \sigma\left(\frac{L_c - L}{\tau}\right) = \frac{1}{1 + e^{-(L_c - L)/\tau}}$$
+    $$P(c | L) = \text{sigmoid}\left(\frac{L_c - L}{\tau}\right) = \frac{1}{1 + e^{-(L_c - L)/\tau}}$$
 
     **From the 50B data point (50% accuracy):**
 
     At 50% accuracy, the sigmoid argument is 0:
 
-    $$\sigma(0) = 0.5 \implies \frac{L_c - L_{50B}}{\tau} = 0$$
+    $$\text{sigmoid}(0) = 0.5 \implies \frac{L_c - L_{50B}}{\tau} = 0$$
 
     $$\boxed{L_c = L_{50B}}$$
 
