@@ -310,3 +310,4 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     | Chinchilla (600B) | 600B | 640 | 3.3% |
     | Extended (2T) | 2T | 640 | 11% |
     | Budget-limited | 2T | 512 | 14% |
+

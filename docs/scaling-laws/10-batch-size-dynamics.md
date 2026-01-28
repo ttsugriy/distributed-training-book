@@ -204,6 +204,8 @@ Where the trust ratio is:
 
 $$\phi = \frac{||w_l||}{||\nabla w_l|| + \lambda ||w_l||}$$
 
+Here $\lambda$ is the weight decay coefficient (typically 0.0001 to 0.001).
+
 **Intuition**: Scale the learning rate by the ratio of weight norm to gradient norm. Prevents any layer from updating too much relative to its current scale.
 
 The update becomes:
@@ -222,6 +224,8 @@ $$v_l^{(t)} = \beta_2 v_l^{(t-1)} + (1-\beta_2) (\nabla w_l)^2$$
 $$\hat{m}_l = \frac{m_l}{1-\beta_1^t}, \quad \hat{v}_l = \frac{v_l}{1-\beta_2^t}$$
 
 $$r_l = \frac{\hat{m}_l}{\sqrt{\hat{v}_l} + \epsilon}$$
+
+Where $\epsilon$ is a small constant for numerical stability (typically $10^{-8}$).
 
 Then apply LARS-style trust ratio:
 

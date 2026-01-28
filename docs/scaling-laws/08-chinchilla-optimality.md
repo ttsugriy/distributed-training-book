@@ -75,9 +75,9 @@ Loss
 
 Fit all data simultaneously to:
 
-$$L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + E$$
+$$L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
-With Lagrange constraint $C = 6ND$, derive optimal scaling.
+Where $L_\infty$ is the irreducible loss (the minimum achievable loss with infinite compute). With Lagrange constraint $C = 6ND$, derive optimal scaling.
 
 **All three methods agreed**: $N^* \propto C^{0.50}$, $D^* \propto C^{0.50}$.
 
@@ -266,7 +266,9 @@ MoE models have different scaling:
 
 Scaling law for MoE:
 
-$$L(N_{\text{active}}, N_{\text{total}}, D) = \frac{A}{N_{\text{total}}^{\alpha_1} N_{\text{active}}^{\alpha_2}} + \frac{B}{D^\beta} + E$$
+$$L(N_{\text{active}}, N_{\text{total}}, D) = \frac{A}{N_{\text{total}}^{\alpha_1} N_{\text{active}}^{\alpha_2}} + \frac{B}{D^\beta} + L_\infty$$
+
+Where $\alpha_1$ and $\alpha_2$ are fitted exponents for total and active parameters respectively.
 
 ### Repeat Tokens
 
@@ -274,7 +276,7 @@ What if $D > D_{\text{unique}}$? Muennighoff et al. (2023) showed:
 
 $$L(N, D, r) = L(N, D_{\text{unique}}) + \gamma \cdot \log(r)$$
 
-Where $r = D / D_{\text{unique}}$ is the repetition ratio.
+Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an empirically fitted coefficient that captures the diminishing value of repeated data.
 
 4 epochs ≈ 4× the unique data is often acceptable; beyond 16 epochs, returns diminish rapidly.
 
