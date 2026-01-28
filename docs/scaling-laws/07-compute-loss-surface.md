@@ -44,8 +44,8 @@ Where:
 | $D$ | Training tokens | $10^9$ to $10^{13}$ |
 | $A$ | Parameter scaling constant | ~400 |
 | $B$ | Data scaling constant | ~400 |
-| $\alpha$ | Parameter exponent | 0.34 (Kaplan) / 0.50 (Chinchilla) |
-| $\beta$ | Data exponent | 0.28 (Kaplan) / 0.50 (Chinchilla) |
+| $\alpha$ | Parameter exponent | 0.076 (Kaplan) / 0.34 (Chinchilla) |
+| $\beta$ | Data exponent | 0.095 (Kaplan) / 0.28 (Chinchilla) |
 | $L_\infty$ | Irreducible loss | ~1.69 nats |
 
 The irreducible loss $L_\infty$ represents the entropy of natural language—even a perfect model can't predict the unpredictable.
@@ -135,6 +135,8 @@ Two influential papers reached different conclusions:
 | Kaplan (2020) | 0.076 | 0.095 | $C^{0.73}$ | $C^{0.27}$ | ~1.7 |
 | Chinchilla (2022) | 0.34 | 0.28 | $C^{0.50}$ | $C^{0.50}$ | ~20 |
 
+*Note: The Kaplan optimal scaling exponents (0.73, 0.27) were empirically fit rather than derived from α and β. The theoretical derivation $N^* \propto C^{\beta/(\alpha+\beta)}$ gives different values, suggesting different fitting methodologies.*
+
 **Why the difference?**
 
 Kaplan trained each model for a fixed number of steps, not to convergence. This systematically undertrained larger models, biasing the fit toward "make models bigger."
@@ -201,9 +203,9 @@ Where MFU (Model FLOP Utilization) is typically 30-50%.
 **Example**: Chinchilla (70B params, 1.4T tokens)
 $$C = 6 \times 70 \times 10^9 \times 1.4 \times 10^{12} = 5.9 \times 10^{23} \text{ FLOPs}$$
 
-On 1000 H100s at 40% MFU:
+On 1000 H100s (1979 TFLOP/s each) at 40% MFU:
 
-$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 10^{15} \times 0.4} \approx 17 \text{ days}$$
+$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 1.979 \times 10^{15} \times 0.4} \approx 8.6 \text{ days}$$
 
 ## Beyond Simple Scaling
 
@@ -307,9 +309,9 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
     Ratio of data terms:
 
-    $$\frac{(140\text{B})^{0.28}}{(2\text{T})^{0.28}} = \left(\frac{140}{2000}\right)^{0.28} = 0.07^{0.28} = 0.50$$
+    $$\frac{(140\text{B})^{0.28}}{(2\text{T})^{0.28}} = \left(\frac{140}{2000}\right)^{0.28} = 0.07^{0.28} \approx 0.47$$
 
-    The overtrained model achieves ~50% reduction in the data-dependent loss term compared to Chinchilla-optimal.
+    The overtrained model achieves ~53% reduction in the data-dependent loss term compared to Chinchilla-optimal (the ratio 0.47 means paying only 47% of the data penalty).
 
     **Estimated improvement: ~0.1-0.2 nats lower loss** from overtraining.
 
