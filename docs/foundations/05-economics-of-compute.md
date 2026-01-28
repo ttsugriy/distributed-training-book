@@ -20,10 +20,13 @@ $$C_{\text{total}} = \underbrace{P \cdot R \cdot T}_{\text{GPU cost}} + \underbr
 Where:
 
 - $P$: number of GPUs
-- $R$: hourly rate per GPU
+- $R$: hourly rate per GPU ($/hr)
 - $T$: training time in hours
+- $C_{\text{network}}$: networking costs (inter-node bandwidth, cross-region transfer)
+- $C_{\text{storage}}$: storage costs (training data, checkpoints, logs)
+- $C_{\text{ops}}$: operational costs (engineering time, monitoring, incident response)
 
-GPU cost typically dominates (80%+ of total).
+GPU cost typically dominates (80%+ of total), so we often approximate $C_{\text{total}} \approx P \cdot R \cdot T$.
 
 ## GPU-Hour Economics
 
@@ -65,7 +68,7 @@ HFU > MFU when using activation checkpointing.
 
 $$C_{\text{token}} = \frac{C_{\text{total}}}{D}$$
 
-Where $D$ is tokens trained. Chinchilla-optimal training at $0.01-0.05 per billion tokens for large models.
+Where $D$ is the total number of tokens trained on. For Chinchilla-optimal training of large models, expect $0.01-0.05 per billion tokens.
 
 ## The Efficiency-Scale Trade-off
 
@@ -131,13 +134,13 @@ Key cost optimizations:
 1. Calculate the GPU-hour cost to train a 70B dense model for 2T tokens on H100s at $4/hr, assuming 45% MFU.
 
 ??? success "Solution"
-    **Total FLOPs required:**
+    **Total FLOPs required** (using the $6ND$ approximation where $N$ = parameters, $D$ = tokens):
 
-    $$F_{total} = 6 \times P \times D = 6 \times 70 \times 10^9 \times 2 \times 10^{12} = 8.4 \times 10^{23} \text{ FLOPs}$$
+    $$F_{\text{total}} = 6 \times N \times D = 6 \times 70 \times 10^9 \times 2 \times 10^{12} = 8.4 \times 10^{23} \text{ FLOPs}$$
 
     **Effective compute per GPU-hour:**
 
-    $$F_{GPU-hr} = \text{MFU} \times \text{Peak} \times 3600 \text{ s}$$
+    $$F_{\text{GPU-hr}} = \text{MFU} \times \text{Peak} \times 3600 \text{ s}$$
     $$= 0.45 \times 1979 \times 10^{12} \times 3600 = 3.21 \times 10^{18} \text{ FLOPs/GPU-hour}$$
 
     **Total GPU-hours required:**
