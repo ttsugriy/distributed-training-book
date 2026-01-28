@@ -467,8 +467,10 @@ $$n^* \approx \frac{\alpha\beta \cdot P}{\log_2 P - 1}$$
 
 $$n^* \approx \frac{10^{-6} \times 10^{11} \times 64}{6 - 1} = \frac{6.4 \times 10^6}{5} = 1.28 \text{ MB}$$
 
-- Messages < 1.28 MB: use tree
-- Messages > 1.28 MB: use ring
+*Note: This approximate formula gives ~12% higher crossover than the exact solution (1.14 MB from solving the full equations). For P=64, the approximation error is noticeable but acceptable for order-of-magnitude guidance.*
+
+- Messages < ~1.2 MB: use tree
+- Messages > ~1.2 MB: use ring
 
 ### Visualization
 
