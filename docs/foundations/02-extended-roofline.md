@@ -159,13 +159,13 @@ The extended roofline is our primary tool for analyzing distributed training bot
 ??? success "Solution"
     **Given:**
 
-    - Parameters: $P = 7 \times 10^9$
+    - Parameters: $\Psi = 7 \times 10^9$
     - Tokens per step: $N = 1 \times 10^6$
-    - GPUs: 64 (data parallel)
+    - GPUs: $P = 64$ (data parallel)
 
     **FLOPs per step:**
 
-    $$\text{FLOPs} = 6 \times P \times N = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
+    $$\text{FLOPs} = 6 \times \Psi \times N = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
 
     **Bytes communicated (AllReduce gradients in FP16):**
 
@@ -173,7 +173,7 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
     **Communication intensity:**
 
-    $$I_{net} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
+    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
 
     This is far above the ridge point (~40,000 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
 

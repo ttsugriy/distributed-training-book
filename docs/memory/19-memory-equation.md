@@ -191,7 +191,7 @@ Each transformer layer stores:
 | FFN intermediate | $[B, S, 4H]$ | $4BSH$ |
 | FFN output | $[B, S, H]$ | $BSH$ |
 
-Total per layer:
+Total per layer (summing the linear terms: 1+3+1+1+4+1 = 11):
 
 $$M_{\text{act/layer}} \approx 11BSH + BAS^2$$
 
@@ -219,7 +219,7 @@ The complete activation memory for a transformer:
 
 $$M_{\text{act}} = 2 \cdot L \cdot B \cdot S \cdot H \cdot \left(11 + \frac{A \cdot S}{H}\right)$$
 
-For typical models where $H = 128A$ (head dimension 128):
+For typical transformer architectures, each attention head has dimension $d_h = H/A \approx 128$ (e.g., GPT-3 has $H=12288$, $A=96$, so $d_h=128$). This means $H = 128A$, simplifying to:
 
 $$M_{\text{act}} \approx 2 \cdot L \cdot B \cdot S \cdot H \cdot \left(11 + \frac{S}{128}\right)$$
 
