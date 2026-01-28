@@ -201,6 +201,7 @@ $$\text{Time} = \frac{6ND}{\text{GPUs} \times \text{FLOPS/GPU} \times \text{MFU}
 Where MFU (Model FLOP Utilization) is typically 30-50%.
 
 **Example**: Chinchilla (70B params, 1.4T tokens)
+
 $$C = 6 \times 70 \times 10^9 \times 1.4 \times 10^{12} = 5.9 \times 10^{23} \text{ FLOPs}$$
 
 On 1000 H100s (1979 TFLOP/s each) at 40% MFU:
