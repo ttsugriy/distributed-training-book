@@ -487,6 +487,7 @@ Always validate your model against measurements.
     $$T_{\text{AllGather}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
     $$T_{\text{AllGather}} = 15 \times 10^{-5} + \frac{15}{16} \times \frac{10^8}{10^{11}}$$
+
     $$= 0.15 \text{ ms} + 0.9375 \text{ ms} = \boxed{1.09 \text{ ms}}$$
 
     **Part 3: Hierarchical (4×4) vs Flat speedup**
@@ -502,6 +503,7 @@ Always validate your model against measurements.
 
     *Phase 2: Inter-node AllReduce (N=4, data = n/G = 25 MB):*
     $$T_2 = 2(4-1) \times 10^{-5} + 2 \times \frac{3}{4} \times \frac{2.5 \times 10^7}{10^{11}}$$
+
     $$= 0.06 + 0.375 = 0.435 \text{ ms}$$
 
     *Phase 3: Intra-node AllGather (G=4):*
@@ -539,6 +541,7 @@ Always validate your model against measurements.
     For AllReduce, the correction factor is $\frac{2(P-1)}{P}$:
 
     $$\text{busbw} = \text{algbw} \times \frac{2(P-1)}{P} = 12.5 \times \frac{2 \times 7}{8}$$
+
     $$= 12.5 \times 1.75 = \boxed{21.875 \text{ GB/s}}$$
 
     **Part 3: Efficiency vs theoretical peak**
@@ -598,6 +601,7 @@ Always validate your model against measurements.
     Activation size per layer:
 
     $$n_{\text{act}} = B \times S \times H \times 2 \text{ bytes (FP16)}$$
+
     $$= 61 \times 4096 \times 5120 \times 2 = 2.56 \text{ GB}$$
 
     Per transformer layer: 4 AllReduce operations (2 forward, 2 backward)
@@ -605,6 +609,7 @@ Always validate your model against measurements.
     Each AllReduce (ring, P=8, NVLink):
 
     $$T_{\text{AR}} = 2(8-1) \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{2.56 \times 10^9}{3 \times 10^{11}}$$
+
     $$= 14 \mu s + 14.9 \text{ ms} = 14.9 \text{ ms}$$
 
     Assuming ~40 layers:
@@ -622,6 +627,7 @@ Always validate your model against measurements.
     AllReduce across DP=8 groups (network):
 
     $$T_{\text{DP}} = 2(8-1) \times 5 \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{3.25 \times 10^9}{5 \times 10^{10}}$$
+
     $$= 70 \mu s + 113.75 \text{ ms} = \boxed{114 \text{ ms}}$$
 
     **Summary:**
@@ -667,10 +673,12 @@ Always validate your model against measurements.
 
     *Phase 1: Intra-node ReduceScatter (G=8):*
     $$T_1 = (8-1) \times 10^{-6} + \frac{7}{8} \times \frac{4 \times 10^9}{3 \times 10^{11}}$$
+
     $$= 7 \mu s + 11.67 \text{ ms} = 11.67 \text{ ms}$$
 
     *Phase 2: Inter-node AllReduce (N=8, data = 4GB/8 = 500 MB per GPU):*
     $$T_2 = 2(8-1) \times 5 \times 10^{-6} + 2 \times \frac{7}{8} \times \frac{5 \times 10^8}{5 \times 10^{10}}$$
+
     $$= 70 \mu s + 17.5 \text{ ms} = 17.57 \text{ ms}$$
 
     *Phase 3: Intra-node AllGather (G=8):*
@@ -682,10 +690,12 @@ Always validate your model against measurements.
 
     *Phase 1: Intra-node ReduceScatter (G=4):*
     $$T_1 = (4-1) \times 10^{-6} + \frac{3}{4} \times \frac{4 \times 10^9}{3 \times 10^{11}}$$
+
     $$= 3 \mu s + 10 \text{ ms} = 10 \text{ ms}$$
 
     *Phase 2: Inter-node AllReduce (N=16, data = 4GB/4 = 1 GB per GPU):*
     $$T_2 = 2(16-1) \times 5 \times 10^{-6} + 2 \times \frac{15}{16} \times \frac{10^9}{5 \times 10^{10}}$$
+
     $$= 150 \mu s + 37.5 \text{ ms} = 37.65 \text{ ms}$$
 
     *Phase 3: Intra-node AllGather (G=4):*
@@ -732,6 +742,7 @@ Always validate your model against measurements.
     The overlapped portion runs concurrently with compute. Only the non-overlapped portion adds to total time:
 
     $$T_{\text{overlapped}} = T_{\text{compute}} + (1 - 0.80) \times T_{\text{comm}}$$
+
     $$= 2000 + 0.20 \times 600 = 2000 + 120 = 2120 \text{ ms}$$
 
     **Speedup:**
@@ -741,6 +752,7 @@ Always validate your model against measurements.
     **Alternative view - time saved:**
 
     $$\text{Time saved} = 2600 - 2120 = 480 \text{ ms}$$
+
     $$\text{Reduction} = \frac{480}{2600} = 18.5\%$$
 
     **Analysis:**

@@ -1415,6 +1415,7 @@ class FaultTolerantTrainer:
     All operations are on the critical path:
 
     $$T_{sync} = T_{GPU \to CPU} + T_{CPU \to storage}$$
+
     $$T_{sync} = \frac{50}{32} + \frac{50}{2} = 1.56 + 25 = \boxed{26.56 \text{ seconds}}$$
 
     Training is blocked for the entire duration.
@@ -1555,6 +1556,7 @@ class FaultTolerantTrainer:
 
     **With compression:**
     $$T_{compress} = \frac{100}{4} = 25 \text{ seconds}$$
+
     $$T_{write} = \frac{40}{10} = 4 \text{ seconds}$$
 
     If sequential: $T_{save}^{comp} = 25 + 4 = 29$ seconds
@@ -1572,6 +1574,7 @@ class FaultTolerantTrainer:
 
     **With compression:**
     $$T_{read} = \frac{40}{10} = 4 \text{ seconds}$$
+
     $$T_{decompress} = \frac{100}{4} = 25 \text{ seconds}$$
 
     If sequential: $T_{load}^{comp} = 4 + 25 = 29$ seconds
@@ -1595,6 +1598,7 @@ class FaultTolerantTrainer:
     Compression becomes faster when I/O is the bottleneck:
 
     $$T_{uncomp} > T_{comp}$$
+
     $$\frac{S}{BW_{io}} > \frac{S}{BW_{comp}}$$
 
     Solve: $BW_{io} < \frac{BW_{comp}}{ratio} = \frac{4}{2.5} = 1.6$ GB/s

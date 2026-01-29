@@ -394,8 +394,11 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     Solving for the exponent:
 
     $$1 + e^{-(L_c - L_{10B})/0.1} = 20$$
+
     $$e^{-(L_c - L_{10B})/0.1} = 19$$
+
     $$-(L_c - L_{10B})/0.1 = \ln(19) = 2.94$$
+
     $$L_c - L_{10B} = -0.294 \text{ nats}$$
 
     **Estimating the losses:**
@@ -467,7 +470,9 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     Using $D^* = 20N$ and $C = 6ND$:
 
     $$C_{\text{needed}} = 6 \times N \times 20N = 120N^2$$
+
     $$C_{\text{needed}} = 120 \times (60 \times 10^9)^2 = 120 \times 3.6 \times 10^{21}$$
+
     $$C_{\text{needed}} = 4.32 \times 10^{23} \text{ FLOPs}$$
 
     **Comparison:**

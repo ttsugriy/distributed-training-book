@@ -1977,8 +1977,11 @@ config = TrainingConfig(
     Solve:
 
     $$7 \times 19 < 3 \times (GA + 7)$$
+
     $$133 < 3 \cdot GA + 21$$
+
     $$112 < 3 \cdot GA$$
+
     $$GA > 37.3$$
 
     $$\boxed{GA \geq 38}$$ for PP=8 to have lower bubble than PP=4/GA=16

@@ -761,12 +761,16 @@ model = DDP(
 
     *Communication time:*
     $$T_{\text{comm}} = 2 \times \frac{P-1}{P} \times \frac{\Psi \times 2}{\beta}$$
+
     $$= 2 \times \frac{7}{8} \times \frac{7 \times 10^9 \times 2}{900 \times 10^9}$$
+
     $$= 1.75 \times 15.56 \text{ ms} = 27.2 \text{ ms}$$
 
     *Compute time:*
     $$T_{\text{compute}} = \frac{6\Psi \times b}{F}$$
+
     $$= \frac{6 \times 7 \times 10^9 \times 2932}{1979 \times 10^{12}}$$
+
     $$= \frac{1.23 \times 10^{14}}{1.979 \times 10^{15}} = 62.2 \text{ ms}$$
 
     *Ratio check:*
@@ -795,6 +799,7 @@ model = DDP(
     **Per-layer times:**
 
     $$T_{\text{AR}}^{\text{layer}} = \frac{100}{100} = 1 \text{ ms}$$
+
     $$T_{\text{bwd}}^{\text{layer}} = \frac{80}{100} = 0.8 \text{ ms}$$
 
     **Overlap analysis:**
@@ -897,6 +902,7 @@ model = DDP(
     **Total time with compression:**
 
     $$T_{\text{total}} = T_{\text{compress}} + T_{\text{AR}}^{\text{compressed}} + T_{\text{decompress}}$$
+
     $$= 5 + 1.5 + 5 = \boxed{11.5 \text{ ms}}$$
 
     **Speedup:**
@@ -936,6 +942,7 @@ model = DDP(
     With accumulation, we compute 4 micro-batches but AllReduce only once:
 
     $$T_{\text{accum}} = A \times T_{\text{compute}}^{\text{micro}} + T_{\text{AR}}$$
+
     $$= 4 \times 100 + 40 = \boxed{440 \text{ ms}}$$
 
     **Case 2: Direct Batch 128 (no accumulation)**

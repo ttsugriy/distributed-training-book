@@ -744,7 +744,9 @@ Only 12.5% of memory holds actual model parameters!
     Attention exceeds linear when:
 
     $$2BAS^2 > 16BSH$$
+
     $$AS^2 > 8SH$$
+
     $$S > \frac{8H}{A}$$
 
     With $H = 4096$, $A = 32$:
@@ -792,6 +794,7 @@ Only 12.5% of memory holds actual model parameters!
 
     **Solving for batch size:**
     $$7.5 \times B \times 2048 \leq 24 \times 10^9$$
+
     $$B \leq \frac{24 \times 10^9}{7.5 \times 2048} \approx 1560$$
 
     Wait, let me recalculate more carefully.
@@ -801,6 +804,7 @@ Only 12.5% of memory holds actual model parameters!
     $$M_{\text{act}} = B \times S \times 1.5\text{ KB} = B \times 2048 \times 1500 = 3.07B \text{ MB}$$
 
     $$3.07B \text{ MB} \leq 24,000 \text{ MB}$$
+
     $$B \leq 7.8$$
 
     **Maximum batch size:** $\boxed{B = 7}$ (or 8 with micro-batching)
@@ -1088,6 +1092,7 @@ Only 12.5% of memory holds actual model parameters!
 ??? success "Solution"
     **Fragmentation ratio:**
     $$\text{Fragmentation} = \frac{M_{\text{allocated}} - M_{\text{used}}}{M_{\text{allocated}}}$$
+
     $$= \frac{100 - 85}{100} = \boxed{15\%}$$
 
     **Alternative metric (overhead ratio):**

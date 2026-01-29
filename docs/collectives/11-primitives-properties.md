@@ -544,8 +544,11 @@ gradients = handle.wait()  # Eventually complete
 
     **Composition:**
     $$\text{Gather}(\text{Scatter}([x_0, x_1, ..., x_{P-1}]))$$
+
     $$= \text{Gather}(P_0: x_0, P_1: x_1, ..., P_{P-1}: x_{P-1})$$
+
     $$= [x_0, x_1, ..., x_{P-1}]$$
+
     $$= x$$
 
     **Therefore:** $\text{Gather} \circ \text{Scatter} = \text{Identity}$ (on root) $\square$
@@ -589,18 +592,25 @@ gradients = handle.wait()  # Eventually complete
 
     **Ring AllReduce time:**
     $$T_{\text{ring}} = 2(P-1)\alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
     $$= 2(63)(10^{-6}) + 2 \cdot \frac{63}{64} \cdot \frac{n}{10^{11}}$$
+
     $$= 126 \mu s + 1.97 \cdot 10^{-11} \cdot n$$
 
     **Tree AllReduce time:**
     $$T_{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot \frac{n}{\beta}$$
+
     $$= 2(6)(10^{-6}) + 2(6) \cdot \frac{n}{10^{11}}$$
+
     $$= 12 \mu s + 1.2 \cdot 10^{-10} \cdot n$$
 
     **Set equal to find crossover:**
     $$126 \mu s + 1.97 \times 10^{-11} n = 12 \mu s + 1.2 \times 10^{-10} n$$
+
     $$114 \mu s = (1.2 \times 10^{-10} - 1.97 \times 10^{-11}) n$$
+
     $$114 \times 10^{-6} = 1.003 \times 10^{-10} \cdot n$$
+
     $$n = \frac{114 \times 10^{-6}}{1.003 \times 10^{-10}} = \boxed{1.14 \text{ MB}}$$
 
     **Conclusion:**

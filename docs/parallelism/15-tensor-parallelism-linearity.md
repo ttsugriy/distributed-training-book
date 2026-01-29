@@ -850,6 +850,7 @@ The tensor parallel degree $P$ is limited by:
     Each AllReduce synchronizes the activation tensor:
 
     $$\text{Tensor size} = b \times s \times d \times \text{sizeof(FP16)}$$
+
     $$= 4 \times 2048 \times 4096 \times 2 = 67,108,864 \text{ bytes} = 64 \text{ MB}$$
 
     **Per AllReduce volume:**
@@ -1068,6 +1069,7 @@ The tensor parallel degree $P$ is limited by:
     This changes the mathematical function:
 
     $$\text{Original: } \text{GeLU}(XW_1)W_2$$
+
     $$\text{Modified: } \text{GeLU}(XW_1 W_2)$$
 
     These are **not equivalent**! The non-linearity must be between the two linear transforms.

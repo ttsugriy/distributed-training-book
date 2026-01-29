@@ -1107,7 +1107,9 @@ prof.export_chrome_trace("overlap_trace.json")
     Solving:
 
     $$B \geq 0.9\beta L + 0.9B$$
+
     $$0.1B \geq 0.9\beta L$$
+
     $$B \geq 9\beta L = 9 \times 12.5 \times 10^9 \times 10^{-4} = 11.25\text{ MB}$$
 
     **Optimal bucket size for 90% efficiency:**
@@ -1376,6 +1378,7 @@ prof.export_chrome_trace("overlap_trace.json")
     For full overlap:
 
     $$k \times T_{\text{compute}} \geq T_{\text{gather}}$$
+
     $$k \geq \frac{T_{\text{gather}}}{T_{\text{compute}}} = \frac{2\text{ms}}{8\text{ms}} = 0.25$$
 
     So $k = 1$ layer of prefetch is sufficient!

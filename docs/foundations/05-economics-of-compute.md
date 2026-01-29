@@ -141,6 +141,7 @@ Key cost optimizations:
     **Effective compute per GPU-hour:**
 
     $$F_{\text{GPU-hr}} = \text{MFU} \times \text{Peak} \times 3600 \text{ s}$$
+
     $$= 0.45 \times 1979 \times 10^{12} \times 3600 = 3.21 \times 10^{18} \text{ FLOPs/GPU-hour}$$
 
     **Total GPU-hours required:**
@@ -219,14 +220,19 @@ Key cost optimizations:
 
     **Break-even condition:**
     $$1.50 \times T_{eff} = 4.00 \times T$$
+
     $$T_{eff} = 2.67T$$
 
     Substituting:
 
     $$\frac{1.05}{1 - 0.5p} = 2.67$$
+
     $$1.05 = 2.67(1 - 0.5p)$$
+
     $$1.05 = 2.67 - 1.33p$$
+
     $$1.33p = 1.62$$
+
     $$p = 1.22 = \boxed{122\%\text{ per hour}}$$
 
     **Interpretation:** Spot remains cheaper even with very high preemption rates (>100%/hr) because the price differential is so large (2.67×). In practice, real preemption rates of 5-15% make spot instances highly cost-effective if you have robust checkpointing.

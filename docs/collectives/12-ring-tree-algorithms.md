@@ -841,18 +841,25 @@ PyTorch DDP uses 25MB buckets by default.
 
     **Ring AllReduce:**
     $$T_{\text{ring}} = 2(P-1)\alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+
     $$= 2(255)(5 \times 10^{-6}) + 2 \cdot \frac{255}{256} \cdot \frac{n}{2 \times 10^{11}}$$
+
     $$= 2.55 \text{ ms} + 9.96 \times 10^{-12} \cdot n$$
 
     **Tree AllReduce:**
     $$T_{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot \frac{n}{\beta}$$
+
     $$= 2(8)(5 \times 10^{-6}) + 2(8) \cdot \frac{n}{2 \times 10^{11}}$$
+
     $$= 80 \mu s + 8 \times 10^{-11} \cdot n$$
 
     **Set equal:**
     $$2.55 \times 10^{-3} + 9.96 \times 10^{-12} n = 8 \times 10^{-5} + 8 \times 10^{-11} n$$
+
     $$2.47 \times 10^{-3} = (8 \times 10^{-11} - 9.96 \times 10^{-12}) n$$
+
     $$2.47 \times 10^{-3} = 7.004 \times 10^{-11} n$$
+
     $$n = \frac{2.47 \times 10^{-3}}{7.004 \times 10^{-11}} = \boxed{35.3 \text{ MB}}$$
 
     **Conclusion:**
@@ -872,17 +879,21 @@ PyTorch DDP uses 25MB buckets by default.
 
     **Flat Ring (all 64 GPUs, bottlenecked by network):**
     $$T_{\text{flat}} = 2(63)\alpha_{\text{net}} + 2 \cdot \frac{63}{64} \cdot \frac{n}{\beta_{\text{net}}}$$
+
     $$= 126 \times 5\mu s + 1.97 \times \frac{10^9}{10^{11}}$$
+
     $$= 0.63 \text{ ms} + 19.7 \text{ ms} = \boxed{20.3 \text{ ms}}$$
 
     **2D Ring (hierarchical):**
 
     *Phase 1: Intra-node ReduceScatter (8 GPUs per node)*
     $$T_1 = (7)\alpha_{\text{NV}} + \frac{7}{8} \cdot \frac{n}{\beta_{\text{NV}}}$$
+
     $$= 7\mu s + 0.875 \times \frac{10^9}{6 \times 10^{11}} = 7\mu s + 1.46 \text{ ms} = 1.47 \text{ ms}$$
 
     *Phase 2: Inter-node AllReduce (8 nodes, 1/8 of data)*
     $$T_2 = 2(7)\alpha_{\text{net}} + 2 \cdot \frac{7}{8} \cdot \frac{n/8}{\beta_{\text{net}}}$$
+
     $$= 70\mu s + 1.75 \times \frac{1.25 \times 10^8}{10^{11}} = 70\mu s + 2.19 \text{ ms} = 2.26 \text{ ms}$$
 
     *Phase 3: Intra-node AllGather (8 GPUs per node)*
@@ -911,6 +922,7 @@ PyTorch DDP uses 25MB buckets by default.
     Per-call time (assuming P=8):
 
     $$T_{\text{call}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{10^6}{10^{11}}$$
+
     $$= 140\mu s + 17.5\mu s = 157.5\mu s$$
 
     Total time:
@@ -922,6 +934,7 @@ PyTorch DDP uses 25MB buckets by default.
     Per-bucket time:
 
     $$T_{\text{bucket}} = 2(7)(10\mu s) + 2 \cdot \frac{7}{8} \cdot \frac{25 \times 10^6}{10^{11}}$$
+
     $$= 140\mu s + 437.5\mu s = 577.5\mu s$$
 
     Total time:

@@ -1059,6 +1059,7 @@ Each stage has its own ZeRO group for sharding.
     For 5% overhead:
 
     $$\frac{0.421}{0.574B} < 0.05$$
+
     $$B > \frac{0.421}{0.05 \times 0.574} = 14.7$$
 
     **Minimum batch size for negligible overhead:** $\boxed{B \geq 15}$
@@ -1312,6 +1313,7 @@ Each stage has its own ZeRO group for sharding.
     For uniform layers ($T_c^{(i)} = T_c$, $T_g^{(i)} = T_g$):
 
     $$T_g \leq k \cdot T_c$$
+
     $$k \geq \frac{T_g}{T_c}$$
 
     **Optimal lookahead:** $k^* = \left\lceil \frac{T_g}{T_c} \right\rceil$

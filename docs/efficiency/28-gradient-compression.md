@@ -1354,6 +1354,7 @@ class CompressionAdvisor:
     For 100× compression:
 
     $$100 = \frac{16,777,216}{8192r}$$
+
     $$r = \frac{16,777,216}{8192 \times 100} = \frac{16,777,216}{819,200} \approx 20.48$$
 
     $$\boxed{r = 20 \text{ (or } r = 21 \text{ for slightly less compression)}}$$

@@ -392,7 +392,9 @@ When noise scale drops, safe to increase batch size.
     Subtract second from first:
 
     $$S_{\text{noise}} \left(\frac{1}{256} - \frac{1}{1024}\right) = 72,000$$
+
     $$S_{\text{noise}} \times \frac{3}{1024} = 72,000$$
+
     $$S_{\text{noise}} = 24,576,000$$
 
     Substitute back:
@@ -409,6 +411,7 @@ When noise scale drops, safe to increase batch size.
     The critical batch size is where noise and curvature contributions are equal:
 
     $$\frac{S_{\text{noise}}}{B_{\text{crit}}} = S_{\min}$$
+
     $$B_{\text{crit}} = \frac{S_{\text{noise}}}{S_{\min}} = \frac{24,576,000}{4,000} = \boxed{6,144}$$
 
     **Interpretation:** Batch sizes above ~6K will show significant diminishing returns. The data shows we're already past $B_{\text{crit}}$ at 4096, confirming the estimate is in the right range.

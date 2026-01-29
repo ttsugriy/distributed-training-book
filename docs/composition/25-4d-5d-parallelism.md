@@ -1066,6 +1066,7 @@ Training Mixtral with 8 experts:
     **KV cache for ring attention:**
 
     $$M_{KV} = 2 \times 2 \times B \times \frac{S}{CP} \times H / TP = 2 \times 2 \times 2 \times 32768 \times 8192 / 8$$
+
     $$M_{KV} = 268 \text{ MB per peer}$$
 
     With double buffering: 536 MB
@@ -1184,6 +1185,7 @@ Training Mixtral with 8 experts:
     AllGather would materialize the FULL sequence K,V:
 
     $$M_{AllGather}^{layer} = 2 \times B \times S_{full} \times H \times 2$$
+
     $$M_{AllGather}^{layer} = 2 \times 2 \times 131072 \times 8192 \times 2 = 8.59 \text{ GB per layer}$$
 
     **Memory comparison:**

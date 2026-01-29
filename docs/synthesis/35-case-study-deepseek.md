@@ -904,6 +904,7 @@ if __name__ == "__main__":
 
     **Option A (256 experts, top-8):**
     $$\mu_A = \frac{N \times 8}{256} = \frac{N}{32}$$
+
     $$\sigma_A = \sqrt{\frac{N}{32} \times (1 - \frac{8}{256})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
 
     Coefficient of variation:
@@ -912,6 +913,7 @@ if __name__ == "__main__":
 
     **Option B (64 experts, top-2):**
     $$\mu_B = \frac{N \times 2}{64} = \frac{N}{32}$$
+
     $$\sigma_B = \sqrt{\frac{N}{32} \times (1 - \frac{2}{64})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
 
     $$CV_B = \frac{5.57}{\sqrt{N}}$$
@@ -1236,6 +1238,7 @@ if __name__ == "__main__":
     Given C = $3.29 \times 10^{24}$ FLOPs and Chinchilla ratio $D = 20N$:
 
     $$3.29 \times 10^{24} = 6 \times N \times 20N = 120N^2$$
+
     $$N = \sqrt{\frac{3.29 \times 10^{24}}{120}} = 165B \text{ parameters}$$
 
     **But wait—MoE uses fewer FLOPs per token!**

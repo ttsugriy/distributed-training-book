@@ -1332,6 +1332,7 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     For $K=4$, $p=0.7$:
 
     $$E[\text{accepted}] = 0 \cdot 0.3 + 1 \cdot 0.7 \cdot 0.3 + 2 \cdot 0.49 \cdot 0.3 + 3 \cdot 0.343 \cdot 0.3 + 4 \cdot 0.2401$$
+
     $$= 0 + 0.21 + 0.294 + 0.309 + 0.960 = 1.77 \text{ tokens}$$
 
     Actually, simpler formula:

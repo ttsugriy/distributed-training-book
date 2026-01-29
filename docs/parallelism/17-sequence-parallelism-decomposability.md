@@ -1194,7 +1194,9 @@ class SequenceParallelAttention(nn.Module):
     Given states $(m_1, s_1, o_1)$ and $(m_2, s_2, o_2)$:
 
     $$m_{12} = \max(m_1, m_2)$$
+
     $$s_{12} = s_1 \cdot e^{m_1 - m_{12}} + s_2 \cdot e^{m_2 - m_{12}}$$
+
     $$o_{12} = o_1 \cdot e^{m_1 - m_{12}} + o_2 \cdot e^{m_2 - m_{12}}$$
 
     **Implementation:**
