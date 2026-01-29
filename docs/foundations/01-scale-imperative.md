@@ -25,7 +25,7 @@ Where:
 
 - $2\Psi$: FP16 parameters
 - $2\Psi$: FP16 gradients
-- $12\Psi$: FP32 optimizer states (Adam: parameters, momentum, variance)
+- $12\Psi$: FP32 optimizer states (Adam: master weights, first moment, second moment)
 
 For a 70B model: $16 \times 70 \times 10^9 = 1.12\text{TB}$
 
