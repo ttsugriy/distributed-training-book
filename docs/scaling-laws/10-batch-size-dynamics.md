@@ -348,16 +348,6 @@ When noise scale drops, safe to increase batch size.
 
 1. **Critical batch size**: A model trains in 100K steps with batch size 256. With batch size 1024, it trains in 28K steps. With batch size 4096, it trains in 15K steps. Estimate $B_{\text{crit}}$.
 
-2. **Learning rate scaling**: You scale from batch 256 with $\eta = 0.001$ to batch 4096. What learning rate should you use under (a) linear scaling, (b) square root scaling?
-
-3. **Compute efficiency**: With batch 512, training takes 50K steps. With batch 8192, training takes 6K steps. Calculate the scaling efficiency $E(8192)$.
-
-4. **LARS derivation**: Show that the LARS trust ratio $\phi = ||w||/||\nabla w||$ ensures that the relative update $||\Delta w||/||w||$ is approximately constant across layers.
-
-5. **Gradient accumulation**: You have 8 GPUs with batch 32 each (256 total) but need effective batch 2048. How many accumulation steps? If each forward-backward takes 100ms, and all-reduce takes 20ms, what's the time per effective step?
-
-6. **Dynamic batching**: You want to train for 1M tokens/step initially, ramping to 4M tokens/step. If you switch at the midpoint of training, how many fewer gradient updates do you perform compared to constant 1M tokens/step?
-
 ??? success "Solution"
     **Given data:**
 
@@ -416,6 +406,8 @@ When noise scale drops, safe to increase batch size.
 
     **Interpretation:** Batch sizes above ~6K will show significant diminishing returns. The data shows we're already past $B_{\text{crit}}$ at 4096, confirming the estimate is in the right range.
 
+2. **Learning rate scaling**: You scale from batch 256 with $\eta = 0.001$ to batch 4096. What learning rate should you use under (a) linear scaling, (b) square root scaling?
+
 ??? success "Solution"
     **Given:**
 
@@ -441,6 +433,8 @@ When noise scale drops, safe to increase batch size.
     | 16,384 | Well above | Constant or sqrt |
 
     **Practical note:** Start with linear scaling (0.016) but use warmup. If training is unstable, fall back to square root (0.004).
+
+3. **Compute efficiency**: With batch 512, training takes 50K steps. With batch 8192, training takes 6K steps. Calculate the scaling efficiency $E(8192)$.
 
 ??? success "Solution"
     **Given:**
@@ -471,6 +465,8 @@ When noise scale drops, safe to increase batch size.
     Actual: 6,000 steps → 1.92× more steps than perfect scaling.
 
     **Conclusion:** At batch 8192, we're well past $B_{\text{crit}}$. Almost half the compute is "wasted" in the sense that it doesn't reduce training steps. However, if wall-clock time is the constraint, this may still be worthwhile.
+
+4. **LARS derivation**: Show that the LARS trust ratio $\phi = ||w||/||\nabla w||$ ensures that the relative update $||\Delta w||/||w||$ is approximately constant across layers.
 
 ??? success "Solution"
     **LARS update rule:**
@@ -513,6 +509,8 @@ When noise scale drops, safe to increase batch size.
 
     This is why LARS enables training with batch sizes of 32K+ where standard SGD fails.
 
+5. **Gradient accumulation**: You have 8 GPUs with batch 32 each (256 total) but need effective batch 2048. How many accumulation steps? If each forward-backward takes 100ms, and all-reduce takes 20ms, what's the time per effective step?
+
 ??? success "Solution"
     **Given:**
 
@@ -550,6 +548,8 @@ When noise scale drops, safe to increase batch size.
     1. $B_{\text{crit}}$ hasn't been reached yet
     2. GPU memory limits batch size
     3. More GPUs aren't available
+
+6. **Dynamic batching**: You want to train for 1M tokens/step initially, ramping to 4M tokens/step. If you switch at the midpoint of training, how many fewer gradient updates do you perform compared to constant 1M tokens/step?
 
 ??? success "Solution"
     **Setup:**
