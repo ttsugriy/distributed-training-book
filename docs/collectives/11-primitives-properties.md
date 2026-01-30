@@ -371,20 +371,6 @@ gradients = handle.wait()  # Eventually complete
 
 1. **Decomposition verification**: Implement AllReduce using ReduceScatter followed by AllGather. Verify they produce the same result.
 
-2. **Associativity test**: Write code that demonstrates floating-point non-associativity. Find inputs where tree-reduction gives different results than sequential reduction.
-
-3. **Communication volume**: For AllReduce of an $n$-byte tensor across $P$ processes:
-
-   - Calculate total bytes sent using naive reduce + broadcast
-   - Calculate total bytes sent using ring AllReduce
-   - What's the improvement factor?
-
-4. **Inverse operations**: Prove that for any vector $x$: $\text{Gather}(\text{Scatter}(x)) = x$ (on root).
-
-5. **AlltoAll analysis**: Derive the communication volume for AlltoAll. Why is it the same as AllGather despite different semantics?
-
-6. **Algorithm selection**: Given α = 1μs, β = 100 GB/s, at what message size does ring AllReduce become faster than tree AllReduce for P = 64?
-
 ??? success "Solution"
     **AllReduce using ReduceScatter + AllGather:**
 
@@ -434,6 +420,8 @@ gradients = handle.wait()  # Eventually complete
     ```
 
     **Result:** Both produce `[10, 20, 30, 40]` on all 4 processes.
+
+2. **Associativity test**: Write code that demonstrates floating-point non-associativity. Find inputs where tree-reduction gives different results than sequential reduction.
 
 ??? success "Solution"
     **Demonstrating floating-point non-associativity:**
@@ -499,6 +487,12 @@ gradients = handle.wait()  # Eventually complete
 
     **Key insight:** Tree reduction can give different results than sequential reduction due to different grouping of operations. Neither matches the exact mathematical result.
 
+3. **Communication volume**: For AllReduce of an $n$-byte tensor across $P$ processes:
+
+   - Calculate total bytes sent using naive reduce + broadcast
+   - Calculate total bytes sent using ring AllReduce
+   - What's the improvement factor?
+
 ??? success "Solution"
     **Communication volume comparison:**
 
@@ -531,6 +525,8 @@ gradients = handle.wait()  # Eventually complete
 
     **Key insight:** Total bytes are similar, but ring distributes load evenly across processes and time, eliminating the root bottleneck.
 
+4. **Inverse operations**: Prove that for any vector $x$: $\text{Gather}(\text{Scatter}(x)) = x$ (on root).
+
 ??? success "Solution"
     **Proof that Gather(Scatter(x)) = x on root:**
 
@@ -554,6 +550,8 @@ gradients = handle.wait()  # Eventually complete
     **Therefore:** $\text{Gather} \circ \text{Scatter} = \text{Identity}$ (on root) $\square$
 
     **Note:** This only holds on the root process. Other processes don't have the full result after Gather.
+
+5. **AlltoAll analysis**: Derive the communication volume for AlltoAll. Why is it the same as AllGather despite different semantics?
 
 ??? success "Solution"
     **AlltoAll communication volume:**
@@ -584,6 +582,8 @@ gradients = handle.wait()  # Eventually complete
     | AlltoAll | Different data to each | Different data from each | Many-to-many |
 
     The total data moved is identical; only the **pattern** differs. AlltoAll is a "personalized" AllGather where each destination gets unique data.
+
+6. **Algorithm selection**: Given α = 1μs, β = 100 GB/s, at what message size does ring AllReduce become faster than tree AllReduce for P = 64?
 
 ??? success "Solution"
     **Ring vs Tree crossover for P = 64:**

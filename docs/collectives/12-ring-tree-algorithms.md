@@ -755,19 +755,6 @@ PyTorch DDP uses 25MB buckets by default.
 
 1. **Ring correctness**: Trace through ring ReduceScatter with P=4 and data `P0=[1,2,3,4], P1=[5,6,7,8], P2=[9,10,11,12], P3=[13,14,15,16]`. What does each process hold after the phase?
 
-2. **Crossover calculation**: For P=256, α=5μs, β=200 GB/s, calculate the crossover point between ring and tree.
-
-3. **Hierarchical analysis**: You have 8 nodes with 8 GPUs each (64 total). Intra-node bandwidth is 600 GB/s (NVLink), inter-node is 100 GB/s. Compare total time for flat ring vs 2D ring for a 1GB AllReduce.
-
-4. **Bucket sizing**: You have 1000 gradient tensors, each 1MB. With α=10μs, β=100 GB/s, compare:
-
-   - 1000 individual AllReduce calls
-   - Bucketed into 25MB chunks
-
-5. **Power of 2 constraint**: Rabenseifner's algorithm requires $P = 2^k$. Describe how to handle P=6 (not a power of 2).
-
-6. **Bidirectional ring**: Prove that bidirectional ring halves the number of steps while maintaining bandwidth optimality.
-
 ??? success "Solution"
     **Tracing Ring ReduceScatter with P=4:**
 
@@ -836,6 +823,8 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [40]    (sum of all fourth elements)
     ```
 
+2. **Crossover calculation**: For P=256, α=5μs, β=200 GB/s, calculate the crossover point between ring and tree.
+
 ??? success "Solution"
     **Crossover calculation for P=256, α=5μs, β=200 GB/s:**
 
@@ -867,6 +856,8 @@ PyTorch DDP uses 25MB buckets by default.
     - Messages > 35.3 MB: Use **ring**
 
     Note: Larger P → higher crossover point (ring's latency penalty increases).
+
+3. **Hierarchical analysis**: You have 8 nodes with 8 GPUs each (64 total). Intra-node bandwidth is 600 GB/s (NVLink), inter-node is 100 GB/s. Compare total time for flat ring vs 2D ring for a 1GB AllReduce.
 
 ??? success "Solution"
     **Hierarchical 2D Ring vs Flat Ring for 64 GPUs, 1 GB AllReduce:**
@@ -910,6 +901,11 @@ PyTorch DDP uses 25MB buckets by default.
     | Flat ring | 20.3 ms | 1 GB crosses network |
     | 2D ring | 5.2 ms | 125 MB crosses network |
 
+4. **Bucket sizing**: You have 1000 gradient tensors, each 1MB. With α=10μs, β=100 GB/s, compare:
+
+   - 1000 individual AllReduce calls
+   - Bucketed into 25MB chunks
+
 ??? success "Solution"
     **Bucket sizing comparison:**
 
@@ -952,6 +948,8 @@ PyTorch DDP uses 25MB buckets by default.
     | Bucketed | 40 | 5.6 ms | 17.5 ms | 23.1 ms |
 
     **Key insight:** Bucketing reduces latency overhead by 25× while bandwidth time stays constant. The 6.8× speedup comes entirely from amortizing $\alpha$.
+
+5. **Power of 2 constraint**: Rabenseifner's algorithm requires $P = 2^k$. Describe how to handle P=6 (not a power of 2).
 
 ??? success "Solution"
     **Handling non-power-of-2 process counts (P=6):**
@@ -1011,6 +1009,8 @@ PyTorch DDP uses 25MB buckets by default.
     Works for any P. Only ~10% slower than Rabenseifner for typical sizes.
 
     **Practical choice:** Most implementations (including NCCL) fall back to ring for non-power-of-2 process counts.
+
+6. **Bidirectional ring**: Prove that bidirectional ring halves the number of steps while maintaining bandwidth optimality.
 
 ??? success "Solution"
     **Proof: Bidirectional ring halves steps while maintaining bandwidth optimality**
