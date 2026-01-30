@@ -1014,16 +1014,6 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
 1. **Window size selection**: Derive the relationship between window size $w$, number of layers $L$, and effective context length. If you need 100K effective context with 32 layers, what window size is required?
 
-2. **GQA memory analysis**: Compare KV cache memory for (a) MHA with 32 heads, (b) MQA with 1 KV head, (c) GQA with 8 KV groups. Which provides the best quality/memory trade-off?
-
-3. **MoE compute efficiency**: For a model with 16 experts and top-2 routing, what fraction of expert FLOPs are activated? How does this change the optimal training data budget according to Chinchilla scaling?
-
-4. **Expert parallelism**: You have 64 GPUs and want to train Mixtral 8x22B (8 experts). Design a parallelism strategy considering TP, EP, and DP dimensions. What are the trade-offs?
-
-5. **Load balancing**: Implement a simulation of token routing with and without auxiliary loss. Measure the expert load imbalance (max/min ratio) after 1000 steps.
-
-6. **Speculative decoding speedup**: If the draft model is 5× faster than the target and accepts 70% of proposed tokens on average with K=4 speculation depth, what is the expected speedup?
-
 ??? success "Solution"
     **Exercise 1: Window Size Selection**
 
@@ -1059,6 +1049,9 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     | 8192 | 32 | 262K | 4× |
     | 4096 | 64 | 262K | 2× (more layers) |
 
+2. **GQA memory analysis**: Compare KV cache memory for (a) MHA with 32 heads, (b) MQA with 1 KV head, (c) GQA with 8 KV groups. Which provides the best quality/memory trade-off?
+
+??? success "Solution"
     **Exercise 2: GQA Memory Analysis**
 
     **Setup:**
@@ -1100,6 +1093,9 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
     $$\boxed{\text{GQA with 8 groups: 4× memory reduction with <1\% quality loss}}$$
 
+3. **MoE compute efficiency**: For a model with 16 experts and top-2 routing, what fraction of expert FLOPs are activated? How does this change the optimal training data budget according to Chinchilla scaling?
+
+??? success "Solution"
     **Exercise 3: MoE Compute Efficiency**
 
     **Mixtral configuration:**
@@ -1149,6 +1145,9 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
     $$\boxed{\text{12.5\% activation → can train on 8× more tokens at same FLOP budget}}$$
 
+4. **Expert parallelism**: You have 64 GPUs and want to train Mixtral 8x22B (8 experts). Design a parallelism strategy considering TP, EP, and DP dimensions. What are the trade-offs?
+
+??? success "Solution"
     **Exercise 4: Expert Parallelism Strategy**
 
     **Setup:**
@@ -1202,6 +1201,9 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
     $$\boxed{\text{Strategy 1 (TP=4, EP=8, DP=2) balances memory and throughput}}$$
 
+5. **Load balancing**: Implement a simulation of token routing with and without auxiliary loss. Measure the expert load imbalance (max/min ratio) after 1000 steps.
+
+??? success "Solution"
     **Exercise 5: Load Balancing Simulation**
 
     ```python
@@ -1311,6 +1313,9 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
     $$\boxed{\text{Auxiliary loss reduces imbalance from 5× to 1.3×}}$$
 
+6. **Speculative decoding speedup**: If the draft model is 5× faster than the target and accepts 70% of proposed tokens on average with K=4 speculation depth, what is the expected speedup?
+
+??? success "Solution"
     **Exercise 6: Speculative Decoding Speedup**
 
     **Given:**

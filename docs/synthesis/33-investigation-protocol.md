@@ -1156,16 +1156,6 @@ Profile step breakdown
 
 1. **Build a Triage System**: Implement a complete triage system for your training infrastructure. It should categorize failures into OOM, network, numerical, and other. Test it by artificially inducing each failure type.
 
-2. **Bisection Debugging**: A model fails at 64 GPUs but works at 8. Use the bisection method to find the exact scale where it breaks. Document what changes at that scale.
-
-3. **Five Whys Practice**: Take a recent training failure and apply the Five Whys analysis. Go at least five levels deep. What root cause do you find?
-
-4. **Correlation Analysis**: Instrument your training to record events (checkpoint save, LR change, batch size change) and failures. After a week, analyze correlations. What events predict failures?
-
-5. **Prevention Checklist**: Create a custom prevention checklist for your specific model and infrastructure. Run through it before your next large training run.
-
-6. **Fix Verification**: Apply a fix to a known problem. Use the FixVerifier to confirm the problem is resolved without introducing regressions.
-
 ??? success "Solution"
     **Exercise 1: Triage System**
 
@@ -1346,6 +1336,9 @@ Profile step breakdown
         print("\nAll triage tests passed!")
     ```
 
+2. **Bisection Debugging**: A model fails at 64 GPUs but works at 8. Use the bisection method to find the exact scale where it breaks. Document what changes at that scale.
+
+??? success "Solution"
     **Exercise 2: Bisection Debugging**
 
     ```python
@@ -1461,6 +1454,9 @@ Profile step breakdown
     | 16 → 32 | AllReduce latency | 2× participants |
     | 32 → 64 | Memory pressure | Smaller per-GPU batch |
 
+3. **Five Whys Practice**: Take a recent training failure and apply the Five Whys analysis. Go at least five levels deep. What root cause do you find?
+
+??? success "Solution"
     **Exercise 3: Five Whys Practice**
 
     ```markdown
@@ -1560,6 +1556,9 @@ Profile step breakdown
     print(analysis.generate_report())
     ```
 
+4. **Correlation Analysis**: Instrument your training to record events (checkpoint save, LR change, batch size change) and failures. After a week, analyze correlations. What events predict failures?
+
+??? success "Solution"
     **Exercise 4: Correlation Analysis**
 
     ```python
@@ -1699,6 +1698,9 @@ Profile step breakdown
     | batch_size_change | 1.8x | Batch changes stress memory |
     | eval_start | 0.9x | Eval is safe |
 
+5. **Prevention Checklist**: Create a custom prevention checklist for your specific model and infrastructure. Run through it before your next large training run.
+
+??? success "Solution"
     **Exercise 5: Prevention Checklist**
 
     ```python
@@ -1833,6 +1835,9 @@ Profile step breakdown
     # print(checklist.generate_report())
     ```
 
+6. **Fix Verification**: Apply a fix to a known problem. Use the FixVerifier to confirm the problem is resolved without introducing regressions.
+
+??? success "Solution"
     **Exercise 6: Fix Verification**
 
     ```python

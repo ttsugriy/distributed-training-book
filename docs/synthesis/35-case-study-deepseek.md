@@ -827,16 +827,6 @@ if __name__ == "__main__":
 
 1. **MLA trade-off**: For DeepSeek-V3's MLA with $d_c=512$, calculate the extra FLOPs from compression/decompression. At what sequence length does the memory savings justify this compute cost?
 
-2. **Fine-grained MoE**: Compare load variance for 256 experts (top-8) vs 64 experts (top-2) with the same activated parameters. Use binomial distribution analysis.
-
-3. **FP8 quantization error**: For a layer with weights normally distributed $\mathcal{N}(0, 0.02)$, calculate the expected quantization error using E4M3 with per-tensor vs per-block (block=128) scaling.
-
-4. **DualPipe scheduling**: Implement the complete DualPipe schedule for 8 stages and 16 micro-batches. Verify the bubble reduction vs standard 1F1B.
-
-5. **Expert communication**: With 2048 GPUs and 256 experts, design an expert placement that minimizes inter-node communication assuming 8 GPUs per node.
-
-6. **Cost comparison**: Using the Chinchilla scaling law, estimate the quality-equivalent dense model for DeepSeek-V3 (37B activated × 14.8T tokens). Compare training costs.
-
 ??? success "Solution"
     **Exercise 1: MLA Trade-off**
 
@@ -888,6 +878,9 @@ if __name__ == "__main__":
 
     For S < 30K, MHA is computationally cheaper. For S > 30K, MLA is the only option.
 
+2. **Fine-grained MoE**: Compare load variance for 256 experts (top-8) vs 64 experts (top-2) with the same activated parameters. Use binomial distribution analysis.
+
+??? success "Solution"
     **Exercise 2: Fine-grained MoE Load Variance**
 
     **Setup:**
@@ -940,6 +933,9 @@ if __name__ == "__main__":
 
     Fine-grained experts also enable better routing decisions (more specialization options).
 
+3. **FP8 quantization error**: For a layer with weights normally distributed $\mathcal{N}(0, 0.02)$, calculate the expected quantization error using E4M3 with per-tensor vs per-block (block=128) scaling.
+
+??? success "Solution"
     **Exercise 3: FP8 Quantization Error**
 
     **Weight distribution:** $w \sim \mathcal{N}(0, 0.02)$
@@ -985,6 +981,9 @@ if __name__ == "__main__":
 
     $$\boxed{\text{Per-block scaling reduces quantization error by } 1.8\times}$$
 
+4. **DualPipe scheduling**: Implement the complete DualPipe schedule for 8 stages and 16 micro-batches. Verify the bubble reduction vs standard 1F1B.
+
+??? success "Solution"
     **Exercise 4: DualPipe Scheduling**
 
     ```python
@@ -1104,6 +1103,9 @@ if __name__ == "__main__":
 
     $$\boxed{\text{DualPipe achieves } 50\% \text{ bubble reduction (30.4\% → 15.2\%)}}$$
 
+5. **Expert communication**: With 2048 GPUs and 256 experts, design an expert placement that minimizes inter-node communication assuming 8 GPUs per node.
+
+??? success "Solution"
     **Exercise 5: Expert Communication**
 
     **Setup:**
@@ -1220,6 +1222,9 @@ if __name__ == "__main__":
 
     $$\boxed{\text{Hierarchical placement: 8-expert groups across 8 nodes, 12.5\% inter-node comm}}$$
 
+6. **Cost comparison**: Using the Chinchilla scaling law, estimate the quality-equivalent dense model for DeepSeek-V3 (37B activated × 14.8T tokens). Compare training costs.
+
+??? success "Solution"
     **Exercise 6: Cost Comparison**
 
     **DeepSeek-V3 effective compute:**

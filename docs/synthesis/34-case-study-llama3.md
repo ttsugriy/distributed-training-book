@@ -683,16 +683,6 @@ if __name__ == "__main__":
 
 1. **Parallelism trade-offs**: LLaMA 3 uses PP=16. Calculate the memory savings vs. PP=8 and PP=32. What is the pipeline bubble for each?
 
-2. **TP scaling limit**: At what message size does TP=16 (crossing node boundary) become faster than TP=8 despite the lower bandwidth? (Hint: consider the latency term.)
-
-3. **FSDP overlap**: LLaMA 3 overlaps FSDP AllGather with computation. What fraction of compute must be overlapped to hide the 200 GB/s of DP communication at 50 GB/s bandwidth?
-
-4. **Context parallelism**: For 128K context with CP=8, calculate the additional KV cache communication per layer. Compare to standard attention memory scaling.
-
-5. **Failure analysis**: With 10 failures/day and 5-minute recovery time, what fraction of training time is lost? How does this change with 30-second in-memory recovery?
-
-6. **Batch size dynamics**: LLaMA 3 increased batch from 4M to 16M tokens. If critical batch size scaled from 2M to 10M during training, estimate the compute efficiency at each phase.
-
 ??? success "Solution"
     **Exercise 1: Parallelism Trade-offs (PP=8 vs PP=16 vs PP=32)**
 
@@ -726,6 +716,9 @@ if __name__ == "__main__":
 
     PP=32 saves memory but wastes 1/3 of compute in bubbles.
 
+2. **TP scaling limit**: At what message size does TP=16 (crossing node boundary) become faster than TP=8 despite the lower bandwidth? (Hint: consider the latency term.)
+
+??? success "Solution"
     **Exercise 2: TP Scaling Limit**
 
     **Communication Model:**
@@ -770,6 +763,9 @@ if __name__ == "__main__":
 
     **Conclusion:** TP=8 (node-local) is almost always better than TP=16 due to NVLink's 18× bandwidth advantage.
 
+3. **FSDP overlap**: LLaMA 3 overlaps FSDP AllGather with computation. What fraction of compute must be overlapped to hide the 200 GB/s of DP communication at 50 GB/s bandwidth?
+
+??? success "Solution"
     **Exercise 3: FSDP Overlap**
 
     **Given:**
@@ -807,6 +803,9 @@ if __name__ == "__main__":
 
     The compute vastly exceeds communication per layer, so minimal overlap suffices.
 
+4. **Context parallelism**: For 128K context with CP=8, calculate the additional KV cache communication per layer. Compare to standard attention memory scaling.
+
+??? success "Solution"
     **Exercise 4: Context Parallelism**
 
     **Standard attention memory scaling:**
@@ -851,6 +850,9 @@ if __name__ == "__main__":
 
     Without CP, 128K context is impossible. With CP, it's feasible at ~18.5s additional communication for full forward pass.
 
+5. **Failure analysis**: With 10 failures/day and 5-minute recovery time, what fraction of training time is lost? How does this change with 30-second in-memory recovery?
+
+??? success "Solution"
     **Exercise 5: Failure Analysis**
 
     **Scenario A: 5-minute recovery**
@@ -884,6 +886,9 @@ if __name__ == "__main__":
     - With 5-min recovery: lose avg 15 min work per failure = 150 min/day = 10% additional
     - With 30-sec recovery: lose avg 1 min work = 10 min/day = 0.7% additional
 
+6. **Batch size dynamics**: LLaMA 3 increased batch from 4M to 16M tokens. If critical batch size scaled from 2M to 10M during training, estimate the compute efficiency at each phase.
+
+??? success "Solution"
     **Exercise 6: Batch Size Dynamics**
 
     **Critical batch size theory:**
