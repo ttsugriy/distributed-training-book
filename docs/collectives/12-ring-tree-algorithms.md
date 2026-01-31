@@ -164,22 +164,22 @@ Initial state (P=4, data partitioned into 4 chunks):
 P0: [A0 A1 A2 A3]    P1: [B0 B1 B2 B3]
 P2: [C0 C1 C2 C3]    P3: [D0 D1 D2 D3]
 
-Step 1: Each sends chunk[i] to (i+1) mod P, receives from (i-1) mod P
-P0: sends A3→P1, recv D0     P1: sends B0→P2, recv A3
-P2: sends C1→P3, recv B0     P3: sends D2→P0, recv C1
+Step 1: Each process i sends chunk[(i+1) mod P] clockwise, receives from counterclockwise
+P0: sends A1→P1, recv D0     P1: sends B2→P2, recv A1
+P2: sends C3→P3, recv B2     P3: sends D0→P0, recv C3
 
 After Step 1 (with reduction):
-P0: [A0+D0 A1 A2 A3]         P1: [B0 B1+A3 B2 B3]
-P2: [C0 C1 C2+B0 C3]         P3: [D0 D1 D2 D3+C1]
+P0: [A0+D0 A1 A2 A3]         P1: [B0 B1+A1 B2 B3]
+P2: [C0 C1 C2+B2 C3]         P3: [D0 D1 D2 D3+C3]
     ↑reduced                      ↑reduced
 
-Step 2: Send next chunk (the one just reduced)
-P0: sends (A0+D0)→P1, recv (D3+C2)
+Step 2: Send the chunk just reduced, receive next contribution
+P0: sends (A0+D0)→P1, recv (D3+C3)
 ...
 
 After Step 2:
-P0: [A0+D0 A1 A2+D3+C2 A3]
-P1: [B0+A0+D0 B1+A3 B2 B3]
+P0: [A0+D0 A1 A2 A3+D3+C3]
+P1: [B0+A0+D0 B1+A1 B2 B3]
 ...
 
 After P-1=3 steps:
