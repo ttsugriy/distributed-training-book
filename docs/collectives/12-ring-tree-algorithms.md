@@ -159,24 +159,20 @@ Partition each process's data into $P$ chunks. In $P-1$ steps, each process:
 2. Receives one chunk from counterclockwise neighbor
 3. Reduces received chunk with local chunk
 
+The visualization above shows the *logical* accumulation pattern where each process's owned chunk gains contributions from around the ring. The actual data movements involve partial sums rotating through the ring, but the end result is the same: after $P-1$ steps, process $i$ holds the fully reduced chunk $i$.
+
 ```
 Initial state (P=4, data partitioned into 4 chunks):
 P0: [A0 A1 A2 A3]    P1: [B0 B1 B2 B3]
 P2: [C0 C1 C2 C3]    P3: [D0 D1 D2 D3]
 
-Step 1: Each process i sends chunk[(i+1) mod P] clockwise, receives from counterclockwise
+Step 1: Each process i sends chunk[(i+1) mod P] clockwise
 P0: sends A1→P1, recv D0     P1: sends B2→P2, recv A1
 P2: sends C3→P3, recv B2     P3: sends D0→P0, recv C3
 
-After Step 1 (with reduction):
-P0: [A0+D0 A1 A2 A3]         P1: [B0 B1+A1 B2 B3]
-P2: [C0 C1 C2+B2 C3]         P3: [D0 D1 D2 D3+C3]
-    ↑reduced                      ↑reduced
-
-Step 2: Continue around ring, each owned chunk gains another contribution
-After Step 2:
-P0: [A0+D0+C0 ...]            P1: [... B1+A1+D1 ...]
-P2: [... C2+B2+A2 ...]        P3: [... D3+C3+B3]
+After Step 1 (each process reduces at their owned position):
+P0: [A0+D0 ...]              P1: [... B1+A1 ...]
+P2: [... C2+B2 ...]          P3: [... D3+C3]
 
 After P-1=3 steps:
 P0: has complete reduction of chunk 0: A0+B0+C0+D0
