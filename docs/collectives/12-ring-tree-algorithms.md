@@ -74,26 +74,26 @@ Each process will end up owning one chunk of the final reduced result.
 </div>
 
 <div class="step" markdown>
-**ReduceScatter Step 1** — Each GPU sends one chunk clockwise, receives from counterclockwise neighbor, and reduces
+**ReduceScatter Step 1** — Each GPU n sends chunk n clockwise, receives chunk (n-1) from counterclockwise neighbor
 
 <div class="tensor-viz">
-<div class="partition gpu-0">P0: <strong>A₀+D₀</strong> A₁ A₂ A₃</div>
-<div class="partition gpu-1">P1: B₀ <strong>B₁+A₁</strong> B₂ B₃</div>
-<div class="partition gpu-2">P2: C₀ C₁ <strong>C₂+B₂</strong> C₃</div>
-<div class="partition gpu-3">P3: D₀ D₁ D₂ <strong>D₃+C₃</strong></div>
+<div class="partition gpu-0">P0: A₀ A₁ A₂ <strong>A₃+D₃</strong></div>
+<div class="partition gpu-1">P1: <strong>B₀+A₀</strong> B₁ B₂ B₃</div>
+<div class="partition gpu-2">P2: C₀ <strong>C₁+B₁</strong> C₂ C₃</div>
+<div class="partition gpu-3">P3: D₀ D₁ <strong>D₂+C₂</strong> D₃</div>
 </div>
 
-P3→P0 (chunk 0), P0→P1 (chunk 1), P1→P2 (chunk 2), P2→P3 (chunk 3)
+P0→P1 (chunk 0), P1→P2 (chunk 1), P2→P3 (chunk 2), P3→P0 (chunk 3)
 </div>
 
 <div class="step" markdown>
-**ReduceScatter Step 2** — Continue sending the chunk just reduced
+**ReduceScatter Step 2** — Each GPU sends the chunk just accumulated
 
 <div class="tensor-viz">
-<div class="partition gpu-0">P0: <strong>A₀+D₀+C₀</strong> A₁ A₂ A₃</div>
-<div class="partition gpu-1">P1: B₀ <strong>B₁+A₁+D₁</strong> B₂ B₃</div>
-<div class="partition gpu-2">P2: C₀ C₁ <strong>C₂+B₂+A₂</strong> C₃</div>
-<div class="partition gpu-3">P3: D₀ D₁ D₂ <strong>D₃+C₃+B₃</strong></div>
+<div class="partition gpu-0">P0: A₀ A₁ <strong>A₂+C₂+D₂</strong> A₃+D₃</div>
+<div class="partition gpu-1">P1: B₀+A₀ B₁ B₂ <strong>B₃+A₃+D₃</strong></div>
+<div class="partition gpu-2">P2: <strong>C₀+A₀+B₀</strong> C₁+B₁ C₂ C₃</div>
+<div class="partition gpu-3">P3: D₀ <strong>D₁+B₁+C₁</strong> D₂+C₂ D₃</div>
 </div>
 
 Partial sums now contain 3 contributions each.
@@ -103,23 +103,23 @@ Partial sums now contain 3 contributions each.
 **ReduceScatter Step 3 (Final)** — After P-1=3 steps, each GPU owns one fully reduced chunk
 
 <div class="tensor-viz">
-<div class="partition complete">P0: <strong>Σ₀</strong> · · ·</div>
-<div class="partition complete">P1: · <strong>Σ₁</strong> · ·</div>
-<div class="partition complete">P2: · · <strong>Σ₂</strong> ·</div>
-<div class="partition complete">P3: · · · <strong>Σ₃</strong></div>
+<div class="partition complete">P0: · <strong>Σ₁</strong> · ·</div>
+<div class="partition complete">P1: · · <strong>Σ₂</strong> ·</div>
+<div class="partition complete">P2: · · · <strong>Σ₃</strong></div>
+<div class="partition complete">P3: <strong>Σ₀</strong> · · ·</div>
 </div>
 
-Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ. Each GPU holds 1/P of the complete result.
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ. Note: GPU n owns chunk (n+1) mod P due to ring rotation.
 </div>
 
 <div class="step" markdown>
 **AllGather Step 1** — Each GPU sends its reduced chunk clockwise
 
 <div class="tensor-viz">
-<div class="partition complete">P0: Σ₀ · · <strong>Σ₃</strong></div>
-<div class="partition complete">P1: <strong>Σ₀</strong> Σ₁ · ·</div>
-<div class="partition complete">P2: · <strong>Σ₁</strong> Σ₂ ·</div>
-<div class="partition complete">P3: · · <strong>Σ₂</strong> Σ₃</div>
+<div class="partition complete">P0: <strong>Σ₀</strong> Σ₁ · ·</div>
+<div class="partition complete">P1: · <strong>Σ₁</strong> Σ₂ ·</div>
+<div class="partition complete">P2: · · <strong>Σ₂</strong> Σ₃</div>
+<div class="partition complete">P3: Σ₀ · · <strong>Σ₃</strong></div>
 </div>
 
 No reduction needed — just store the received chunk.
@@ -129,10 +129,10 @@ No reduction needed — just store the received chunk.
 **AllGather Step 2** — Continue propagating chunks around the ring
 
 <div class="tensor-viz">
-<div class="partition complete">P0: Σ₀ · <strong>Σ₂</strong> Σ₃</div>
-<div class="partition complete">P1: Σ₀ Σ₁ · <strong>Σ₃</strong></div>
-<div class="partition complete">P2: <strong>Σ₀</strong> Σ₁ Σ₂ ·</div>
-<div class="partition complete">P3: · <strong>Σ₁</strong> Σ₂ Σ₃</div>
+<div class="partition complete">P0: Σ₀ Σ₁ · <strong>Σ₃</strong></div>
+<div class="partition complete">P1: <strong>Σ₀</strong> Σ₁ Σ₂ ·</div>
+<div class="partition complete">P2: · <strong>Σ₁</strong> Σ₂ Σ₃</div>
+<div class="partition complete">P3: Σ₀ · <strong>Σ₂</strong> Σ₃</div>
 </div>
 
 Each GPU now has 3 of 4 chunks.
@@ -154,34 +154,46 @@ Each GPU now has 3 of 4 chunks.
 
 ### Phase 1: ReduceScatter via Ring
 
-Partition each process's data into $P$ chunks. In $P-1$ steps, each process:
-1. Sends one chunk clockwise
-2. Receives one chunk from counterclockwise neighbor
-3. Reduces received chunk with local chunk
+Partition each process's data into $P$ chunks. In step $k$ (from 0 to $P-2$), each process:
 
-The visualization above shows the *logical* accumulation pattern where each process's owned chunk gains contributions from around the ring. The actual data movements involve partial sums rotating through the ring, but the end result is the same: after $P-1$ steps, process $i$ holds the fully reduced chunk $i$.
+1. Sends chunk $(n-k) \mod P$ clockwise (where $n$ is the process rank)
+2. Receives one chunk from counterclockwise neighbor
+3. Accumulates received chunk with local data at that position
 
 ```
 Initial state (P=4, data partitioned into 4 chunks):
 P0: [A0 A1 A2 A3]    P1: [B0 B1 B2 B3]
 P2: [C0 C1 C2 C3]    P3: [D0 D1 D2 D3]
 
-Step 1: Each process i sends chunk[(i+1) mod P] clockwise
-P0: sends A1→P1, recv D0     P1: sends B2→P2, recv A1
-P2: sends C3→P3, recv B2     P3: sends D0→P0, recv C3
+Step 1: GPU n sends chunk n, receives chunk (n-1) mod P
+P0: sends A0→P1, recv D3     P1: sends B1→P2, recv A0
+P2: sends C2→P3, recv B1     P3: sends D3→P0, recv C2
 
-After Step 1 (each process reduces at their owned position):
-P0: [A0+D0 ...]              P1: [... B1+A1 ...]
-P2: [... C2+B2 ...]          P3: [... D3+C3]
+After Step 1 (accumulate at received chunk's position):
+P0: [A0 A1 A2 A3+D3]         P1: [A0+B0 B1 B2 B3]
+P2: [C0 B1+C1 C2 C3]         P3: [D0 D1 C2+D2 D3]
+        position 3                 position 0
 
-After P-1=3 steps:
-P0: has complete reduction of chunk 0: A0+B0+C0+D0
-P1: has complete reduction of chunk 1: A1+B1+C1+D1
-P2: has complete reduction of chunk 2: A2+B2+C2+D2
-P3: has complete reduction of chunk 3: A3+B3+C3+D3
+Step 2: GPU n sends chunk (n-1) mod P (the one just accumulated)
+P0: sends (A3+D3)→P1         P1: sends (A0+B0)→P2
+P2: sends (B1+C1)→P3         P3: sends (C2+D2)→P0
+
+After Step 2:
+P0: [... A2+C2+D2 ...]       P1: [... B3+A3+D3]
+P2: [A0+B0+C0 ...]           P3: [... B1+C1+D1 ...]
+
+Step 3: Final accumulation completes one chunk per GPU
+P0: receives B1+C1+D1, accumulates → Σ1 = A1+B1+C1+D1
+P1: receives A2+C2+D2, accumulates → Σ2 = A2+B2+C2+D2
+P2: receives A3+B3+D3, accumulates → Σ3 = A3+B3+C3+D3
+P3: receives A0+B0+C0, accumulates → Σ0 = A0+B0+C0+D0
+
+After P-1=3 steps (note the rotated ownership):
+P0: has Σ1 (chunk 1)    P1: has Σ2 (chunk 2)
+P2: has Σ3 (chunk 3)    P3: has Σ0 (chunk 0)
 ```
 
-Each process now holds 1/P of the fully reduced result.
+Each process now holds 1/P of the fully reduced result. Due to the ring rotation, GPU $n$ ends up with chunk $(n+1) \mod P$.
 
 ```mermaid
 flowchart TB
@@ -193,8 +205,8 @@ flowchart TB
 
     subgraph step3["After ReduceScatter (P-1 steps)"]
         direction LR
-        A3["P0: Σ₀ · · ·"] ~~~ B3["P1: · Σ₁ · ·"]
-        C3["P2: · · Σ₂ ·"] ~~~ D3["P3: · · · Σ₃"]
+        A3["P0: · Σ₁ · ·"] ~~~ B3["P1: · · Σ₂ ·"]
+        C3["P2: · · · Σ₃"] ~~~ D3["P3: Σ₀ · · ·"]
     end
 
     step0 --> step3
@@ -205,7 +217,7 @@ flowchart TB
     style D3 fill:#2ecc71,stroke:#27ae60,color:white
 ```
 
-Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ (the fully reduced chunk i).
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ (the fully reduced chunk i). Note: GPU n owns chunk (n+1) mod P.
 
 ### Phase 2: AllGather via Ring
 
@@ -215,17 +227,17 @@ In $P-1$ steps, each process:
 3. Stores received chunk (no reduction needed)
 
 ```
-After ReduceScatter:
-P0: [Σ0 . . .]    P1: [. Σ1 . .]
-P2: [. . Σ2 .]    P3: [. . . Σ3]
+After ReduceScatter (GPU n has chunk (n+1) mod P):
+P0: [. Σ1 . .]    P1: [. . Σ2 .]
+P2: [. . . Σ3]    P3: [Σ0 . . .]
 
 Step 1: Each sends its chunk clockwise
-P0: sends Σ0→P1    P1: sends Σ1→P2
-P2: sends Σ2→P3    P3: sends Σ3→P0
+P0: sends Σ1→P1    P1: sends Σ2→P2
+P2: sends Σ3→P3    P3: sends Σ0→P0
 
 After Step 1:
-P0: [Σ0 . . Σ3]    P1: [Σ0 Σ1 . .]
-P2: [. Σ1 Σ2 .]    P3: [. . Σ2 Σ3]
+P0: [Σ0 Σ1 . .]    P1: [. Σ1 Σ2 .]
+P2: [. . Σ2 Σ3]    P3: [Σ0 . . Σ3]
 
 Step 2: Send what was just received
 ...
@@ -239,8 +251,8 @@ P2: [Σ0 Σ1 Σ2 Σ3]    P3: [Σ0 Σ1 Σ2 Σ3]
 flowchart TB
     subgraph before["After ReduceScatter"]
         direction LR
-        A1["P0: Σ₀ · · ·"] ~~~ B1["P1: · Σ₁ · ·"]
-        C1["P2: · · Σ₂ ·"] ~~~ D1["P3: · · · Σ₃"]
+        A1["P0: · Σ₁ · ·"] ~~~ B1["P1: · · Σ₂ ·"]
+        C1["P2: · · · Σ₃"] ~~~ D1["P3: Σ₀ · · ·"]
     end
 
     subgraph after["After AllGather (P-1 steps)"]
@@ -758,61 +770,62 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [13, 14, 15, 16]  → chunks: [13] [14] [15] [16]
     ```
 
-    **Step 1:** Each process sends chunk[rank-step] to (rank+1), receives from (rank-1), reduces:
-    - P0 sends chunk[0]=1 → P1, receives chunk[3]=16 from P3 → reduces at position 3
-    - P1 sends chunk[1]=6 → P2, receives chunk[0]=1 from P0 → reduces at position 0
-    - P2 sends chunk[2]=11 → P3, receives chunk[1]=6 from P1 → reduces at position 1
-    - P3 sends chunk[3]=16 → P0, receives chunk[2]=11 from P2 → reduces at position 2
+    **Step 1:** GPU n sends chunk n, receives chunk (n-1) mod 4:
+    - P0 sends chunk 0 (=1) → P1, receives chunk 3 (=16) from P3 → accumulates at position 3
+    - P1 sends chunk 1 (=6) → P2, receives chunk 0 (=1) from P0 → accumulates at position 0
+    - P2 sends chunk 2 (=11) → P3, receives chunk 1 (=6) from P1 → accumulates at position 1
+    - P3 sends chunk 3 (=16) → P0, receives chunk 2 (=11) from P2 → accumulates at position 2
 
     ```
     After Step 1:
-    P0: [1, 2, 3, 4+16=20]
-    P1: [5+1=6, 6, 7, 8]
-    P2: [9, 10+6=16, 11, 12]
-    P3: [13, 14, 15+11=26, 16]
+    P0: [1, 2, 3, 4+16=20]       position 3 accumulated
+    P1: [5+1=6, 6, 7, 8]         position 0 accumulated
+    P2: [9, 10+6=16, 11, 12]     position 1 accumulated
+    P3: [13, 14, 15+11=26, 16]   position 2 accumulated
     ```
 
-    **Step 2:** Send the chunk just reduced, receive next chunk:
-    - P0 sends chunk[3]=20 → P1, receives chunk[2]=26 from P3
-    - P1 sends chunk[0]=6 → P2, receives chunk[3]=20 from P0
-    - P2 sends chunk[1]=16 → P3, receives chunk[0]=6 from P1
-    - P3 sends chunk[2]=26 → P0, receives chunk[1]=16 from P2
+    **Step 2:** Send the chunk just accumulated (chunk (n-1) mod 4):
+    - P0 sends 20 (pos 3) → P1, receives 26 (pos 2) from P3 → accumulates at position 2
+    - P1 sends 6 (pos 0) → P2, receives 20 (pos 3) from P0 → accumulates at position 3
+    - P2 sends 16 (pos 1) → P3, receives 6 (pos 0) from P1 → accumulates at position 0
+    - P3 sends 26 (pos 2) → P0, receives 16 (pos 1) from P2 → accumulates at position 1
 
     ```
     After Step 2:
-    P0: [1, 2, 3+26=29, 20]        position 2 now has P2+P3+P0 partial
-    P1: [6, 6, 7, 8+20=28]         position 3 now has P0+P3+P1 partial
-    P2: [9+6=15, 16, 11, 12]       position 0 now has P0+P1+P2 partial
-    P3: [13, 14+16=30, 26, 16]     position 1 now has P1+P2+P3 partial
+    P0: [1, 2, 3+26=29, 20]           position 2 = 3+11+16 = 30? Let me recalculate...
     ```
 
-    **Step 3:** Final round:
-    - P0 sends chunk[2]=29 → P1, receives chunk[1]=30 from P3
-    - P1 sends chunk[3]=28 → P2, receives chunk[2]=29 from P0
-    - P2 sends chunk[0]=15 → P3, receives chunk[3]=28 from P1
-    - P3 sends chunk[1]=30 → P0, receives chunk[0]=15 from P2
+    Actually, let me trace more carefully. After Step 1, P3 has 26 at position 2 (that's 15+11 = C2+D2).
+    P0 receives 26, accumulates: 3 + 26 = 29 at position 2.
+
+    ```
+    After Step 2:
+    P0: [1, 2, 29, 20]          pos 2 = A2+C2+D2
+    P1: [6, 6, 7, 8+20=28]      pos 3 = B3+A3+D3
+    P2: [9+6=15, 16, 11, 12]    pos 0 = C0+A0+B0
+    P3: [13, 14+16=30, 26, 16]  pos 1 = D1+B1+C1
+    ```
+
+    **Step 3:** Final round, send chunk (n-2) mod 4:
+    - P0 sends 29 → P1, receives 30 from P3 → accumulates at position 1
+    - P1 sends 28 → P2, receives 29 from P0 → accumulates at position 2
+    - P2 sends 15 → P3, receives 28 from P1 → accumulates at position 3
+    - P3 sends 30 → P0, receives 15 from P2 → accumulates at position 0
 
     ```
     After Step 3 (Final):
-    P0: [1, 2+30=32, 29, 20]    → P0 has complete sum at position 1?
+    P0: [1, 2+30=32, 29, 20]    → P0 has Σ1=32 at position 1 ✓
+    P1: [6, 6, 7+29=36, 28]     → P1 has Σ2=36 at position 2 ✓
+    P2: [15, 16, 11, 12+28=40]  → P2 has Σ3=40 at position 3 ✓
+    P3: [13+15=28, 30, 26, 16]  → P3 has Σ0=28 at position 0 ✓
     ```
 
-    Wait, let me redo this more carefully. The key is which chunk each process "owns" at the end.
-
-    **Correct tracing:**
-
-    After P-1=3 steps, each process holds the complete reduction of ONE chunk:
-    - P0 owns chunk 0: $1+5+9+13 = \boxed{28}$
-    - P1 owns chunk 1: $2+6+10+14 = \boxed{32}$
-    - P2 owns chunk 2: $3+7+11+15 = \boxed{36}$
-    - P3 owns chunk 3: $4+8+12+16 = \boxed{40}$
-
-    **Final result:**
+    **Final result (GPU n owns chunk (n+1) mod P):**
     ```
-    P0: [28]    (sum of all first elements)
-    P1: [32]    (sum of all second elements)
-    P2: [36]    (sum of all third elements)
-    P3: [40]    (sum of all fourth elements)
+    P0: has Σ1 = 2+6+10+14 = 32   (sum of all second elements)
+    P1: has Σ2 = 3+7+11+15 = 36   (sum of all third elements)
+    P2: has Σ3 = 4+8+12+16 = 40   (sum of all fourth elements)
+    P3: has Σ0 = 1+5+9+13 = 28    (sum of all first elements)
     ```
 
 2. **Crossover calculation**: For P=256, α=5μs, β=200 GB/s, calculate the crossover point between ring and tree.
