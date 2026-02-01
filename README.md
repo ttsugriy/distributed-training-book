@@ -63,7 +63,7 @@ This book is a companion to [*The Algebra of Speed*](https://ttsugriy.github.io/
 ## Local Development
 
 ### Prerequisites
-- [Quarto](https://quarto.org/) (1.4+)
+- [MkDocs](https://www.mkdocs.org/) + [Material](https://squidfunk.github.io/mkdocs-material/)
 - Python 3.10+
 - Node.js 18+ (for interactive elements)
 
@@ -78,8 +78,8 @@ pip install -r requirements.txt
 
 ### Build
 ```bash
-quarto preview    # Live development server
-quarto render     # Build static site
+mkdocs serve      # Live development server
+mkdocs build      # Build static site
 ```
 
 ## Contributing

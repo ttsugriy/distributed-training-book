@@ -44,9 +44,9 @@ Where:
 - $F$: FLOP/s of the device
 - Factor of 6: forward (2) + backward (4) FLOPs per parameter per token
 
-For GPT-3 (175B parameters, 300B tokens) on a single H100 (1979 TFLOP/s at FP16):
+For GPT-3 (175B parameters, 300B tokens) on a single H100 (~989 TFLOP/s dense FP16/BF16):
 
-$$T = \frac{6 \times 175 \times 10^9 \times 300 \times 10^9}{1979 \times 10^{12}} = 159 \times 10^6 \text{ seconds} \approx 5 \text{ years}$$
+$$T = \frac{6 \times 175 \times 10^9 \times 300 \times 10^9}{989 \times 10^{12}} = 318 \times 10^6 \text{ seconds} \approx 10 \text{ years}$$
 
 We need parallelism to finish in reasonable time.
 
@@ -137,7 +137,7 @@ Let's begin with the foundations.
 
     In practice, you'd need more to account for activations, batch data, and framework overhead. A typical choice would be 4-8 GPUs.
 
-2. You want to train a 7B parameter model on 2 trillion tokens. Using a single H100 (1979 TFLOP/s peak), how long would training take assuming 50% of peak utilization? Express your answer in days.
+2. You want to train a 7B parameter model on 2 trillion tokens. Using a single H100 (~989 TFLOP/s dense FP16/BF16), how long would training take assuming 50% of peak utilization? Express your answer in days.
 
 ??? success "Solution"
     **Training time formula:**
@@ -148,13 +148,13 @@ Let's begin with the foundations.
 
     **Calculation:**
 
-    $$T = \frac{6 \times 7 \times 10^9 \times 2 \times 10^{12}}{1979 \times 10^{12} \times 0.5}$$
+    $$T = \frac{6 \times 7 \times 10^9 \times 2 \times 10^{12}}{989 \times 10^{12} \times 0.5}$$
 
-    $$T = \frac{84 \times 10^{21}}{989.5 \times 10^{12}} = 84.9 \times 10^6 \text{ seconds}$$
+    $$T = \frac{84 \times 10^{21}}{494.5 \times 10^{12}} = 169.8 \times 10^6 \text{ seconds}$$
 
     **Converting to days:**
 
-    $$T = \frac{84.9 \times 10^6}{86400} \approx 983 \text{ days} \approx 2.7 \text{ years}$$
+    $$T = \frac{169.8 \times 10^6}{86400} \approx 1965 \text{ days} \approx 5.4 \text{ years}$$
 
     This is why we need hundreds of GPUs—to reduce this to weeks or months.
 

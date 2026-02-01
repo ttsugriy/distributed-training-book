@@ -4,6 +4,8 @@ title: "Preface"
 
 **Read online: [ttsugriy.github.io/distributed-training-book](https://ttsugriy.github.io/distributed-training-book/)**
 
+![The Algebra of Distributed Training](images/distributed_training_book.png)
+
 <div class="chapter-opener" markdown>
 Every parallelism strategy exploits a mathematical property. Every communication pattern has an algebraic structure. Every efficiency gain traces to a fundamental insight about what can be decomposed and what must be synchronized.
 </div>

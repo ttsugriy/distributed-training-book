@@ -514,15 +514,8 @@ Like tree reduce, but only exchange $n/2$ data at each step:
 ```
 Step 1: Pairs exchange opposite halves and reduce
         P0: [A B] ↔ P1: [C D]
-        P0 sends [B], recvs [D], computes [A A+C+D]
-        P1 sends [A], recvs [C], computes [B+C B]
-
-Wait, this isn't quite right. Let me be more precise:
-
-Step 1: P0 sends second half [B] to P1
-        P1 sends first half [C] to P0
-        P0: reduces received C with local A → [A+C, B]
-        P1: reduces received B with local D → [C, B+D]
+        P0 sends upper half [B], receives [C], reduces into its lower half
+        P1 sends lower half [C], receives [B], reduces into its upper half
 ```
 
 Actually, the Rabenseifner algorithm for ReduceScatter:

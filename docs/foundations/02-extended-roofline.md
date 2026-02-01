@@ -50,9 +50,9 @@ xychart-beta
     title "Extended Roofline Model"
     x-axis "Arithmetic Intensity (FLOPs/byte)" [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
     y-axis "Performance (TFLOP/s)" 0 --> 2000
-    line "Network Ceiling" [50, 100, 200, 400, 800, 1600, 1979, 1979, 1979, 1979, 1979]
-    line "Memory Ceiling" [100, 200, 400, 800, 1600, 1979, 1979, 1979, 1979, 1979, 1979]
-    line "Compute Ceiling" [1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979, 1979]
+    line "Network Ceiling" [50, 100, 200, 400, 800, 989, 989, 989, 989, 989, 989]
+    line "Memory Ceiling" [100, 200, 400, 800, 989, 989, 989, 989, 989, 989, 989]
+    line "Compute Ceiling" [989, 989, 989, 989, 989, 989, 989, 989, 989, 989, 989]
 ```
 
 **How to read this:**
@@ -67,9 +67,9 @@ xychart-beta
 | Middle slope | Memory | Low $I_{mem}$ | HBM bandwidth |
 | Flat top | Compute | High | Peak FLOP/s |
 
-**Ridge points** mark transitions between regimes. For H100 with 400 Gbps InfiniBand:
+**Ridge points** mark transitions between regimes. For H100 (~989 TFLOP/s dense FP16/BF16) with 400 Gbps InfiniBand:
 
-$$I_{ridge}^{net} = \frac{1979 \times 10^{12} \text{ FLOP/s}}{50 \times 10^9 \text{ B/s}} \approx 39,580 \text{ FLOPs/byte}$$
+$$I_{ridge}^{net} = \frac{989 \times 10^{12} \text{ FLOP/s}}{50 \times 10^9 \text{ B/s}} \approx 19,780 \text{ FLOPs/byte}$$
 
 ## The Three Regimes
 
@@ -137,9 +137,9 @@ The **ridge point** is where two ceilings intersect. For distributed training:
 
 $$I_{\text{ridge}} = \frac{\text{Peak FLOP/s}}{\text{Network BW}}$$
 
-For an H100 (1979 TFLOP/s) with 400 Gbps (50 GB/s) InfiniBand:
+For an H100 (989 TFLOP/s) with 400 Gbps (50 GB/s) InfiniBand:
 
-$$I_{\text{ridge}} = \frac{1979 \times 10^{12}}{50 \times 10^9} = 39,580 \text{ FLOPs/byte}$$
+$$I_{\text{ridge}} = \frac{989 \times 10^{12}}{50 \times 10^9} = 19,780 \text{ FLOPs/byte}$$
 
 Operations with communication intensity below this are network-bound.
 
@@ -184,18 +184,18 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
     $$I_{ridge} = \frac{\text{Peak FLOPs}}{\text{Bandwidth}}$$
 
-    **For H100 (1979 TFLOP/s peak):**
+    **For H100 (989 TFLOP/s peak):**
 
     NVLink (900 GB/s):
 
-    $$I_{ridge}^{NVLink} = \frac{1979 \times 10^{12}}{900 \times 10^9} = 2,199 \text{ FLOPs/byte}$$
+    $$I_{ridge}^{NVLink} = \frac{989 \times 10^{12}}{900 \times 10^9} = 1,099 \text{ FLOPs/byte}$$
 
     InfiniBand (400 Gbps = 50 GB/s):
 
-    $$I_{ridge}^{IB} = \frac{1979 \times 10^{12}}{50 \times 10^9} = 39,580 \text{ FLOPs/byte}$$
+    $$I_{ridge}^{IB} = \frac{989 \times 10^{12}}{50 \times 10^9} = 19,780 \text{ FLOPs/byte}$$
 
     **Ratio:**
-    $$\frac{I_{ridge}^{IB}}{I_{ridge}^{NVLink}} = \frac{39,580}{2,199} \approx 18\times$$
+    $$\frac{I_{ridge}^{IB}}{I_{ridge}^{NVLink}} = \frac{19,780}{1,099} \approx 18\times$$
 
     **Implication:** Operations need 18× higher arithmetic intensity to be compute-bound over InfiniBand vs NVLink. This is why tensor parallelism (low intensity) uses NVLink, while data parallelism (high intensity) can use InfiniBand.
 

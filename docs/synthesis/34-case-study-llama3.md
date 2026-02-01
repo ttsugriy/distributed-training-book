@@ -42,22 +42,22 @@ $$C = 6 \times (405 \times 10^9) \times (15.6 \times 10^{12}) \approx 3.79 \time
 
 Each H100 SXM provides:
 
-- Peak FP16/BF16: 1,979 TFLOPS
-- Peak FP8: 3,958 TFLOPS
+- Peak FP16/BF16: 989 TFLOPS
+- Peak FP8: 1,979 TFLOPS
 - HBM3 Memory: 80 GB
 - Memory Bandwidth: 3.35 TB/s
 
 For 16,384 GPUs at realistic 40% MFU (typical for very large models):
 
-$$\text{Effective FLOPS} = 16384 \times 1979 \times 10^{12} \times 0.40 \approx 1.3 \times 10^{19} \text{ FLOPS}$$
+$$\text{Effective FLOPS} = 16384 \times 989 \times 10^{12} \times 0.40 \approx 6.5 \times 10^{18} \text{ FLOPS}$$
 
 ### Training Time Derivation
 
-$$\text{Training time} = \frac{C}{\text{Effective FLOPS}} = \frac{3.79 \times 10^{25}}{1.3 \times 10^{19}} \approx 2.9 \times 10^6 \text{ seconds} \approx 34 \text{ days}$$
+$$\text{Training time} = \frac{C}{\text{Effective FLOPS}} = \frac{3.79 \times 10^{25}}{6.5 \times 10^{18}} \approx 5.8 \times 10^6 \text{ seconds} \approx 67 \text{ days}$$
 
 The actual training took approximately 54 days, suggesting:
 
-- Effective MFU closer to 25-30%
+- Effective MFU closer to ~50% (or a lower effective compute budget)
 - Time lost to failures and restarts
 - Validation and checkpoint overhead
 
@@ -276,11 +276,11 @@ $$F_{\text{step}} = 6 \times 405 \times 10^9 \times 10^6 = 2.43 \times 10^{18} \
 
 **Hardware peak**:
 
-$$F_{\text{peak}} = 16384 \times 1979 \times 10^{12} = 3.24 \times 10^{19} \text{ FLOPS}$$
+$$F_{\text{peak}} = 16384 \times 989 \times 10^{12} = 1.62 \times 10^{19} \text{ FLOPS}$$
 
 If step takes 0.3 seconds:
 
-$$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 0.3} \approx 0.25 = 25\%$$
+$$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 0.3} \approx 0.50 = 50\%$$
 
 ### Efficiency Breakdown
 
@@ -525,7 +525,7 @@ class LLaMA3Analyzer:
         self.gpu_memory = 80  # GB
         self.nvlink_bw = 600  # GB/s
         self.ib_bw = 50  # GB/s
-        self.peak_flops = 1979e12  # FP16
+        self.peak_flops = 989e12  # FP16/BF16 dense
 
         # Parallelism
         self.tp = 8

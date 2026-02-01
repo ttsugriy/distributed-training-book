@@ -1528,7 +1528,7 @@ class MixedPrecisionTrainer:
         memory_frac_fp32 = 0.40
 
         # FP16 speedups
-        compute_speedup = 4.0  # Tensor Cores: 1979 vs 495 TFLOP/s
+        compute_speedup = 4.0  # Tensor Cores: FP8 1979 vs FP16 495 TFLOP/s
         memory_speedup = 2.0  # Half the bytes
 
         # Weighted speedup

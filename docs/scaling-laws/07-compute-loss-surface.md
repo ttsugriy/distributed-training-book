@@ -114,7 +114,7 @@ $$D^* = \left(\frac{B\beta}{A\alpha}\right)^{\frac{\alpha}{\alpha+\beta}} \left(
 
 **Key insight**: Both $N^*$ and $D^*$ are power laws in $C$.
 
-If $\alpha = \beta$ (as Chinchilla suggests):
+If $\alpha \approx \beta$ (Chinchilla: $\alpha \approx 0.34$, $\beta \approx 0.28$):
 
 $$N^* \propto C^{0.5}, \quad D^* \propto C^{0.5}$$
 
@@ -204,9 +204,9 @@ Where MFU (Model FLOP Utilization) is typically 30-50%.
 
 $$C = 6 \times 70 \times 10^9 \times 1.4 \times 10^{12} = 5.9 \times 10^{23} \text{ FLOPs}$$
 
-On 1000 H100s (1979 TFLOP/s each) at 40% MFU:
+On 1000 H100s (~989 TFLOP/s dense FP16/BF16 each) at 40% MFU:
 
-$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 1.979 \times 10^{15} \times 0.4} \approx 8.6 \text{ days}$$
+$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 9.89 \times 10^{14} \times 0.4} \approx 8.6 \text{ days}$$
 
 ## Beyond Simple Scaling
 
@@ -264,12 +264,12 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
     - $C = 10^{24}$ FLOPs
     - GPUs = 512
-    - H100 peak = 1979 TFLOP/s = $1.979 \times 10^{15}$ FLOP/s
+    - H100 peak = 989 TFLOP/s = $9.89 \times 10^{14}$ FLOP/s
     - MFU = 45% = 0.45
 
     **Calculation:**
 
-    $$T = \frac{10^{24}}{512 \times 1.979 \times 10^{15} \times 0.45}$$
+    $$T = \frac{10^{24}}{512 \times 9.89 \times 10^{14} \times 0.45}$$
 
     $$T = \frac{10^{24}}{4.56 \times 10^{17}} = 2.19 \times 10^6 \text{ seconds}$$
 

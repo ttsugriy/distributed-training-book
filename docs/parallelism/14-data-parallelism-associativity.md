@@ -739,7 +739,7 @@ model = DDP(
     - $\Psi = 7 \times 10^9$ parameters
     - $P = 8$ GPUs
     - $\beta = 900$ GB/s (NVLink bandwidth)
-    - $F = 1979 \times 10^{12}$ FLOP/s (H100 FP16 peak)
+    - $F = 989 \times 10^{12}$ FLOP/s (H100 dense FP16/BF16 peak)
     - FP16 training: sizeof(dtype) = 2 bytes
     - Target: $R = 2$
 
@@ -751,11 +751,11 @@ model = DDP(
 
     $$b = \frac{R \cdot F \cdot \text{sizeof}(\text{dtype})}{3 \cdot \beta}$$
 
-    $$b = \frac{2 \times 1979 \times 10^{12} \times 2}{3 \times 900 \times 10^9}$$
+    $$b = \frac{2 \times 989 \times 10^{12} \times 2}{3 \times 900 \times 10^9}$$
 
-    $$b = \frac{7.916 \times 10^{15}}{2.7 \times 10^{12}}$$
+    $$b = \frac{3.956 \times 10^{15}}{2.7 \times 10^{12}}$$
 
-    $$b = \boxed{2,932 \text{ samples}}$$
+    $$b = \boxed{1,465 \text{ samples}}$$
 
     **Verification:**
 
@@ -769,9 +769,9 @@ model = DDP(
     *Compute time:*
     $$T_{\text{compute}} = \frac{6\Psi \times b}{F}$$
 
-    $$= \frac{6 \times 7 \times 10^9 \times 2932}{1979 \times 10^{12}}$$
+    $$= \frac{6 \times 7 \times 10^9 \times 1465}{989 \times 10^{12}}$$
 
-    $$= \frac{1.23 \times 10^{14}}{1.979 \times 10^{15}} = 62.2 \text{ ms}$$
+    $$= \frac{6.16 \times 10^{13}}{9.89 \times 10^{14}} = 62.2 \text{ ms}$$
 
     *Ratio check:*
     $$R = \frac{62.2}{27.2} = 2.29 \approx 2 \checkmark$$

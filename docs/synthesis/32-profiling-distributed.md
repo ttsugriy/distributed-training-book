@@ -1351,11 +1351,11 @@ def diagnose_memory_pressure():
         flops_per_step = 6 * flops_per_token * tokens_per_step  # 6 = 1 fwd + 2 bwd
 
         # Peak FLOPs for GPU
-        # H100: 1979 TFLOP/s (FP16 Tensor Core)
+        # H100: 989 TFLOP/s (dense FP16/BF16)
         # A100: 312 TFLOP/s (FP16 Tensor Core)
         gpu_name = torch.cuda.get_device_name(device)
         if 'H100' in gpu_name:
-            peak_flops = 1979e12
+            peak_flops = 989e12
         elif 'A100' in gpu_name:
             peak_flops = 312e12
         else:
@@ -1430,7 +1430,7 @@ def diagnose_memory_pressure():
     |--------|-------|
     | Time per step | ~180 ms |
     | Achieved | ~450 TFLOP/s |
-    | Peak | 1979 TFLOP/s |
+    | Peak | 989 TFLOP/s |
     | **MFU** | **~23%** |
 
     Note: Single-GPU MFU is typically lower (20-30%) than multi-GPU with tensor parallelism (40-50%) due to memory bandwidth limitations.

@@ -116,7 +116,7 @@ For a given model, there's often a "sweet spot" of parallelism where $/FLOP is m
 
 ## Case Study: DeepSeek's $5.6M Training
 
-DeepSeek V3 (671B MoE, 37B active) trained for ~$5.6M:
+DeepSeek V3 (671B MoE, 37B active) is reported/estimated to have trained for ~$5.6M:
 
 - 2048 H800 GPUs
 - 14.8T tokens
@@ -142,15 +142,15 @@ Key cost optimizations:
 
     $$F_{\text{GPU-hr}} = \text{MFU} \times \text{Peak} \times 3600 \text{ s}$$
 
-    $$= 0.45 \times 1979 \times 10^{12} \times 3600 = 3.21 \times 10^{18} \text{ FLOPs/GPU-hour}$$
+    $$= 0.45 \times 989 \times 10^{12} \times 3600 = 1.60 \times 10^{18} \text{ FLOPs/GPU-hour}$$
 
     **Total GPU-hours required:**
 
-    $$\text{GPU-hours} = \frac{8.4 \times 10^{23}}{3.21 \times 10^{18}} = 261,682 \text{ GPU-hours}$$
+    $$\text{GPU-hours} = \frac{8.4 \times 10^{23}}{1.60 \times 10^{18}} = 525,000 \text{ GPU-hours}$$
 
     **Total cost:**
 
-    $$\text{Cost} = 261,682 \times \$4 = \boxed{\$1,046,728 \approx \$1.05\text{M}}$$
+    $$\text{Cost} = 525,000 \times \$4 = \boxed{\$2.10\text{M}}$$
 
     **Sanity check**: This is in the range of published training costs for models of this scale.
 

@@ -132,7 +132,7 @@ $$D^* \approx 20 \times 2.9 \times 10^{10} = 5.8 \times 10^{11}$$
 
 **Compute-optimal**: ~29B parameters, ~580B tokens.
 
-Compare to GPT-4 rumors: 1.8T parameters (mixture-of-experts), trained on 13T tokens. This is heavily **overtrained** relative to Chinchilla—deliberately so for inference efficiency.
+Reported estimates vary; one commonly cited rumor is 1.8T parameters (mixture-of-experts) trained on 13T tokens. Treat this as speculative. If true, it would be heavily **overtrained** relative to Chinchilla—deliberately so for inference efficiency.
 
 ## The Undertrained Models
 

@@ -103,11 +103,11 @@ Where:
 
 **Example**: 70B model, batch=1M tokens, 128 H100s, 45% MFU:
 
-$$T_{\text{step}} = \frac{6 \times 70 \times 10^9 \times 10^6}{0.45 \times 1979 \times 10^{12} \times 128} = 3.67 \text{ seconds}$$
+$$T_{\text{step}} = \frac{6 \times 70 \times 10^9 \times 10^6}{0.45 \times 989 \times 10^{12} \times 128} = 7.37 \text{ seconds}$$
 
 ### Tokens per Second
 
-$$\text{Tokens/s} = \frac{B \cdot S}{T_{\text{step}}} = \frac{10^6}{3.67} \approx 272,000 \text{ tokens/s}$$
+$$\text{Tokens/s} = \frac{B \cdot S}{T_{\text{step}}} = \frac{10^6}{7.37} \approx 136,000 \text{ tokens/s}$$
 
 ### Training Time
 
@@ -115,7 +115,7 @@ $$T_{\text{train}} = \frac{D}{B \cdot S} \times T_{\text{step}} = \frac{D \times
 
 For 2T tokens:
 
-$$T_{\text{train}} = \frac{2 \times 10^{12}}{272,000} \approx 7.35 \times 10^6 \text{ seconds} \approx 85 \text{ days}$$
+$$T_{\text{train}} = \frac{2 \times 10^{12}}{136,000} \approx 14.7 \times 10^6 \text{ seconds} \approx 170 \text{ days}$$
 
 ## Communication Estimation
 
@@ -237,11 +237,11 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     **Peak FLOPs/s (64 H100s):**
 
-    $$F_{peak} = 64 \times 1979 \text{ TFLOP/s} = 126,656 \text{ TFLOP/s}$$
+    $$F_{peak} = 64 \times 989 \text{ TFLOP/s} = 63,296 \text{ TFLOP/s}$$
 
     **MFU:**
 
-    $$\text{MFU} = \frac{6,300}{126,656} = \boxed{4.97\% \approx 5\%}$$
+    $$\text{MFU} = \frac{6,300}{63,296} = \boxed{9.95\% \approx 10\%}$$
 
     **Analysis:** This is a very low MFU, indicating significant inefficiency. Possible causes:
 
@@ -287,11 +287,11 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     **Peak throughput with 640 H100s:**
 
-    $$F_{peak} = 640 \times 1979 \times 10^{12} = 1.27 \times 10^{18} \text{ FLOP/s}$$
+    $$F_{peak} = 640 \times 989 \times 10^{12} = 6.33 \times 10^{17} \text{ FLOP/s}$$
 
     **Required MFU:**
 
-    $$\text{MFU}_{required} = \frac{4.17 \times 10^{16}}{1.27 \times 10^{18}} = \boxed{3.3\%}$$
+    $$\text{MFU}_{required} = \frac{4.17 \times 10^{16}}{6.33 \times 10^{17}} = \boxed{6.6\%}$$
 
     **Conclusion:** This is easily achievable—well-optimized runs achieve 40-50% MFU.
 
@@ -299,7 +299,7 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     $$F_{total}^{2T} = 6 \times 30 \times 10^9 \times 2 \times 10^{12} = 3.6 \times 10^{23} \text{ FLOPs}$$
 
-    $$\text{MFU}_{required}^{2T} = \frac{3.6 \times 10^{23} / (720 \times 3600)}{1.27 \times 10^{18}} = 11\%$$
+    $$\text{MFU}_{required}^{2T} = \frac{3.6 \times 10^{23} / (720 \times 3600)}{6.33 \times 10^{17}} = 22\%$$
 
     Still very achievable with standard optimization.
 
@@ -307,7 +307,7 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     | Scenario | Tokens | GPUs | Required MFU |
     |----------|--------|------|--------------|
-    | Chinchilla (600B) | 600B | 640 | 3.3% |
+    | Chinchilla (600B) | 600B | 640 | 6.6% |
     | Extended (2T) | 2T | 640 | 11% |
     | Budget-limited | 2T | 512 | 14% |
 

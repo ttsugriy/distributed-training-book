@@ -2132,7 +2132,7 @@ class MoETransformer(nn.Module):
 
 3. **Load balancing is critical**: Without balancing, routing collapse makes sparsity useless. Use auxiliary loss + capacity limiting.
 
-4. **Expert choice guarantees balance**: Letting experts choose tokens, rather than tokens choosing experts, ensures perfect load distribution.
+4. **Expert choice improves balance**: Letting experts choose tokens reduces collapse, but still needs capacity limits and auxiliary losses to avoid overload.
 
 5. **Capacity factor trades off drops vs. memory**: Higher capacity = fewer dropped tokens but more memory per expert.
 
