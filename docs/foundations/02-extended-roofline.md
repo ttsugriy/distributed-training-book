@@ -103,11 +103,11 @@ For different parallelism strategies:
 
 ### Data Parallelism
 
-Per step: $6ND$ FLOPs (forward + backward), $2\Psi$ bytes AllReduced
+Per step: $6\Psi B$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param)
 
-$$I_{\text{net}}^{\text{DP}} = \frac{6ND}{2\Psi} = \frac{3ND}{\Psi}$$
+$$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B}{2\Psi s} = \frac{3B}{s}$$
 
-As batch size $N$ increases, communication intensity increases → less communication-bound.
+As token batch $B$ increases, communication intensity increases → less communication-bound.
 
 ### Tensor Parallelism
 
@@ -160,12 +160,12 @@ The extended roofline is our primary tool for analyzing distributed training bot
     **Given:**
 
     - Parameters: $\Psi = 7 \times 10^9$
-    - Tokens per step: $N = 1 \times 10^6$
+    - Tokens per step: $B = 1 \times 10^6$
     - GPUs: $P = 64$ (data parallel)
 
     **FLOPs per step:**
 
-    $$\text{FLOPs} = 6 \times \Psi \times N = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
+    $$\text{FLOPs} = 6 \times \Psi \times B = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
 
     **Bytes communicated (AllReduce gradients in FP16):**
 
@@ -173,7 +173,7 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
     **Communication intensity:**
 
-    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
+    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte} = 3B/s$$
 
     This is far above the ridge point (~40,000 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
 
@@ -226,4 +226,3 @@ The extended roofline is our primary tool for analyzing distributed training bot
     3. Measure achieved bandwidth vs theoretical
     4. Check arithmetic intensity of dominant operations
     5. If pipeline parallel, calculate bubble fraction: $\frac{P-1}{P+M-1}$
-

@@ -28,7 +28,8 @@ $$T(n) = \alpha + \frac{n}{\beta}$$
 
 | Symbol | Meaning | Typical Units |
 |---|---|---|
-| $\Psi$ or $N$ | Parameters | count |
+| $\Psi$ | Parameters | count |
+| $N$ | Parameters (legacy in some chapters) | count |
 | $D$ | Training tokens | tokens |
 | $B$ | Global batch (tokens) | tokens/step |
 | $b$ | Per-GPU batch (tokens) | tokens/step |

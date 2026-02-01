@@ -890,26 +890,26 @@ if __name__ == "__main__":
 
     **Binomial model for expert load:**
 
-    For $N$ tokens and $E$ experts with top-$k$ routing:
+    For $D$ tokens and $E$ experts with top-$k$ routing:
     - Each token selects $k$ experts
-    - Expected tokens per expert: $\mu = \frac{N \times k}{E}$
+    - Expected tokens per expert: $\mu = \frac{D \times k}{E}$
     - Variance (assuming uniform routing): $\sigma^2 = \mu \times (1 - k/E)$
 
     **Option A (256 experts, top-8):**
-    $$\mu_A = \frac{N \times 8}{256} = \frac{N}{32}$$
+    $$\mu_A = \frac{D \times 8}{256} = \frac{D}{32}$$
 
-    $$\sigma_A = \sqrt{\frac{N}{32} \times (1 - \frac{8}{256})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
+    $$\sigma_A = \sqrt{\frac{D}{32} \times (1 - \frac{8}{256})} = \sqrt{\frac{D}{32} \times 0.969} \approx 0.174\sqrt{D}$$
 
     Coefficient of variation:
 
-    $$CV_A = \frac{\sigma_A}{\mu_A} = \frac{0.174\sqrt{N}}{N/32} = \frac{5.57}{\sqrt{N}}$$
+    $$CV_A = \frac{\sigma_A}{\mu_A} = \frac{0.174\sqrt{D}}{D/32} = \frac{5.57}{\sqrt{D}}$$
 
     **Option B (64 experts, top-2):**
-    $$\mu_B = \frac{N \times 2}{64} = \frac{N}{32}$$
+    $$\mu_B = \frac{D \times 2}{64} = \frac{D}{32}$$
 
-    $$\sigma_B = \sqrt{\frac{N}{32} \times (1 - \frac{2}{64})} = \sqrt{\frac{N}{32} \times 0.969} \approx 0.174\sqrt{N}$$
+    $$\sigma_B = \sqrt{\frac{D}{32} \times (1 - \frac{2}{64})} = \sqrt{\frac{D}{32} \times 0.969} \approx 0.174\sqrt{D}$$
 
-    $$CV_B = \frac{5.57}{\sqrt{N}}$$
+    $$CV_B = \frac{5.57}{\sqrt{D}}$$
 
     **Wait—same CV?** The key difference is in the tail behavior!
 
@@ -926,8 +926,8 @@ if __name__ == "__main__":
 
     | Config | Expected Load | Max Load Factor | Practical Imbalance |
     |--------|---------------|-----------------|---------------------|
-    | 256 experts, top-8 | N/32 | 1 + 3.33/√(N/32) | Lower |
-    | 64 experts, top-2 | N/32 | 1 + 2.88/√(N/32) | Higher |
+    | 256 experts, top-8 | D/32 | 1 + 3.33/√(D/32) | Lower |
+    | 64 experts, top-2 | D/32 | 1 + 2.88/√(D/32) | Higher |
 
     $$\boxed{\text{256 experts has 15\% lower peak imbalance despite similar average variance}}$$
 

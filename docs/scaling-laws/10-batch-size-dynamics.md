@@ -309,7 +309,7 @@ $B_{\text{crit}}$ increases during training. Optimal strategy: **increase batch 
 LLaMA increased batch size mid-training:
 
 - Start: batch size 2M tokens
-- After N steps: increase to 4M tokens
+- After $t$ steps: increase to 4M tokens
 
 Benefits:
 1. Early training: smaller batch for exploration
@@ -554,33 +554,33 @@ When noise scale drops, safe to increase batch size.
 ??? success "Solution"
     **Setup:**
 
-    Let total training be $N$ tokens (e.g., 2T tokens).
+    Let total training be $D$ tokens (e.g., 2T tokens).
 
     **Constant batch size (1M tokens/step):**
 
-    $$\text{Updates}_{\text{constant}} = \frac{N}{1\text{M}} = N \text{ updates (in millions)}$$
+    $$\text{Updates}_{\text{constant}} = \frac{D}{1\text{M}} = D \text{ updates (in millions)}$$
 
     **Dynamic batch size:**
 
-    - First half ($N/2$ tokens) at 1M tokens/step:
+    - First half ($D/2$ tokens) at 1M tokens/step:
 
-    $$\text{Updates}_1 = \frac{N/2}{1\text{M}} = \frac{N}{2\text{M}}$$
+    $$\text{Updates}_1 = \frac{D/2}{1\text{M}} = \frac{D}{2\text{M}}$$
 
-    - Second half ($N/2$ tokens) at 4M tokens/step:
+    - Second half ($D/2$ tokens) at 4M tokens/step:
 
-    $$\text{Updates}_2 = \frac{N/2}{4\text{M}} = \frac{N}{8\text{M}}$$
+    $$\text{Updates}_2 = \frac{D/2}{4\text{M}} = \frac{D}{8\text{M}}$$
 
     - Total dynamic updates:
 
-    $$\text{Updates}_{\text{dynamic}} = \frac{N}{2\text{M}} + \frac{N}{8\text{M}} = \frac{4N + N}{8\text{M}} = \frac{5N}{8\text{M}}$$
+    $$\text{Updates}_{\text{dynamic}} = \frac{D}{2\text{M}} + \frac{D}{8\text{M}} = \frac{4D + D}{8\text{M}} = \frac{5D}{8\text{M}}$$
 
     **Reduction:**
 
-    $$\text{Reduction} = \frac{N}{\text{M}} - \frac{5N}{8\text{M}} = \frac{8N - 5N}{8\text{M}} = \frac{3N}{8\text{M}}$$
+    $$\text{Reduction} = \frac{D}{\text{M}} - \frac{5D}{8\text{M}} = \frac{8D - 5D}{8\text{M}} = \frac{3D}{8\text{M}}$$
 
-    $$\text{Reduction fraction} = \frac{3N/8}{N} = \boxed{37.5\%}$$
+    $$\text{Reduction fraction} = \frac{3D/8}{D} = \boxed{37.5\%}$$
 
-    **Concrete example with N = 2T tokens:**
+    **Concrete example with D = 2T tokens:**
 
     | Strategy | Updates | Wall-clock (relative) |
     |----------|---------|----------------------|
