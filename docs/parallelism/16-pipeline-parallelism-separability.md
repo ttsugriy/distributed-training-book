@@ -1630,6 +1630,15 @@ loss.backward()
     | Bubble fraction | Unchanged (same scheduling) |
     | Implementation complexity | Higher (must handle recomputation) |
 
+## Knobs and Trade-offs
+
+| Knob | Primary Effect | Cost |
+|---|---|---|
+| Pipeline stages (P) | Fits larger models | More bubbles and activation traffic |
+| Micro-batches (m) | Reduces bubbles | Increases activation memory |
+| Schedule (1F1B, interleaved) | Better utilization | More orchestration complexity |
+| Recomputation | Lowers activation memory | Adds compute overhead |
+
 ## Key Takeaways
 
 1. **Separability enables pipelining**: Sequential composition $f_L \circ \cdots \circ f_1$ naturally parallelizes.

@@ -1138,6 +1138,15 @@ model = DDP(
     | Kahan summation | 2× compute | Near FP64 accuracy |
     | Tree reduction (balanced) | Same | More stable than ring |
 
+## Knobs and Trade-offs
+
+| Knob | Primary Effect | Cost |
+|---|---|---|
+| Data-parallel degree (P) | More aggregate compute | More gradient communication and latency sensitivity |
+| Local batch size (b) | Higher comm intensity | Memory pressure and optimizer stability |
+| Gradient accumulation | Larger effective batch | More step latency, less responsiveness |
+| Bucketing size | Better overlap | Higher peak memory and delayed updates |
+
 ## Key Takeaways
 
 1. **Associativity enables data parallelism**: The partitioning theorem is the mathematical foundation—gradient of sum equals sum of gradients.

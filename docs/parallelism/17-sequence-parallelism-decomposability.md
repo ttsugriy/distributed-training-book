@@ -1516,6 +1516,15 @@ class SequenceParallelAttention(nn.Module):
 
     $$\text{Reduction} = \frac{(S/P)^2}{S/P \cdot d} = \frac{S/P}{d} = \frac{128K}{128} = \boxed{1024\times}$$
 
+## Knobs and Trade-offs
+
+| Knob | Primary Effect | Cost |
+|---|---|---|
+| Sequence-parallel degree | Reduces activation memory | More AllGather/ReduceScatter |
+| Ring vs AlltoAll (context) | Better overlap vs simplicity | Topology sensitivity |
+| Flash + tiling | Lower memory and IO | More kernel complexity |
+| Causal masking shortcuts | Fewer chunks | More edge-case logic |
+
 ## Key Takeaways
 
 1. **Two types of sequence parallelism**:

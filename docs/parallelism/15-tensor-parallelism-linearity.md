@@ -1251,6 +1251,15 @@ The tensor parallel degree $P$ is limited by:
 
     This is why Megatron pairs column-parallel (no forward comm) with row-parallel (no backward comm for input grad), achieving balanced communication.
 
+## Knobs and Trade-offs
+
+| Knob | Primary Effect | Cost |
+|---|---|---|
+| Tensor-parallel degree (T) | Splits large matmuls | More activation AllReduce/AllGather |
+| Intra-node placement | Lower latency and higher BW | Constrains topology and scaling |
+| Shard layout (row/col) | Changes comm phase | Requires matching layer ordering |
+| Fusion (e.g., QKV) | Fewer collectives | More complex kernels and scheduling |
+
 ## Key Takeaways
 
 1. **Linearity enables parallelism**: $f(X_1 + X_2) = f(X_1) + f(X_2)$ allows independent computation.

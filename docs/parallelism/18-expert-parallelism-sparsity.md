@@ -2124,6 +2124,15 @@ class MoETransformer(nn.Module):
 
     The 60/40 imbalance creates a corrective force that pushes toward 50/50 distribution over training steps.
 
+## Knobs and Trade-offs
+
+| Knob | Primary Effect | Cost |
+|---|---|---|
+| Experts per layer (E) | More capacity | Routing complexity and load imbalance |
+| Top-k routing | Fixed compute per token | AlltoAll volume and dispatch overhead |
+| Capacity factor | Fewer dropped tokens | Higher expert memory and padding |
+| Aux loss weight | Better balance | Slight optimization bias |
+
 ## Key Takeaways
 
 1. **Sparsity enables scale**: MoE models can have 10-100× more parameters with constant compute per token.
