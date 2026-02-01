@@ -937,6 +937,14 @@ if __name__ == "__main__":
 
     The 2-3× efficiency gain from dynamic batch sizing saves weeks of training time.
 
+## Invariant Summary
+
+| Invariant | Primary Pressure | Response |
+|---|---|---|
+| Memory | Model state and activations | ZeRO/FSDP-style sharding + checkpointing |
+| Compute | High per-token FLOPs | FP16/BF16 kernels and large batches |
+| Communication | Gradient and pipeline traffic | Hierarchical parallelism + overlap |
+
 ## Key Takeaways
 
 1. **Scale demands 4D+ parallelism**: 405B parameters across 16K GPUs requires combining TP, PP, DP, and CP.

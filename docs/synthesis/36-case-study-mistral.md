@@ -1379,6 +1379,14 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
 
     Higher acceptance rates dramatically improve speedup. K=4 is near-optimal for p=70%.
 
+## Invariant Summary
+
+| Invariant | Primary Pressure | Response |
+|---|---|---|
+| Memory | Long context KV cache | GQA + sliding window attention |
+| Compute | Efficient attention | Flash-style kernels |
+| Communication | Moderate scaling | Simpler parallelism mix |
+
 ## Key Takeaways
 
 1. **Sliding Window Attention enables long context**: Fixed memory regardless of sequence length, with effective context growing through layer stacking.

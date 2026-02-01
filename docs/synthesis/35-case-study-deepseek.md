@@ -1276,6 +1276,14 @@ if __name__ == "__main__":
     - Better scaling potential (can add experts)
     - Memory-compute trade-off flexibility
 
+## Invariant Summary
+
+| Invariant | Primary Pressure | Response |
+|---|---|---|
+| Memory | Sparse MoE states | Expert sharding + capacity control |
+| Compute | Large effective model | FP8 and sparse activation |
+| Communication | AlltoAll routing | Custom kernels + overlap |
+
 ## Key Takeaways
 
 1. **Architecture drives efficiency**: MoE (18×) and MLA (57× KV) provide larger gains than systems optimizations.
