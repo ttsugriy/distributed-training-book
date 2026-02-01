@@ -12,7 +12,7 @@ The fastest communication is communication you don't wait for. By overlapping da
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 4 (α-β model), Chapter 14 (data parallelism and gradient synchronization)
+    **Prerequisites**: [Chapter 4](../foundations/04-alpha-beta-model.md) (α-β model), [Chapter 14](../parallelism/14-data-parallelism-associativity.md) (data parallelism and gradient synchronization)
 
     **Key insight**: Gradients for later layers are ready first during backpropagation. By overlapping AllReduce with ongoing backward computation, you can hide most communication latency—the goal is max(compute, communication) instead of their sum.
 

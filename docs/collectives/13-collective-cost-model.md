@@ -12,7 +12,7 @@ Armed with α-β analysis and algorithm knowledge, we can predict the cost of an
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 4 (α-β model fundamentals), Chapter 12 (ring vs tree algorithms)
+    **Prerequisites**: [Chapter 4](../foundations/04-alpha-beta-model.md) (α-β model fundamentals), [Chapter 12](12-ring-tree-algorithms.md) (ring vs tree algorithms)
 
     **Key insight**: Every collective has a predictable cost formula. Compare your measured times against these formulas to identify inefficiencies—the gap reveals whether you're limited by latency, bandwidth, or implementation overhead.
 

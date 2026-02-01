@@ -12,7 +12,7 @@ The same logical operation—AllReduce—can be implemented many ways. Ring algo
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 4 (α-β cost model), Chapter 11 (collective primitives)
+    **Prerequisites**: [Chapter 4](../foundations/04-alpha-beta-model.md) (α-β cost model), [Chapter 11](11-primitives-properties.md) (collective primitives)
 
     **Key insight**: Ring algorithms achieve bandwidth-optimality for large messages; tree algorithms minimize latency for small messages. The crossover point from the α-β model tells you which to use.
 

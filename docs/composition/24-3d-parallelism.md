@@ -12,7 +12,7 @@ No single parallelism strategy scales to thousands of GPUs. Data parallelism was
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapters 14–16 (DP, TP, PP fundamentals), Chapter 23 (device mesh abstraction)
+    **Prerequisites**: [Chapters 14–16](../parallelism/14-data-parallelism-associativity.md) (DP, TP, PP fundamentals; see also [Chapter 15](../parallelism/15-tensor-parallelism-linearity.md) and [Chapter 16](../parallelism/16-pipeline-parallelism-separability.md)), [Chapter 23](23-device-mesh.md) (device mesh abstraction)
 
     **Key insight**: Each parallelism strategy has an optimal scale. TP works best within nodes (fast NVLink). PP spans nodes with minimal communication. DP scales the outer dimension. The canonical 3D composition: TP within nodes, PP across nodes, DP across replicas.
 

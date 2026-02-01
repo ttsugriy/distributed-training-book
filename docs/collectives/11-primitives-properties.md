@@ -12,7 +12,7 @@ Every distributed training algorithm is built from a small set of collective ope
 </div>
 
 !!! abstract "Building On: Parts I–II"
-    This part builds on the **network ceiling** concept from the extended roofline (Chapter 2), the **α-β cost model** (Chapter 4), and the **memory hierarchy** of clusters (Chapter 3). From Part II, we understand that training at scale requires massive data movement. Now we formalize the communication primitives that make this movement possible.
+    This part builds on the **network ceiling** concept from the [extended roofline (Chapter 2)](../foundations/02-extended-roofline.md), the **α-β cost model** ([Chapter 4](../foundations/04-alpha-beta-model.md)), and the **memory hierarchy** of clusters ([Chapter 3](../foundations/03-cluster-memory-hierarchy.md)). From Part II, we understand that training at scale requires massive data movement. Now we formalize the communication primitives that make this movement possible.
 
 ## The Seven Primitives
 

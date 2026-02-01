@@ -12,7 +12,7 @@ The memory equation from Chapter 19 reveals massive redundancy: every GPU stores
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 11 (AllGather, ReduceScatter), Chapter 19 (memory equation)
+    **Prerequisites**: [Chapter 11](../collectives/11-primitives-properties.md) (AllGather, ReduceScatter), [Chapter 19](19-memory-equation.md) (memory equation)
 
     **Key insight**: Data parallelism stores P redundant copies of model state. ZeRO shards optimizer states (ZeRO-1), gradients (ZeRO-2), and parameters (ZeRO-3) across GPUs, trading extra AllGather/ReduceScatter communication for near-linear memory scaling.
 

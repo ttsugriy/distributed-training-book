@@ -12,7 +12,7 @@ Every bit costs bandwidth. Every mantissa bit costs compute. Mixed-precision tra
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 2 (arithmetic intensity and hardware capabilities)
+    **Prerequisites**: [Chapter 2](../foundations/02-extended-roofline.md) (arithmetic intensity and hardware capabilities)
 
     **Key insight**: Training tolerates low precision in forward/backward passes because gradients are averaged over many samples. BF16's 8-bit exponent preserves dynamic range (critical for large gradients); FP32 master weights preserve precision across many small updates. FP8 pushes the frontier further with careful scaling.
 

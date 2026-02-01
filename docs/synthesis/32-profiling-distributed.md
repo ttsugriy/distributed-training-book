@@ -12,7 +12,7 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 </div>
 
 !!! abstract "Building On: All Previous Parts"
-    This final part synthesizes everything. You understand **rooflines and estimation** (Part I), **optimal resource allocation** (Part II), **collective costs** (Part III), **parallelism strategies** (Part IV), **memory management** (Part V), **composition** (Part VI), and **efficiency techniques** (Part VII). Now we apply this knowledge: diagnose real systems, investigate bottlenecks, and analyze state-of-the-art training runs.
+    This final part synthesizes everything. You understand **rooflines and estimation** ([Part I](../foundations/01-scale-imperative.md)), **optimal resource allocation** ([Part II](../scaling-laws/07-compute-loss-surface.md)), **collective costs** ([Part III](../collectives/11-primitives-properties.md)), **parallelism strategies** ([Part IV](../parallelism/14-data-parallelism-associativity.md)), **memory management** ([Part V](../memory/19-memory-equation.md)), **composition** ([Part VI](../composition/23-device-mesh.md)), and **efficiency techniques** ([Part VII](../efficiency/28-gradient-compression.md)). Now we apply this knowledge: diagnose real systems, investigate bottlenecks, and analyze state-of-the-art training runs.
 
 ## The Profiling Imperative
 
@@ -2173,4 +2173,3 @@ def diagnose_memory_pressure():
 6. **Stragglers kill scaling**: One slow GPU affects all GPUs in synchronous training.
 
 7. **Profile iteratively**: Start broad, then zoom in on bottlenecks.
-

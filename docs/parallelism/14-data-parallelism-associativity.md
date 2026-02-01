@@ -12,7 +12,7 @@ Data parallelism works because gradient accumulation is associative. This isn't 
 </div>
 
 !!! abstract "Building On: Part III Collectives"
-    This part assumes mastery of **collective operations**—especially AllReduce (Chapter 11), the **ring and tree algorithms** (Chapter 12), and **cost modeling** (Chapter 13). Each parallelism strategy we derive here will rely on specific collectives. Data parallelism, our first strategy, uses AllReduce to synchronize gradients.
+    This part assumes mastery of **collective operations**—especially [AllReduce (Chapter 11)](../collectives/11-primitives-properties.md), the [ring and tree algorithms (Chapter 12)](../collectives/12-ring-tree-algorithms.md), and [cost modeling (Chapter 13)](../collectives/13-collective-cost-model.md). Each parallelism strategy we derive here will rely on specific collectives. Data parallelism, our first strategy, uses AllReduce to synchronize gradients.
 
 ## The Mathematical Foundation
 

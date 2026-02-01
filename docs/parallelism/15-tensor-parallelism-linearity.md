@@ -12,7 +12,7 @@ Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. T
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 11 (AllReduce, AllGather), Chapter 14 (data parallelism fundamentals)
+    **Prerequisites**: [Chapter 11](../collectives/11-primitives-properties.md) (AllReduce, AllGather), [Chapter 14](14-data-parallelism-associativity.md) (data parallelism fundamentals)
 
     **Key insight**: Linear operations (matrix multiplications) can be partitioned across GPUs with a final AllReduce. Non-linear operations (GELU, LayerNorm, Softmax) force synchronization points—understanding which operations are linear determines your communication pattern.
 

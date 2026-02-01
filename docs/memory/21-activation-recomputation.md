@@ -12,7 +12,7 @@ Activations dominate memory in deep networks. A 7B model's parameters need ~14 G
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 19 (memory equation breakdown)
+    **Prerequisites**: [Chapter 19](19-memory-equation.md) (memory equation breakdown)
 
     **Key insight**: Activations dominate memory for large batch sizes. By checkpointing only at layer boundaries and recomputing intermediates during backward, you trade ~33% extra compute for dramatic memory savings—enabling larger batches and longer sequences.
 

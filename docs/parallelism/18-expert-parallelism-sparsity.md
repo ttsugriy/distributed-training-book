@@ -12,7 +12,7 @@ Mixture of Experts models activate only a subset of parameters per token. This s
 </div>
 
 !!! abstract "Chapter Map"
-    **Prerequisites**: Chapter 11 (AlltoAll primitive), Chapters 14–15 (data and tensor parallelism context)
+    **Prerequisites**: [Chapter 11](../collectives/11-primitives-properties.md) (AlltoAll primitive), [Chapters 14–15](14-data-parallelism-associativity.md) (data and tensor parallelism context; see also [Chapter 15](15-tensor-parallelism-linearity.md))
 
     **Key insight**: MoE achieves massive parameter counts with constant compute by activating only a few experts per token. The communication pattern is AlltoAll (tokens to experts, results back). Load balancing is critical—auxiliary losses and capacity factors prevent expert collapse.
 

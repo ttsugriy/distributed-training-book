@@ -12,7 +12,7 @@ Communication costs dominate large-scale training. Gradient compression offers a
 </div>
 
 !!! abstract "Building On: Parts III–VI"
-    We established in Part III that **AllReduce costs** scale with model size and dominate large-scale training. Part IV showed how **data parallelism** requires gradient synchronization every step. Part VI taught composition. Now we ask: can we reduce the communication volume itself? This part explores techniques that push efficiency beyond what basic parallelism offers.
+    We established in [Part III](../collectives/11-primitives-properties.md) that **AllReduce costs** scale with model size and dominate large-scale training. [Part IV](../parallelism/14-data-parallelism-associativity.md) showed how **data parallelism** requires gradient synchronization every step. [Part VI](../composition/23-device-mesh.md) taught composition. Now we ask: can we reduce the communication volume itself? This part explores techniques that push efficiency beyond what basic parallelism offers.
 
 ## The Communication Bottleneck
 

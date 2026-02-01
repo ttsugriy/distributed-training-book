@@ -12,7 +12,7 @@ Loss is a function of two investments: model size and training data. Understandi
 </div>
 
 !!! abstract "Building On: Part I Foundations"
-    This part assumes familiarity with the **three walls** (memory, time, cost) from Chapter 1, the **extended roofline** model from Chapter 2, and the **estimation mindset** from Chapter 6. We'll now ask: given that we must distribute training, how do we allocate our compute budget optimally between model size and training data?
+    This part assumes familiarity with the **three walls** (memory, time, cost) from [Chapter 1](../foundations/01-scale-imperative.md), the **extended roofline** model from [Chapter 2](../foundations/02-extended-roofline.md), and the **estimation mindset** from [Chapter 6](../foundations/06-estimation-discipline.md). We'll now ask: given that we must distribute training, how do we allocate our compute budget optimally between model size and training data?
 
 ## The Empirical Discovery
 
