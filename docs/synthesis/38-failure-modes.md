@@ -101,3 +101,9 @@ Start with the invariants:
 ## Closing Note
 
 Failure modes are not random. Each one violates an invariant. Train yourself to map symptoms back to the invariant first, then apply the minimal fix.
+
+## Key Takeaways
+
+1. **Start with invariants**: memory, compute, and communication triage most failures.
+2. **Use the fastest observable**: per-rank timelines and memory charts beat guesses.
+3. **Fix the minimal root cause**: one well-placed change (batch, overlap, topology) often recovers most performance.

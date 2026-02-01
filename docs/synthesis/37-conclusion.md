@@ -361,3 +361,9 @@ Science advances through shared knowledge. We hope this book contributes to that
 <div class="key-insight" markdown>
 **Final Takeaway**: Distributed training is mathematics. Learn the equations, understand the constraints, and the configurations follow. The algebra of scale is the algebra of AI.
 </div>
+
+## Key Takeaways
+
+1. **First principles scale**: algebraic properties predict every parallelism strategy.
+2. **Systems thinking is mandatory**: memory, compute, and communication jointly bound performance.
+3. **Investigation beats recipes**: the best configurations are derived, not memorized.

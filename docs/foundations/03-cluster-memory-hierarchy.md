@@ -242,3 +242,8 @@ This hierarchy emerges directly from the bandwidth hierarchy of the cluster.
 
     **Key insight:** PP exploits the *sequential* nature of neural network layers. Collectives are for *parallel* operations on the same data.
 
+## Key Takeaways
+
+1. **Clusters are hierarchical**: NVLink, PCIe, NICs, and switches define bandwidth tiers.
+2. **Parallelism placement must respect bandwidth gaps**: TP within nodes, DP across nodes, PP across stages.
+3. **Topology awareness prevents hidden slowdowns**: mismatching strategy to link speeds can add 10–20× overhead.

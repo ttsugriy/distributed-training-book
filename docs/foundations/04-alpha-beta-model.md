@@ -414,3 +414,9 @@ def measure_bandwidth(size_bytes, warmup=10, trials=100):
     - **Data parallelism** (InfiniBand): Gradient AllReduces are typically GB-scale, far above 100 KB. Also bandwidth-bound.
 
     - **Key insight**: Both strategies operate in the bandwidth-bound regime for typical workloads. However, NVLink's 18× higher bandwidth (900 vs 50 GB/s) makes it essential for the frequent, per-layer communication of tensor parallelism. Data parallelism communicates less frequently (once per step), so it tolerates the lower InfiniBand bandwidth.
+
+## Key Takeaways
+
+1. **Communication has two costs**: latency ($\alpha$) dominates small messages, bandwidth ($\beta$) dominates large ones.
+2. **Crossover size guides algorithm choice**: below $n^* = \alpha\beta$ optimize for latency, above optimize for bandwidth.
+3. **Bucketing wins by amortizing $\alpha$**: aggregating small messages can deliver 5–10× speedups.

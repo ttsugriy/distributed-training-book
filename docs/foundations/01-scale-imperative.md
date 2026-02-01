@@ -178,3 +178,9 @@ Let's begin with the foundations.
     $$\text{Wasted cost} = \$10M \times 0.30 = \$3M$$
 
     **Key insight:** Improving from 35% to 50% MFU would either save $3M or equivalently allow 43% more training for the same budget.
+
+## Key Takeaways
+
+1. **Training compute is dominated by $6ND$**: Parameter count and token count set the irreducible FLOP budget.
+2. **Wall-clock time is a utilization problem**: MFU and parallelism are the levers that turn years into weeks.
+3. **Budget waste is often performance, not hardware**: Small MFU gains translate to millions of dollars at scale.

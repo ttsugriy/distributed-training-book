@@ -1650,16 +1650,12 @@ def optimal_sync_interval(compute_time: float, comm_time: float,
 
     $$\boxed{\text{SCAFFOLD handles heterogeneity best: 11\% higher accuracy at } \alpha=0.01}$$
 
+## Key Takeaways
+
 1. **Synchronization is expensive**: The straggler problem grows with worker count.
-
 2. **Staleness hurts convergence**: Must reduce learning rate for async SGD.
-
 3. **Local SGD works surprisingly well**: Can sync every 100+ steps with minimal quality loss.
-
 4. **DiLoCo scales to LLMs**: 500× less communication while matching quality.
-
 5. **Different optimizers for inner/outer**: DiLoCo's key insight—Adam locally, Nesterov globally.
-
 6. **Variance reduction helps heterogeneity**: SCAFFOLD and FedProx handle non-IID data.
-
 7. **Choose strategy based on profile**: No single approach wins everywhere.

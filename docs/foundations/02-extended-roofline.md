@@ -226,3 +226,9 @@ The extended roofline is our primary tool for analyzing distributed training bot
     3. Measure achieved bandwidth vs theoretical
     4. Check arithmetic intensity of dominant operations
     5. If pipeline parallel, calculate bubble fraction: $\frac{P-1}{P+M-1}$
+
+## Key Takeaways
+
+1. **Distributed performance has three ceilings**: compute, memory bandwidth, and network bandwidth.
+2. **Communication intensity is the diagnostic lever**: low $I_{\text{net}}$ means you are network-bound.
+3. **Topology choice follows the ridge point**: TP prefers high-bandwidth links; DP tolerates slower networks when batches are large.

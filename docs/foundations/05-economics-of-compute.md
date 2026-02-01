@@ -244,3 +244,9 @@ Key cost optimizations:
     | 5%/hr | 1.08× | Yes (1.62 vs 4.00) |
     | 20%/hr | 1.17× | Yes (1.76 vs 4.00) |
     | 50%/hr | 1.40× | Yes (2.10 vs 4.00) |
+
+## Key Takeaways
+
+1. **Cost scales with utilization**: MFU and throughput dictate real $/token.
+2. **Spot economics favor redundancy**: cheap instances win if checkpointing is robust.
+3. **Infrastructure decisions are model decisions**: hardware, precision, and parallelism change training budgets by 2–10×.
