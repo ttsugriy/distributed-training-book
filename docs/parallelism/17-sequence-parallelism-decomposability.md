@@ -414,7 +414,7 @@ $$\text{Overlap} = \min\left(1, \frac{T_{\text{compute}}}{T_{\text{comm}}}\right
 
 Where:
 
-$$T_{\text{compute}} = \frac{2 \cdot (S/P)^2 \cdot H}{F_{\text{FLOPS}}}$$
+$$T_{\text{compute}} = \frac{2 \cdot (S/P)^2 \cdot H}{F_{\text{FLOPs}}}$$
 
 $$T_{\text{comm}} = \frac{2 \cdot (S/P) \cdot H \cdot \text{sizeof}}{\text{bandwidth}}$$
 

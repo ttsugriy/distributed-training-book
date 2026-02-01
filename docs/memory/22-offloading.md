@@ -740,7 +740,7 @@ For a transformer layer:
 - Parameters: ~$12H^2$ (for hidden dim $H$)
 - Compute: ~$24BSH^2$ FLOPs (for batch $B$, sequence $S$)
 
-With PCIe Gen4 (32 GB/s) and A100 (312 TFLOPS fp16):
+With PCIe Gen4 (32 GB/s) and A100 (312 TFLOPs fp16):
 
 $$\frac{12H^2 \cdot 2}{32 \times 10^9} \leq \frac{24BSH^2}{312 \times 10^{12}}$$
 

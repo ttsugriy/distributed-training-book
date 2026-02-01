@@ -196,7 +196,7 @@ LLaMA models train on 1-2T tokens, far exceeding Chinchilla ratios, to reduce se
 
 Combining scaling laws with hardware:
 
-$$\text{Time} = \frac{6ND}{\text{GPUs} \times \text{FLOPS/GPU} \times \text{MFU}}$$
+$$\text{Time} = \frac{6ND}{\text{GPUs} \times \text{FLOPs/GPU} \times \text{MFU}}$$
 
 Where MFU (Model FLOP Utilization) is typically 30-50%.
 

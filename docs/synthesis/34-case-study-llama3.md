@@ -42,18 +42,18 @@ $$C = 6 \times (405 \times 10^9) \times (15.6 \times 10^{12}) \approx 3.79 \time
 
 Each H100 SXM provides:
 
-- Peak FP16/BF16: 989 TFLOPS
-- Peak FP8: 1,979 TFLOPS
+- Peak FP16/BF16: 989 TFLOPs
+- Peak FP8: 1,979 TFLOPs
 - HBM3 Memory: 80 GB
 - Memory Bandwidth: 3.35 TB/s
 
 For 16,384 GPUs at realistic 40% MFU (typical for very large models):
 
-$$\text{Effective FLOPS} = 16384 \times 989 \times 10^{12} \times 0.40 \approx 6.5 \times 10^{18} \text{ FLOPS}$$
+$$\text{Effective FLOPs} = 16384 \times 989 \times 10^{12} \times 0.40 \approx 6.5 \times 10^{18} \text{ FLOPs}$$
 
 ### Training Time Derivation
 
-$$\text{Training time} = \frac{C}{\text{Effective FLOPS}} = \frac{3.79 \times 10^{25}}{6.5 \times 10^{18}} \approx 5.8 \times 10^6 \text{ seconds} \approx 67 \text{ days}$$
+$$\text{Training time} = \frac{C}{\text{Effective FLOPs}} = \frac{3.79 \times 10^{25}}{6.5 \times 10^{18}} \approx 5.8 \times 10^6 \text{ seconds} \approx 67 \text{ days}$$
 
 The actual training took approximately 54 days, suggesting:
 
@@ -276,7 +276,7 @@ $$F_{\text{step}} = 6 \times 405 \times 10^9 \times 10^6 = 2.43 \times 10^{18} \
 
 **Hardware peak**:
 
-$$F_{\text{peak}} = 16384 \times 989 \times 10^{12} = 1.62 \times 10^{19} \text{ FLOPS}$$
+$$F_{\text{peak}} = 16384 \times 989 \times 10^{12} = 1.62 \times 10^{19} \text{ FLOPs}$$
 
 If step takes 0.3 seconds:
 

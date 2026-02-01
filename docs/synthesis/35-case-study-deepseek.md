@@ -394,7 +394,7 @@ class FP8GradScaler:
 
 FP8 tensor cores provide 2× throughput vs BF16:
 
-| GPU | BF16 TFLOPS | FP8 TFLOPS |
+| GPU | BF16 TFLOPs | FP8 TFLOPs |
 |-----|-------------|------------|
 | H100 SXM | 1,979 | 3,958 |
 | H800 | ~1,600 | ~3,200 |
@@ -646,7 +646,7 @@ $$F = 6 \times N_{\text{active}} \times T_{\text{batch}} = 6 \times 37\text{B} \
 
 **Hardware capacity**:
 
-$$F_{\text{peak}} = 2048 \times 3200 \times 10^{12} = 6.55 \times 10^{18} \text{ FP8 FLOPS}$$
+$$F_{\text{peak}} = 2048 \times 3200 \times 10^{12} = 6.55 \times 10^{18} \text{ FP8 FLOPs}$$
 
 **With overhead (bubble, communication)**:
 If step time is 0.6 seconds:

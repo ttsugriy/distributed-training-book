@@ -217,7 +217,7 @@ class BandwidthConstraint:
                  flops_per_token: int,
                  intra_node_bw: float = 300e9,   # NVLink: 300 GB/s
                  inter_node_bw: float = 100e9,   # IB: 100 GB/s
-                 gpu_flops: float = 989e12,     # H100: 989 TFLOPS FP16/BF16 dense
+                 gpu_flops: float = 989e12,     # H100: 989 TFLOPs FP16/BF16 dense
                  max_comm_ratio: float = 0.2):
 
         self.model_params = model_params
@@ -569,7 +569,7 @@ class StepTimePrediction:
 class HardwareSpec:
     """Hardware specifications for a single GPU."""
 
-    flops: float = 989e12         # Peak TFLOPS (H100 FP16/BF16 dense)
+    flops: float = 989e12         # Peak TFLOPs (H100 FP16/BF16 dense)
     memory: float = 80e9           # HBM capacity
     intra_node_bw: float = 300e9   # NVLink bandwidth
     inter_node_bw: float = 100e9   # InfiniBand bandwidth

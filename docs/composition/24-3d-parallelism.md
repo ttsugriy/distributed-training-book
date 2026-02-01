@@ -302,7 +302,7 @@ $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 
 Forward and backward pass time (per micro-batch):
 
-$$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu}}{P \times \text{FLOPS}_{\text{GPU}}}$$
+$$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu}}{P \times \text{FLOPs}_{\text{GPU}}}$$
 
 Where $B_{\mu}$ is micro-batch size.
 
@@ -604,7 +604,7 @@ class HardwareSpec:
     gpu_memory_gb: float
     nvlink_bandwidth_gbps: float
     ib_bandwidth_gbps: float
-    gpu_flops: float  # TFLOPS
+    gpu_flops: float  # TFLOPs
 
 @dataclass
 class ModelSpec:

@@ -429,7 +429,7 @@ torch.backends.cudnn.allow_tf32 = False
 
 ### TF32 Performance
 
-| Operation | FP32 TFLOPS | TF32 TFLOPS | Speedup |
+| Operation | FP32 TFLOPs | TF32 TFLOPs | Speedup |
 |-----------|-------------|-------------|---------|
 | A100 matmul | 19.5 | 156 | 8× |
 | A100 conv | 19.5 | 156 | 8× |

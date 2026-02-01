@@ -1013,7 +1013,7 @@ Each stage has its own ZeRO group for sharding.
 
     ZeRO-2 actually has *lower* latency (half the steps) with identical bandwidth!
 
-3. **Breakeven analysis**: At what batch size does ZeRO-3's communication overhead become negligible compared to compute time? Assume $\alpha = 10\mu s$, $\beta = 100$ GB/s, and compute throughput of 150 TFLOPS.
+3. **Breakeven analysis**: At what batch size does ZeRO-3's communication overhead become negligible compared to compute time? Assume $\alpha = 10\mu s$, $\beta = 100$ GB/s, and compute throughput of 150 TFLOPs.
 
 ??? success "Solution"
     **ZeRO-3 communication per layer:**

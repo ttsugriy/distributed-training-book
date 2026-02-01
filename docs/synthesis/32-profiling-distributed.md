@@ -8,7 +8,7 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 </div>
 
 <div class="investigation-question" markdown>
-**The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOPS Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
+**The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOPs Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
 </div>
 
 !!! abstract "Building On: All Previous Parts"
@@ -26,7 +26,7 @@ Distributed training profiling examines four domains:
 - Kernel execution time
 - Tensor Core utilization
 - Memory bandwidth utilization
-- FLOPS achieved vs theoretical peak
+- FLOPs achieved vs theoretical peak
 
 **2. Communication**
 - Collective operation duration
@@ -157,7 +157,7 @@ def profile_distributed_training(model, dataloader, num_steps=5):
         ),
         record_shapes=True,
         profile_memory=True,
-        with_flops=True,  # Estimate FLOPS
+        with_flops=True,  # Estimate FLOPs
     )
 
     with profiler_config as prof:
@@ -522,11 +522,11 @@ def detect_stragglers(num_iterations=10):
 
 ## MFU and Efficiency Metrics
 
-### Model FLOPS Utilization
+### Model FLOPs Utilization
 
 MFU measures actual compute efficiency:
 
-$$\text{MFU} = \frac{\text{Achieved FLOPS}}{\text{Peak FLOPS}}$$
+$$\text{MFU} = \frac{\text{Achieved FLOPs}}{\text{Peak FLOPs}}$$
 
 **Calculating MFU**:
 ```python
@@ -538,14 +538,14 @@ def calculate_mfu(
     peak_flops_per_gpu: float
 ) -> float:
     """
-    Calculate Model FLOPS Utilization.
+    Calculate Model FLOPs Utilization.
 
     Args:
         model_flops_per_sample: Forward + backward FLOPs per sample
         batch_size: Global batch size
         step_time_seconds: Time for one training step
         num_gpus: Number of GPUs used
-        peak_flops_per_gpu: Theoretical peak FLOPS (e.g., 312 TFLOPS for A100)
+        peak_flops_per_gpu: Theoretical peak FLOPs (e.g., 312 TFLOPs for A100)
 
     Returns:
         MFU as a fraction (0-1)
@@ -553,10 +553,10 @@ def calculate_mfu(
     # Total FLOPs for this step
     total_flops = model_flops_per_sample * batch_size
 
-    # Achieved FLOPS
+    # Achieved FLOPs
     achieved_flops = total_flops / step_time_seconds
 
-    # Peak system FLOPS
+    # Peak system FLOPs
     peak_flops = peak_flops_per_gpu * num_gpus
 
     return achieved_flops / peak_flops
@@ -572,11 +572,11 @@ mfu = calculate_mfu(model_flops, batch_size, step_time, num_gpus, peak_per_gpu)
 print(f"MFU: {mfu:.1%}")  # Typically 30-50% for large models
 ```
 
-### Hardware FLOPS Utilization (HFU)
+### Hardware FLOPs Utilization (HFU)
 
 HFU includes rematerialization:
 
-$$\text{HFU} = \frac{\text{Achieved FLOPS including recomputation}}{\text{Peak FLOPS}}$$
+$$\text{HFU} = \frac{\text{Achieved FLOPs including recomputation}}{\text{Peak FLOPs}}$$
 
 ```python
 def calculate_hfu(
@@ -588,7 +588,7 @@ def calculate_hfu(
     recomputation_ratio: float = 1.0  # 1.0 = no recomputation, 2.0 = full recomputation
 ) -> float:
     """
-    Calculate Hardware FLOPS Utilization (includes recomputation).
+    Calculate Hardware FLOPs Utilization (includes recomputation).
 
     The recomputation_ratio accounts for activation checkpointing.
     """
@@ -1293,7 +1293,7 @@ def diagnose_memory_pressure():
 
 ## Exercises
 
-1. **MFU Measurement**: Implement a complete MFU measurement for your model. Compare theoretical FLOPS (from model architecture) with achieved FLOPS (from step time). What efficiency do you achieve?
+1. **MFU Measurement**: Implement a complete MFU measurement for your model. Compare theoretical FLOPs (from model architecture) with achieved FLOPs (from step time). What efficiency do you achieve?
 
 ??? success "Solution"
     **MFU measurement implementation:**
