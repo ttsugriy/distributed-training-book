@@ -159,4 +159,5 @@ nav:
 
   - Appendices:
     - appendices/glossary.md
+    - appendices/hardware-assumptions.md
     - appendices/references.md
