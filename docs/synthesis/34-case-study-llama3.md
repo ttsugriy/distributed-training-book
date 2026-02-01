@@ -260,7 +260,7 @@ This is well within the 50 GB/s IB capability, allowing significant overlap.
 
 ## Efficiency Analysis
 
-### Model FLOPs Utilization
+### Model FLOP Utilization
 
 Computing MFU for LLaMA 3 405B:
 
@@ -613,7 +613,7 @@ class LLaMA3Analyzer:
         return (self.pp - 1) / microbatches
 
     def estimate_mfu(self, tokens_per_step: int, step_time: float):
-        """Estimate Model FLOPs Utilization."""
+        """Estimate Model FLOP Utilization."""
         # FLOPs per token (forward + backward)
         flops_per_token = 6 * self.params
 

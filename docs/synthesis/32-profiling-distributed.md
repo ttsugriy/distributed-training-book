@@ -8,7 +8,7 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 </div>
 
 <div class="investigation-question" markdown>
-**The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOPs Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
+**The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOP Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
 </div>
 
 !!! abstract "Building On: All Previous Parts"
@@ -522,7 +522,7 @@ def detect_stragglers(num_iterations=10):
 
 ## MFU and Efficiency Metrics
 
-### Model FLOPs Utilization
+### Model FLOP Utilization
 
 MFU measures actual compute efficiency:
 
@@ -538,7 +538,7 @@ def calculate_mfu(
     peak_flops_per_gpu: float
 ) -> float:
     """
-    Calculate Model FLOPs Utilization.
+    Calculate Model FLOP Utilization.
 
     Args:
         model_flops_per_sample: Forward + backward FLOPs per sample
@@ -572,7 +572,7 @@ mfu = calculate_mfu(model_flops, batch_size, step_time, num_gpus, peak_per_gpu)
 print(f"MFU: {mfu:.1%}")  # Typically 30-50% for large models
 ```
 
-### Hardware FLOPs Utilization (HFU)
+### Hardware FLOP Utilization (HFU)
 
 HFU includes rematerialization:
 
@@ -588,7 +588,7 @@ def calculate_hfu(
     recomputation_ratio: float = 1.0  # 1.0 = no recomputation, 2.0 = full recomputation
 ) -> float:
     """
-    Calculate Hardware FLOPs Utilization (includes recomputation).
+    Calculate Hardware FLOP Utilization (includes recomputation).
 
     The recomputation_ratio accounts for activation checkpointing.
     """
@@ -1340,7 +1340,7 @@ def diagnose_memory_pressure():
         return total_flops + embedding_flops
 
     def measure_mfu(model, config: ModelConfig, num_warmup=5, num_measure=20):
-        """Measure Model FLOPs Utilization."""
+        """Measure Model FLOP Utilization."""
         device = next(model.parameters()).device
 
         # Theoretical FLOPs per step
