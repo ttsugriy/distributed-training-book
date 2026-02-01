@@ -103,7 +103,7 @@ For different parallelism strategies:
 
 ### Data Parallelism
 
-Per step: $6\Psi B$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param)
+Per step: $6\Psi B$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param). Using $s=2$ (FP16) gives $I_{\text{net}}^{\text{DP}} = 1.5B$.
 
 $$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B}{2\Psi s} = \frac{3B}{s}$$
 
@@ -173,7 +173,7 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
     **Communication intensity:**
 
-    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte} = 3B/s$$
+    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte} = 1.5B$$
 
     This is far above the ridge point (~40,000 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
 
