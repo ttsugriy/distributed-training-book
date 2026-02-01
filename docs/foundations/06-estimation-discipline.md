@@ -21,6 +21,9 @@ Good estimates are:
 
 The goal is to identify infeasible configurations quickly and focus experimentation on viable options.
 
+!!! note "Practice"
+    Estimates here use idealized peak values. Always sanity-check against profiler measurements on your actual stack.
+
 See [Hardware Assumptions and Units](../appendices/hardware-assumptions.md) for the default throughput and bandwidth values used in examples.
 
 ## Memory Estimation

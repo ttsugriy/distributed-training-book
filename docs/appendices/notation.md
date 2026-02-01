@@ -42,6 +42,13 @@ $$T(n) = \alpha + \frac{n}{\beta}$$
 | $T$ | Time | seconds |
 | MFU | Model FLOP Utilization | ratio |
 
+## Interpretation Tags
+
+When you see labeled callouts, read them as follows:
+
+- **Theory**: Algorithmic lower bounds and idealized models.
+- **Practice**: Empirical ranges, framework behavior, and overheads.
+
 ## Conventions
 
 - **GB/TB** are decimal (10^9/10^12 bytes)

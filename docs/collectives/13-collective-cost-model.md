@@ -20,6 +20,12 @@ Armed with α-β analysis and algorithm knowledge, we can predict the cost of an
 
 Using the α-β model, we can predict communication time for any collective.
 
+!!! note "Theory"
+    The formulas below are algorithmic lower bounds under idealized assumptions (perfect overlap, no contention).
+
+!!! note "Practice"
+    Real systems typically achieve ~70–90% of these bounds depending on topology, kernel efficiency, and overlap.
+
 ### Point-to-Point Operations
 
 **Send/Recv**:
