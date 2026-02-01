@@ -152,6 +152,7 @@ nav:
   - "Part VIII: Synthesis":
     - synthesis/32-profiling-distributed.md
     - synthesis/33-investigation-protocol.md
+    - synthesis/38-failure-modes.md
     - synthesis/34-case-study-llama3.md
     - synthesis/35-case-study-deepseek.md
     - synthesis/36-case-study-mistral.md
