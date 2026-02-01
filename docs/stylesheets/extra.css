@@ -439,3 +439,54 @@
     stroke-dashoffset: 0;
   }
 }
+
+
+/* ========================================
+   Aesthetic system upgrades
+   ======================================== */
+
+/* Zebra tables + clearer row separation */
+.md-typeset table:not([class]) tbody tr:nth-child(odd) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-md-color-scheme="slate"] .md-typeset table:not([class]) tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.md-typeset table:not([class]) th,
+.md-typeset table:not([class]) td {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+/* Figure captions */
+.md-typeset figure {
+  margin: 1.5rem auto;
+  text-align: center;
+}
+
+.md-typeset figure figcaption {
+  font-size: 0.85rem;
+  color: var(--md-default-fg-color--light);
+  margin-top: 0.5rem;
+}
+
+/* Subtle image framing for key visuals */
+.md-typeset img {
+  border-radius: 8px;
+}
+
+.md-typeset img[alt*="Algebra of Distributed Training"],
+.md-typeset img[alt*="Distributed Training"] {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Admonition visual rhythm */
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 8px;
+}
+
+.md-typeset .admonition-title {
+  font-weight: 600;
+}
