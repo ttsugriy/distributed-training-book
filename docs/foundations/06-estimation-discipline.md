@@ -21,6 +21,8 @@ Good estimates are:
 
 The goal is to identify infeasible configurations quickly and focus experimentation on viable options.
 
+See [Hardware Assumptions and Units](../appendices/hardware-assumptions.md) for the default throughput and bandwidth values used in examples.
+
 ## Memory Estimation
 
 ### Model Memory
