@@ -39,6 +39,26 @@ We don't hand you the answer. We explore the problem space, identify the mathema
 
 This approach is inspired by Pólya's *How to Solve It* and Stepanov's *From Mathematics to Generic Programming*. The goal is not to memorize techniques but to develop the intuition to derive them yourself.
 
+## The Three Invariants
+
+Every distributed training system obeys three invariants. All strategies are trade-offs between them.
+
+1. **Memory**: What must fit where?
+2. **Compute**: How much work per step can the hardware sustain?
+3. **Communication**: What data must cross which links, how often?
+
+Throughout the book we return to these invariants. When you get stuck, ask which invariant is violated and which lever fixes it.
+
+## A Simple Decision Procedure
+
+When designing or debugging a system, use this order:
+
+1. **Fit**: Does the model state + activations fit? If not, add sharding or recomputation.
+2. **Keep GPUs busy**: Are you compute-bound or memory-bound? If not, improve kernels, precision, or batch.
+3. **Hide communication**: If comm dominates, increase intensity, overlap, or change topology.
+
+Every chapter can be read as a response to a failure in one of these steps.
+
 ## What You'll Learn
 
 By the end of this book, you'll be able to:
