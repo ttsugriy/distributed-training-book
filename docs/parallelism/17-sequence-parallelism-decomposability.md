@@ -151,14 +151,14 @@ Savings factor: $T$ (the tensor parallelism degree).
 
 ### Communication Analysis
 
-Each transformer layer incurs:
+Each transformer layer incurs (per rank, ring-style collectives):
 
-- 1 AllGather before attention ($b \cdot S \cdot H$ bytes)
-- 1 ReduceScatter after attention ($b \cdot S \cdot H$ bytes)
-- 1 AllGather before FFN ($b \cdot S \cdot H$ bytes)
-- 1 ReduceScatter after FFN ($b \cdot S \cdot H$ bytes)
+- 1 AllGather before attention
+- 1 ReduceScatter after attention
+- 1 AllGather before FFN
+- 1 ReduceScatter after FFN
 
-**Total per layer**: $4 \cdot b \cdot S \cdot H \cdot \text{sizeof(dtype)}$
+**Total per layer (per rank)**: $4 \cdot \frac{P-1}{P} \cdot b \cdot S \cdot H \cdot \text{sizeof(dtype)}$
 
 This is **the same volume** as tensor parallelism's AllReduce operations, just restructured.
 
@@ -192,7 +192,7 @@ def sequence_parallel_attention(q, k, v, tp_group):
     # Standard attention on full sequence
     output = attention(q_full, k_full, v_full)  # (batch, seq, hidden)
 
-    # ReduceScatter back to local sequence chunk
+    # Scatter back to local sequence chunk
     output_local = reduce_scatter_sequence(output, tp_group)
 
     return output_local  # (batch, seq_local, hidden)
@@ -205,17 +205,17 @@ def all_gather_sequence(x: torch.Tensor, group) -> torch.Tensor:
     return torch.cat(gathered, dim=1)  # Concat along seq dimension
 
 def reduce_scatter_sequence(x: torch.Tensor, group) -> torch.Tensor:
-    """ReduceScatter along sequence dimension."""
+    """Scatter along sequence dimension (no reduction)."""
     world_size = dist.get_world_size(group)
     seq_len = x.size(1)
+    if seq_len % world_size != 0:
+        raise ValueError("Sequence length must be divisible by world size (pad or use uneven splits).")
     local_seq = seq_len // world_size
 
     # Split into chunks
     chunks = x.split(local_seq, dim=1)
-    output = torch.empty_like(chunks[0])
-
-    dist.reduce_scatter(output, list(chunks), op=dist.ReduceOp.SUM, group=group)
-    return output
+    rank = dist.get_rank(group)
+    return chunks[rank].contiguous()
 ```
 
 ## The Decomposability of Attention
@@ -1148,8 +1148,8 @@ class SequenceParallelAttention(nn.Module):
 
     *Ring (inter-node):*
 
-    - Per step: $2 \times (S/8) \times H \times 2 = 4.3$ GB
-    - 7 steps at 50 GB/s: $7 \times 4.3 / 50 \approx 600$ ms
+- Per step: $(K+V) = 2 \times (S/8) \times H$ elements → $2 \times (S/8) \times H \times 2 = 8.6$ GB (bf16)
+- 7 steps at 50 GB/s: $7 \times 8.6 / 50 \approx 1.2$ s
 
     **Alternative: Pure Ring with 64-way**
 
@@ -1485,7 +1485,7 @@ class SequenceParallelAttention(nn.Module):
 
     **Memory implications of nested tiling:**
 
-    $$M_{\text{Flash+Ring}} = \underbrace{3 \times \frac{S}{P} \times d}_{\text{Q,K,V local}} + \underbrace{2 \times \frac{S}{P} \times d}_{\text{KV double buffer}} + \underbrace{O(B \times d)}_{\text{Flash SRAM}} + \underbrace{\frac{S}{P} \times d}_{\text{output}}$$
+$$M_{\text{Flash+Ring}} = \underbrace{3 \times \frac{S}{P} \times d}_{\text{Q,K,V local}} + \underbrace{4 \times \frac{S}{P} \times d}_{\text{KV double buffer}} + \underbrace{O(B \times d)}_{\text{Flash SRAM}} + \underbrace{\frac{S}{P} \times d}_{\text{output}}$$
 
     For $S = 1M$, $P = 8$, $d = 128$, $B = 256$:
 

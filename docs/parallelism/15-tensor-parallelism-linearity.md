@@ -4,7 +4,7 @@ subtitle: "Why Matrix Multiplication Shards and GELU Doesn't"
 ---
 
 <div class="chapter-opener" markdown>
-Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. This single property enables tensor parallelism. Non-linear operations like GELU break this property, forcing synchronization. Understanding linearity reveals which operations can be parallelized and which force communication.
+Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. This single property enables tensor parallelism. Non-linear operations like GELU break this property, but element-wise ops can still be local; only operations that couple sharded dimensions force synchronization. Understanding linearity reveals which operations can be parallelized and which force communication.
 </div>
 
 <div class="investigation-question" markdown>
@@ -14,7 +14,7 @@ Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. T
 !!! abstract "Chapter Map"
     **Prerequisites**: [Chapter 11](../collectives/11-primitives-properties.md) (AllReduce, AllGather), [Chapter 14](14-data-parallelism-associativity.md) (data parallelism fundamentals)
 
-    **Key insight**: Linear operations (matrix multiplications) can be partitioned across GPUs with a final AllReduce. Non-linear operations (GELU, LayerNorm, Softmax) force synchronization points—understanding which operations are linear determines your communication pattern.
+    **Key insight**: Linear operations (matrix multiplications) can be partitioned across GPUs with a final AllReduce. Non-linear operations (GELU, LayerNorm, Softmax) may force synchronization depending on which dimension is sharded—understanding which operations couple shards determines your communication pattern.
 
 ## The Linearity Property
 
@@ -51,7 +51,7 @@ This **decomposition** is the foundation of tensor parallelism.
 | Bias addition | Affine (linear + translation) | Special handling |
 | ReLU | No | Element-wise only |
 | GELU | No | Element-wise only |
-| Softmax | No | Requires full tensor |
+| Softmax | No | Requires full tensor along the softmax axis |
 | LayerNorm | No | Requires statistics |
 | Dropout | No (stochastic) | Element-wise with care |
 
@@ -390,7 +390,7 @@ Per Transformer layer:
 | GeLU | None (local) |
 | MLP down-projection | 1 AllReduce |
 
-**Total: 2 AllReduce operations per Transformer layer**
+**Total: 2 AllReduce operations in the forward pass (4 total including backward)**
 
 ## Communication Analysis
 
@@ -592,7 +592,7 @@ class RowParallelLinear(nn.Module):
             torch.empty(out_features, self.in_features_per_gpu)
         )
         if bias:
-            # Bias added after AllReduce (only on rank 0)
+            # Bias is replicated; add after AllReduce on all ranks
             self.bias = nn.Parameter(torch.empty(out_features))
         else:
             self.bias = None

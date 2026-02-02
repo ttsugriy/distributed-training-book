@@ -569,17 +569,15 @@ Where $V_i$ denotes virtual stage $i$.
 
 ### Bubble Reduction
 
-With $v$ virtual stages per device (total $Pv$ virtual stages):
+With $v$ virtual stages per device (total $Pv$ virtual stages), the standard 1F1B bubble is:
 
-$$\text{Bubble} = \frac{Pv - 1}{Pv - 1 + m}$$
+$$\text{Bubble} = \frac{P - 1}{m + P - 1}$$
 
-Wait—this looks worse! But we reduce effective pipeline depth:
+With interleaving, a commonly used large-$m$ approximation is:
 
-The key insight: with proper scheduling, the bubble becomes:
+$$\text{Bubble}_{\text{interleaved}} \approx \frac{P-1}{m \cdot v}$$
 
-$$\text{Bubble}_{\text{interleaved}} = \frac{P-1}{m \cdot v}$$
-
-This is a factor of $v$ reduction.
+This is a factor of $v$ reduction when the approximation holds.
 
 **Example**: $P = 4$, $m = 8$, $v = 2$
 - Standard: Bubble = 3/11 = 27%
@@ -714,7 +712,7 @@ Unequal stage times create bubbles.
 
 If stage times are $t_0, t_1, \ldots, t_{P-1}$:
 
-$$\text{Effective bubble} = \frac{(P-1) \cdot t_{\max}}{\sum_i t_i}$$
+$$E = \frac{\sum_i t_i}{P \cdot t_{\max}} \quad \Rightarrow \quad \text{Bubble} = 1 - E$$
 
 Where $t_{\max} = \max_i t_i$.
 
@@ -804,6 +802,8 @@ class PipelineConfig:
     num_micro_batches: int
     stage_id: int
     device: torch.device
+    activation_shape: Optional[Tuple[int, ...]] = None
+    activation_dtype: torch.dtype = torch.float16
 
 class PipelineStage(nn.Module):
     """Wrapper for a pipeline stage."""
@@ -817,14 +817,24 @@ class PipelineStage(nn.Module):
         self.is_first = (self.stage_id == 0)
         self.is_last = (self.stage_id == self.num_stages - 1)
 
-        # Communication buffers
-        self.recv_buffer = None
+        # Communication buffers (preallocate if shape is known)
+        if self.config.activation_shape is not None:
+            self.recv_buffer = torch.empty(
+                self.config.activation_shape,
+                device=self.config.device,
+                dtype=self.config.activation_dtype,
+            )
+        else:
+            self.recv_buffer = None
         self.send_buffer = None
 
     def recv_forward(self) -> torch.Tensor:
         """Receive activation from previous stage."""
         if self.is_first:
             return None
+
+        if self.recv_buffer is None:
+            raise RuntimeError("recv_buffer is not initialized; set activation_shape in PipelineConfig")
 
         # Wait for activation from previous stage
         dist.recv(self.recv_buffer, src=self.stage_id - 1)
@@ -842,6 +852,9 @@ class PipelineStage(nn.Module):
         """Receive gradient from next stage."""
         if self.is_last:
             return None
+
+        if self.recv_buffer is None:
+            raise RuntimeError("recv_buffer is not initialized; set activation_shape in PipelineConfig")
 
         dist.recv(self.recv_buffer, src=self.stage_id + 1)
         return self.recv_buffer.clone()
@@ -1158,9 +1171,9 @@ loss.backward()
 
     **(b) Interleaved scheduling with $v = 2$:**
 
-    The interleaved bubble fraction is:
+    A commonly used large-$m$ approximation for interleaving is:
 
-    $$\text{Bubble}_{\text{interleaved}} = \frac{P-1}{m \cdot v}$$
+    $$\text{Bubble}_{\text{interleaved}} \approx \frac{P-1}{m \cdot v}$$
 
     Substituting:
 

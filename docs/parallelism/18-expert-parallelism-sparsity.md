@@ -181,6 +181,7 @@ def expert_choice_routing(tokens, router_logits, capacity):
     """
     batch, seq, dim = tokens.shape
     num_tokens = batch * seq
+    num_experts = router_logits.shape[-1]
 
     # Reshape for routing
     tokens_flat = tokens.view(num_tokens, dim)

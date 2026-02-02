@@ -118,6 +118,7 @@ This invariant is why we don't need to broadcast parameters every step—the ide
 ### Pseudocode Implementation
 
 ```python
+import os
 import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -219,15 +220,15 @@ Define scaling efficiency:
 
 $$E(P) = \frac{T_1}{P \cdot T_P}$$
 
-where $T_1$ is single-GPU time and $T_P$ is $P$-GPU time per step.
+where $T_1$ is the single-GPU time for the same *global* batch, and $T_P$ is $P$-GPU time per step (strong scaling).
 
 With perfect overlap:
 
-$$T_P = \max(T_{\text{compute}}, T_{\text{comm}})$$
+$$T_P = \max\left(\frac{T_{\text{compute}}}{P},\; T_{\text{comm}}\right)$$
 
 **Compute-bound regime** ($T_{\text{compute}} > T_{\text{comm}}$):
 
-$$E(P) = \frac{T_{\text{compute}}}{P \cdot T_{\text{compute}}} = \frac{1}{P} \cdot P = 1$$
+$$E(P) = \frac{T_{\text{compute}}}{P \cdot (T_{\text{compute}}/P)} = 1$$
 
 Perfect scaling! But this assumes:
 1. Perfect overlap of communication and computation
@@ -374,10 +375,12 @@ def enable_deterministic_training():
     # Disable auto-tuning (chooses different algorithms)
     torch.backends.cudnn.benchmark = False
 
-    # Set deterministic NCCL reduction order
+    # Set deterministic NCCL reduction order (still not a strict bitwise guarantee)
     os.environ["NCCL_ALGO"] = "Ring"
     os.environ["NCCL_PROTO"] = "Simple"
 ```
+
+Even with these settings, NCCL can still vary channel selection or topology; strict bitwise determinism often requires fixed topology and limited channels.
 
 **Cost of determinism**: Often 10-20% slower due to disabled optimizations.
 
@@ -540,6 +543,8 @@ With accumulation: AllReduce every $A$ micro-batches
 
 $$\frac{T_{\text{no-accum}}}{T_{\text{accum}}} = \frac{A \cdot T_{\text{compute/A}} + A \cdot T_{\text{comm}}}{A \cdot T_{\text{compute/A}} + T_{\text{comm}}} = \frac{A \cdot T_c + A \cdot T_r}{A \cdot T_c + T_r}$$
 
+where $T_c$ is compute time per micro-batch and $T_r$ is the AllReduce time for one gradient synchronization.
+
 For $T_r = T_c$: speedup = $(2A)/(A+1)$ → 2× as $A \to \infty$.
 
 ## Scaling Behavior
@@ -573,6 +578,8 @@ $$E_{\text{strong}}(P) = \frac{T_1}{P \cdot T_P} = \frac{T_c(1)}{P \cdot (T_c(1)
 As $P$ increases, $T_c/P$ becomes small compared to $T_r$, and efficiency drops.
 
 ### Practical Limits
+
+These limits are order-of-magnitude and depend strongly on hardware, model architecture, and batch size.
 
 | Model Size | Typical P Limit (90% efficiency) |
 |------------|----------------------------------|
