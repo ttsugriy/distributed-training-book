@@ -39,6 +39,10 @@ class TrainingConfig:
     micro_batch_size: int
     gradient_accumulation_steps: int
 
+    # Model shape
+    seq_length: int
+    hidden_dim: int
+
     # Pipeline schedule
     pipeline_schedule: str  # "1F1B", "interleaved", "zero-bubble"
     num_interleaved_stages: int
@@ -123,8 +127,8 @@ class MemoryConstraint:
 
         bytes_per_param = self._bytes_per_param(config.precision)
 
-        # Model memory (sharded by TP and ZeRO-3)
-        params_per_gpu = self.model_params / config.tp_size
+        # Model memory (sharded by TP and PP, then by ZeRO-3)
+        params_per_gpu = self.model_params / (config.tp_size * config.pp_size)
         if config.zero_stage >= 3:
             params_per_gpu /= config.dp_size
 
@@ -184,9 +188,10 @@ class MemoryConstraint:
         # Attention: batch × heads × seq × seq
         # FFN: batch × seq × 4*hidden
 
+        # Tensor counts (bytes applied below)
         per_layer = batch * seq * hidden * 2  # Input + output
-        per_layer += batch * seq * seq * 2    # Attention scores (approx)
-        per_layer += batch * seq * hidden * 4 * 2  # FFN intermediate
+        per_layer += batch * seq * seq * 2    # Attention scores + probs (approx)
+        per_layer += batch * seq * hidden * 4  # FFN intermediate
 
         total = per_layer * layers * bytes_per_element
 
@@ -215,6 +220,9 @@ class BandwidthConstraint:
     def __init__(self,
                  model_params: int,
                  flops_per_token: int,
+                 hidden_dim: int,
+                 seq_length: int,
+                 num_layers: int,
                  intra_node_bw: float = 300e9,   # NVLink: 300 GB/s
                  inter_node_bw: float = 100e9,   # IB: 100 GB/s
                  gpu_flops: float = 989e12,     # H100: 989 TFLOPs FP16/BF16 dense
@@ -222,6 +230,9 @@ class BandwidthConstraint:
 
         self.model_params = model_params
         self.flops_per_token = flops_per_token
+        self.hidden_dim = hidden_dim
+        self.seq_length = seq_length
+        self.num_layers = num_layers
         self.intra_bw = intra_node_bw
         self.inter_bw = inter_node_bw
         self.gpu_flops = gpu_flops
@@ -235,8 +246,13 @@ class BandwidthConstraint:
         # TP communication (AllReduce per layer, high frequency)
         # Happens within node (NVLink)
         if config.tp_size > 1:
-            tp_volume = self.model_params / config.tp_size / config.pp_size
-            tp_volume *= bytes_per_param * 2  # AllReduce = 2× volume
+            layers_per_stage = self.num_layers // config.pp_size
+            activation_size = (config.micro_batch_size *
+                               self.seq_length *
+                               self.hidden_dim *
+                               bytes_per_param)
+            per_allreduce = 2 * (config.tp_size - 1) / config.tp_size * activation_size
+            tp_volume = 2 * layers_per_stage * per_allreduce  # ~2 AllReduces per layer
             tp_time = tp_volume / self.intra_bw
         else:
             tp_time = 0
@@ -244,7 +260,8 @@ class BandwidthConstraint:
         # DP communication (AllReduce gradients, once per step)
         # May cross nodes (IB)
         if config.dp_size > 1:
-            grad_volume = self.model_params * bytes_per_param
+            params_per_rank = self.model_params / (config.tp_size * config.pp_size)
+            grad_volume = params_per_rank * bytes_per_param
 
             # ZeRO reduces communication
             if config.zero_stage >= 1:
@@ -267,8 +284,8 @@ class BandwidthConstraint:
         # PP communication (point-to-point, per micro-batch)
         if config.pp_size > 1:
             activation_size = (config.micro_batch_size *
-                             config.seq_length *
-                             config.hidden_dim *
+                             self.seq_length *
+                             self.hidden_dim *
                              bytes_per_param)
             pp_volume = activation_size * 2  # Forward + backward
             pp_time = pp_volume / self.inter_bw
@@ -703,6 +720,8 @@ class PrunedGridSearch:
                                     offload_params=False,
                                     micro_batch_size=mbs,
                                     gradient_accumulation_steps=ga,
+                                    seq_length=self.seq_length,
+                                    hidden_dim=self.hidden_dim,
                                     pipeline_schedule="1F1B",
                                     num_interleaved_stages=1,
                                     overlap_comm_compute=True,
@@ -830,6 +849,8 @@ class BayesianConfigSearch:
                 gradient_accumulation_steps=random.choice(
                     self.param_space['gradient_accumulation']
                 ),
+                seq_length=self.param_space['seq_length'],
+                hidden_dim=self.param_space['hidden_dim'],
                 pipeline_schedule="1F1B",
                 num_interleaved_stages=1,
                 overlap_comm_compute=True,
@@ -1052,6 +1073,8 @@ class EvolutionarySearch:
             offload_params=False,
             micro_batch_size=attrs['micro_batch_size'],
             gradient_accumulation_steps=attrs['gradient_accumulation_steps'],
+            seq_length=self.param_space['seq_length'],
+            hidden_dim=self.param_space['hidden_dim'],
             pipeline_schedule="1F1B",
             num_interleaved_stages=1,
             overlap_comm_compute=True,
@@ -1084,6 +1107,8 @@ class EvolutionarySearch:
             gradient_accumulation_steps=random.choice(
                 self.param_space['gradient_accumulation']
             ),
+            seq_length=self.param_space['seq_length'],
+            hidden_dim=self.param_space['hidden_dim'],
             pipeline_schedule="1F1B",
             num_interleaved_stages=1,
             overlap_comm_compute=True,
@@ -1171,6 +1196,8 @@ class HierarchicalSearch:
                     offload_params=False,
                     micro_batch_size=1,  # Placeholder
                     gradient_accumulation_steps=1,  # Placeholder
+                    seq_length=self.model.seq_length,
+                    hidden_dim=self.model.hidden_dim,
                     pipeline_schedule="1F1B",
                     num_interleaved_stages=1,
                     overlap_comm_compute=True,
@@ -1207,6 +1234,8 @@ class HierarchicalSearch:
                         offload_params=False,
                         micro_batch_size=1,
                         gradient_accumulation_steps=1,
+                        seq_length=base_config.seq_length,
+                        hidden_dim=base_config.hidden_dim,
                         pipeline_schedule="1F1B",
                         num_interleaved_stages=1,
                         overlap_comm_compute=True,
@@ -1250,6 +1279,8 @@ class HierarchicalSearch:
                 offload_params=base_config.offload_params,
                 micro_batch_size=mbs,
                 gradient_accumulation_steps=ga,
+                seq_length=base_config.seq_length,
+                hidden_dim=base_config.hidden_dim,
                 pipeline_schedule="1F1B",
                 num_interleaved_stages=1,
                 overlap_comm_compute=True,
@@ -1465,7 +1496,8 @@ class ConfigurationAdvisor:
 
         # Rule 1: TP size based on model width
         # Use TP if model is too wide for single GPU
-        params_per_gpu = model_params * 18  # Model + optimizer in bytes
+        bytes_per_param = 16  # fp16 params+grads + fp32 master/m/v (AdamW)
+        params_per_gpu = model_params * bytes_per_param
         if params_per_gpu > gpu_memory_gb * 1e9:
             tp_size = min(8, self._ceil_power_of_2(
                 params_per_gpu / (gpu_memory_gb * 1e9 * 0.5)
@@ -1541,6 +1573,8 @@ class ConfigurationAdvisor:
             offload_params=False,
             micro_batch_size=micro_batch_size,
             gradient_accumulation_steps=gradient_accumulation,
+            seq_length=seq_length,
+            hidden_dim=hidden_dim,
             pipeline_schedule="interleaved" if pp_size >= 4 else "1F1B",
             num_interleaved_stages=2 if pp_size >= 4 else 1,
             overlap_comm_compute=True,
@@ -1583,6 +1617,8 @@ config = TrainingConfig(
     offload_params=False,
     micro_batch_size=2,
     gradient_accumulation_steps=8,
+    seq_length=seq_length,
+    hidden_dim=hidden_dim,
     pipeline_schedule="interleaved",
     num_interleaved_stages=2,
     overlap_comm_compute=True,
@@ -1623,6 +1659,8 @@ config = TrainingConfig(
     offload_params=False,
     micro_batch_size=1,
     gradient_accumulation_steps=4,
+    seq_length=seq_length,
+    hidden_dim=hidden_dim,
     pipeline_schedule="1F1B",
     num_interleaved_stages=1,
     overlap_comm_compute=True,

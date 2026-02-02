@@ -651,7 +651,8 @@ class ShardingSpec:
             if placement.type == PlacementType.SHARD:
                 dim = placement.tensor_dim
                 mesh_size = self.mesh.get_axis_size(placement.mesh_dim)
-                rank = coord[i]
+                axis_idx = self.mesh.axis_names.index(placement.mesh_dim)
+                rank = coord[axis_idx]
 
                 # Chunk and take local piece
                 chunks = local_tensor.chunk(mesh_size, dim=dim)
@@ -710,7 +711,8 @@ def redistribute(
         elif curr.type == PlacementType.REPLICATE and tgt.type == PlacementType.SHARD:
             # Replicate → Shard: Local chunk
             coord = mesh.get_coordinate(dist.get_rank())
-            rank = coord[i]
+            axis_idx = mesh.axis_names.index(mesh_dim)
+            rank = coord[axis_idx]
             chunks = result.chunk(mesh_size, dim=tgt.tensor_dim)
             result = chunks[rank].contiguous()
 

@@ -30,7 +30,9 @@ $$\text{Memory per GPU} = M_{\text{model}} + M_{\text{optimizer}} + M_{\text{act
 
 For a 175B model with Adam optimizer in mixed precision:
 
-$$M_{\text{model}} + M_{\text{optimizer}} = 175\text{B} \times (2 + 8) = 1.75\text{ TB}$$
+$$M_{\text{model}} + M_{\text{optimizer}} = 175\text{B} \times (2 + 8 + 4) = 2.45\text{ TB}$$
+
+(If you omit FP32 master weights, this drops to $1.75$ TB.)
 
 No GPU can hold this.
 
@@ -270,7 +272,7 @@ $$M_{\text{params}} = \frac{\Psi \times 2}{T \times P}$$
 
 **Optimizer States** (sharded by TP and PP):
 
-$$M_{\text{optimizer}} = \frac{\Psi \times 8}{T \times P}$$
+$$M_{\text{optimizer}} = \frac{\Psi \times 8}{T \times P} \quad (\text{m} + \text{v only; add } \frac{4\Psi}{T P} \text{ for FP32 master})$$
 
 **Activations** (sharded by TP, multiplied by pipeline depth):
 
@@ -290,9 +292,9 @@ $$\frac{175\text{B} \times 2}{4 \times 8} = \frac{350\text{GB}}{32} = 10.9\text{
 
 $$\frac{175\text{B} \times 8}{4 \times 8} = \frac{1.4\text{TB}}{32} = 43.8\text{ GB}$$
 
-**Activations per GPU** (with $B=32$ micro-batches in flight):
+**Activations per GPU** (with $M=32$ micro-batches in flight, micro-batch size $B_{\mu}=32$, and $S=1$ for simplicity):
 
-$$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
+$$\frac{M \times L_{\text{stage}} \times B_{\mu} \times H \times 2}{T} = \frac{32 \times 12 \times 32 \times 12288 \times 2}{4} \approx 24 \text{ GB}$$
 
 **Total**: 10.9 + 43.8 + 24 ≈ **79 GB** (fits in 80GB A100).
 
@@ -302,7 +304,7 @@ $$\frac{32 \times 12 \times 12288 \times 2}{4} \times 32 = \text{~24 GB}$$
 
 Forward and backward pass time (per micro-batch):
 
-$$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu}}{P \times \text{FLOPs}_{\text{GPU}}}$$
+$$T_{\text{compute}} = \frac{6 \times \Psi \times B_{\mu} \times S}{P \times \text{FLOPs}_{\text{GPU}}}$$
 
 Where $B_{\mu}$ is micro-batch size.
 
@@ -310,7 +312,9 @@ Where $B_{\mu}$ is micro-batch size.
 
 **TP Communication** (per layer, both forward and backward):
 
-$$T_{\text{TP}} = 4 \times L_{\text{stage}} \times \left(\alpha + \frac{2(T-1)}{T} \times \frac{H \times B_{\mu}}{\beta_{\text{NVLink}}}\right)$$
+$$T_{\text{TP}} = 4 \times L_{\text{stage}} \times \left(\alpha + \frac{2(T-1)}{T} \times \frac{B_{\mu} \times S \times H \times \text{bytes}}{\beta_{\text{NVLink}}}\right)$$
+
+where $\text{bytes} = 2$ for FP16/BF16.
 
 **PP Communication** (per micro-batch):
 

@@ -130,6 +130,7 @@ class RingAttention:
         # Initialize output accumulator
         output = torch.zeros_like(q)
         normalizer = torch.zeros(batch, seq_local, heads, 1, device=q.device)
+        running_max = torch.full_like(normalizer, float('-inf'))
 
         # Ring buffers
         k_recv = torch.empty_like(k)
@@ -161,8 +162,8 @@ class RingAttention:
             chunk_output = torch.einsum('bshS,bShd->bshd', exp_scores, v_send)
 
             # Numerically stable accumulation
-            output, normalizer = self._online_softmax_update(
-                output, normalizer, chunk_output, sum_exp, max_scores
+            output, normalizer, running_max = self._online_softmax_update(
+                output, normalizer, running_max, chunk_output, sum_exp, max_scores
             )
 
             # Ring communication (except last step)
@@ -224,26 +225,27 @@ class RingAttention:
         self,
         output: torch.Tensor,
         normalizer: torch.Tensor,
+        running_max: torch.Tensor,
         chunk_output: torch.Tensor,
         chunk_sum: torch.Tensor,
         chunk_max: torch.Tensor
     ) -> tuple:
-        """Online softmax accumulation for numerical stability."""
-        # This implements the online softmax algorithm
-        # for accumulating attention across chunks
-
+        """Online softmax accumulation with running max for stability."""
         # First chunk
-        if normalizer.sum() == 0:
-            return chunk_output, chunk_sum
+        if torch.isinf(running_max).all():
+            return chunk_output, chunk_sum, chunk_max
 
-        # Update normalizer and output with proper scaling
-        new_normalizer = normalizer + chunk_sum
-        scale_old = normalizer / new_normalizer
-        scale_new = chunk_sum / new_normalizer
+        # Update running max
+        new_max = torch.maximum(running_max, chunk_max)
+
+        # Rescale old and new contributions
+        scale_old = torch.exp(running_max - new_max)
+        scale_new = torch.exp(chunk_max - new_max)
 
         new_output = output * scale_old + chunk_output * scale_new
+        new_normalizer = normalizer * scale_old + chunk_sum * scale_new
 
-        return new_output, new_normalizer
+        return new_output, new_normalizer, new_max
 ```
 
 ### CP Memory Savings
@@ -253,7 +255,7 @@ Memory reduction from context parallelism:
 | Component | Without CP | With CP=C |
 |-----------|-----------|-----------|
 | Activations | $B \times S \times H$ | $B \times S/C \times H$ |
-| KV Cache | $2 \times L \times B \times S \times H$ | $2 \times L \times B \times S \times H$ (ring) |
+| KV Cache | $2 \times L \times B \times S \times H$ | $2 \times L \times B \times \frac{S}{C} \times H$ (+ ring buffers) |
 | Peak Memory | $O(S^2)$ for attention | $O(S \times S/C)$ with ring |
 
 **Key insight**: Ring attention avoids the $O(S^2)$ memory for attention matrices.
@@ -801,14 +803,14 @@ $$M_{\text{optimizer}} = 4 \times M_{\text{params}}$$
 
 $$M_{\text{activations}} = \frac{B \times S \times H}{T \times C} \times L_{\text{stage}} \times k_{\text{buffer}}$$
 
-**Example**: 1T MoE (200B dense + 800B experts), 128K context, 16K GPUs
+**Example**: 1T MoE (200B dense + 800B experts), 128K context, 16K GPUs, $B=128$, $k_{\text{buffer}}=4$
 
 Configuration: DP=8, PP=16, TP=8, CP=4, EP=4
 
 - Dense params: $\frac{200\text{B} \times 2}{8 \times 16} = 3.1\text{ GB}$
 - Expert params: $\frac{800\text{B} \times 2}{8 \times 16 \times 4} = 3.1\text{ GB}$
 - Optimizer: $4 \times 6.2 = 24.8\text{ GB}$
-- Activations: $\frac{4096 \times 128\text{K} \times 8192 \times 2}{8 \times 4} \times 4 = 34\text{ GB}$
+- Activations: $\frac{128 \times 128\text{K} \times 8192 \times 2}{8 \times 4} \times 4 \approx 34\text{ GB}$
 - **Total**: ~65 GB (fits 80GB A100)
 
 ## Practical Considerations

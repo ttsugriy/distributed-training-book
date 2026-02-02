@@ -454,18 +454,18 @@ For a 100GB checkpoint shard:
 
 Let:
 
-- $T_{\text{step}}$: time per training step
 - $T_{\text{ckpt}}$: time to checkpoint (overhead)
-- $\lambda$: failure rate (failures per hour)
-- $f$: checkpoint frequency (checkpoints per step)
+- $\lambda$: failure rate (failures per second)
+- $I$: checkpoint interval (seconds between checkpoints)
+- $T_{\text{total}}$: total wall-clock training time
 
-**Total time with checkpointing**:
+**Overhead per unit time**:
 
-$$T_{\text{total}} = N_{\text{steps}} \cdot T_{\text{step}} \cdot (1 + f \cdot T_{\text{ckpt}}/T_{\text{step}})$$
+$$\text{overhead} = \frac{T_{\text{ckpt}}}{I}$$
 
 **Expected work lost per failure**:
 
-$$W_{\text{lost}} = \frac{T_{\text{step}}}{2f}$$
+$$W_{\text{lost}} = \frac{I}{2}$$
 
 (On average, failure occurs halfway between checkpoints.)
 
@@ -475,17 +475,17 @@ $$\mathbb{E}[\text{restarts}] = \lambda \cdot T_{\text{total}}$$
 
 ### Optimal Checkpoint Frequency
 
-Minimize total training time including failures:
+Minimize total training time including failures (Young/Daly):
 
-$$T_{\text{expected}} = N_{\text{steps}} \cdot T_{\text{step}} \cdot \left(1 + f \cdot \frac{T_{\text{ckpt}}}{T_{\text{step}}} + \lambda \cdot \frac{1}{2f}\right)$$
+$$\text{overhead factor} = 1 + \frac{T_{\text{ckpt}}}{I} + \lambda \cdot \frac{I}{2}$$
 
-Taking derivative with respect to $f$ and setting to zero:
+Taking derivative with respect to $I$ and setting to zero:
 
-$$\frac{d T_{\text{expected}}}{df} = N \cdot T_{\text{step}} \cdot \left(\frac{T_{\text{ckpt}}}{T_{\text{step}}} - \frac{\lambda}{2f^2}\right) = 0$$
+$$\frac{d}{dI}\left(\frac{T_{\text{ckpt}}}{I} + \lambda \cdot \frac{I}{2}\right) = 0$$
 
 Solving:
 
-$$f^* = \sqrt{\frac{\lambda \cdot T_{\text{step}}}{2 \cdot T_{\text{ckpt}}}}$$
+$$I^* = \sqrt{\frac{2 T_{\text{ckpt}}}{\lambda}}$$
 
 ### Numerical Example
 
@@ -495,7 +495,7 @@ Given:
 - $T_{\text{ckpt}} = 60$ seconds (including overhead)
 - $\lambda = 0.625$ failures/hour = $1.74 \times 10^{-4}$ failures/second
 
-$$f^* = \sqrt{\frac{1.74 \times 10^{-4} \cdot 1}{2 \cdot 60}} = \sqrt{1.45 \times 10^{-6}} = 0.0012$$
+$$I^* = \sqrt{\frac{2 \cdot 60}{1.74 \times 10^{-4}}} \approx 830 \text{ s} \approx 14 \text{ min}$$
 
 Checkpoint every $1/f^* \approx 830$ steps.
 
@@ -623,9 +623,10 @@ class PipelineCheckpointer:
         else:
             checkpoint_signal = torch.zeros(1, device='cuda')
 
-        # Broadcast from last stage
+        # Broadcast from last stage (map group rank to global rank)
+        src_global = dist.get_global_rank(self.pp_group, self.pp_size - 1)
         dist.broadcast(checkpoint_signal,
-                      src=self.pp_size - 1,
+                      src=src_global,
                       group=self.pp_group)
 
         # All stages wait for pipeline to drain
@@ -722,19 +723,17 @@ class ResilientLoader:
 
         # Check required keys
         required = ['model', 'optimizer', 'step']
-        for key in required:
-            if key not in state:
-                return False
+        local_valid = all(key in state for key in required)
 
         # Check model state
-        for name, param in state['model'].items():
-            if torch.isnan(param).any():
-                return False
-            if torch.isinf(param).any():
-                return False
+        if local_valid:
+            for param in state['model'].values():
+                if torch.isnan(param).any() or torch.isinf(param).any():
+                    local_valid = False
+                    break
 
         # All ranks must agree checkpoint is valid
-        valid_tensor = torch.ones(1, device='cuda')
+        valid_tensor = torch.tensor(1 if local_valid else 0, device='cuda')
         dist.all_reduce(valid_tensor, op=dist.ReduceOp.MIN)
 
         return valid_tensor.item() == 1
