@@ -8,7 +8,7 @@ Every distributed training algorithm is built from a small set of collective ope
 </div>
 
 <div class="investigation-question" markdown>
-**The Question**: Why is AllReduce = ReduceScatter ∘ AllGather? What properties must hold for this decomposition to be valid? What happens when these properties are violated?
+**The Question**: Why is AllReduce = AllGather ∘ ReduceScatter? What properties must hold for this decomposition to be valid? What happens when these properties are violated?
 </div>
 
 <div class="notation-banner" markdown>
@@ -36,7 +36,7 @@ P3: [. . . .]        P3: [A B C D]
 
 **Use case**: Distributing model weights at initialization.
 
-**Volume**: $n$ bytes total sent by root.
+**Volume**: Root injects $n$ bytes; total network volume depends on algorithm (e.g., $n \log P$ for tree, $n(P-1)$ for naive).
 
 ### 2. Reduce
 
@@ -137,7 +137,7 @@ P3: [4 8 12 16]      P3: [40]
 
 **Volume**: Each process sends $(P-1)/P \cdot n$ bytes.
 
-### Bonus: AlltoAll
+### Bonus: All-to-All
 
 Each process sends different data to each other process.
 
@@ -159,14 +159,14 @@ The following table uses the α-β cost model (see Chapter 4), where $P$ = numbe
 
 | Primitive | Input/Output | Data Movement | Optimal Complexity |
 |-----------|--------------|---------------|-------------------|
-| Broadcast | 1 → N copies | root → all | $\alpha \log P + n/\beta$ |
-| Reduce | N → 1 sum | all → root | $\alpha \log P + n/\beta$ |
+| Broadcast | 1 → N copies | root → all | $\log_2 P \cdot \left(\alpha + \frac{n}{\beta}\right)$ |
+| Reduce | N → 1 sum | all → root | $\log_2 P \cdot \left(\alpha + \frac{n}{\beta}\right)$ |
 | AllReduce | N → N sum | all ↔ all | $2\alpha(P-1) + 2\frac{P-1}{P}\frac{n}{\beta}$ |
 | Scatter | 1 → N shards | root → all | $\alpha \log P + \frac{P-1}{P}\frac{n}{\beta}$ |
 | Gather | N → 1 concat | all → root | $\alpha \log P + \frac{P-1}{P}\frac{n}{\beta}$ |
 | AllGather | N → N concat | all ↔ all | $\alpha(P-1) + \frac{P-1}{P}\frac{n}{\beta}$ |
 | ReduceScatter | N → N sharded sum | all ↔ all | $\alpha(P-1) + \frac{P-1}{P}\frac{n}{\beta}$ |
-| AlltoAll | N → N transpose | all ↔ all | $\alpha(P-1) + \frac{P-1}{P}\frac{n}{\beta}$ |
+| All-to-All | N → N transpose | all ↔ all | $\alpha(P-1) + \frac{P-1}{P}\frac{n}{\beta}$ |
 
 ## Algebraic Properties
 
@@ -276,13 +276,13 @@ This equals the result of AllReduce. $\square$
 3. **Fusion opportunities**: Can fuse computation between RS and AG
 4. **Understanding ZeRO**: ZeRO exploits this decomposition directly
 
-## Inverse Operations
+## Dual Operations
 
-Some collectives have natural inverses:
+Some collectives have natural duals (not strict inverses in the algebraic sense):
 
-| Operation | Inverse |
-|-----------|---------|
-| Broadcast | Reduce |
+| Operation | Dual |
+|-----------|------|
+| Broadcast | Reduce (only an inverse for identity reductions) |
 | Scatter | Gather |
 | AllGather | ReduceScatter (with reshape) |
 
@@ -529,7 +529,7 @@ gradients = handle.wait()  # Eventually complete
 
     **Key insight:** Total bytes are similar, but ring distributes load evenly across processes and time, eliminating the root bottleneck.
 
-4. **Inverse operations**: Prove that for any vector $x$: $\text{Gather}(\text{Scatter}(x)) = x$ (on root).
+4. **Gather/Scatter identity**: Prove that for any vector $x$: $\text{Gather}(\text{Scatter}(x)) = x$ (on root).
 
 ??? success "Solution"
     **Proof that Gather(Scatter(x)) = x on root:**

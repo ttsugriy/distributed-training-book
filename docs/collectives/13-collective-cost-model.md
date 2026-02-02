@@ -91,11 +91,11 @@ $$T_{\text{ReduceScatter}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\
 
 Where $n$ is the total input size (each process outputs $n/P$).
 
-### AlltoAll
+### All-to-All
 
 **Pairwise exchange**:
 
-$$T_{\text{AlltoAll}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+$$T_{\text{All-to-All}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
 Where $n$ is the total data per process (sends $n/P$ to each other process).
 
@@ -110,7 +110,7 @@ Where $n$ is the total data per process (sends $n/P$ to each other process).
 | AllReduce | $2(P-1) \cdot \alpha$ | $2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$ | Ring |
 | AllGather | $(P-1) \cdot \alpha$ | $\frac{P-1}{P} \cdot \frac{n}{\beta}$ | Ring |
 | ReduceScatter | $(P-1) \cdot \alpha$ | $\frac{P-1}{P} \cdot \frac{n}{\beta}$ | Ring |
-| AlltoAll | $(P-1) \cdot \alpha$ | $\frac{P-1}{P} \cdot \frac{n}{\beta}$ | Pairwise |
+| All-to-All | $(P-1) \cdot \alpha$ | $\frac{P-1}{P} \cdot \frac{n}{\beta}$ | Pairwise |
 
 ## Algorithmic Bandwidth
 

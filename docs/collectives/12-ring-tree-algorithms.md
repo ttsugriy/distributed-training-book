@@ -74,7 +74,7 @@ Each process will end up owning one chunk of the final reduced result.
 </div>
 
 <div class="step" markdown>
-**ReduceScatter Step 1** — Each GPU n sends chunk n clockwise, receives chunk (n-1) from counterclockwise neighbor
+**ReduceScatter Step 1** — Each GPU r sends chunk r clockwise, receives chunk (r-1) from counterclockwise neighbor
 
 <div class="tensor-viz">
 <div class="partition gpu-0">P0: A₀ A₁ A₂ <strong>A₃+D₃</strong></div>
@@ -109,7 +109,7 @@ Partial sums now contain 3 contributions each.
 <div class="partition complete">P3: <strong>Σ₀</strong> · · ·</div>
 </div>
 
-Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ. Note: GPU n owns chunk (n+1) mod P due to ring rotation.
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ. Note: GPU r owns chunk (r+1) mod P due to ring rotation.
 </div>
 
 <div class="step" markdown>
@@ -156,7 +156,7 @@ Each GPU now has 3 of 4 chunks.
 
 Partition each process's data into $P$ chunks. In step $k$ (from 0 to $P-2$), each process:
 
-1. Sends chunk $(n-k) \mod P$ clockwise (where $n$ is the process rank)
+1. Sends chunk $(r-k) \mod P$ clockwise (where $r$ is the process rank)
 2. Receives one chunk from counterclockwise neighbor
 3. Accumulates received chunk with local data at that position
 
@@ -165,7 +165,7 @@ Initial state (P=4, data partitioned into 4 chunks):
 P0: [A0 A1 A2 A3]    P1: [B0 B1 B2 B3]
 P2: [C0 C1 C2 C3]    P3: [D0 D1 D2 D3]
 
-Step 1: GPU n sends chunk n, receives chunk (n-1) mod P
+Step 1: GPU r sends chunk r, receives chunk (r-1) mod P
 P0: sends A0→P1, recv D3     P1: sends B1→P2, recv A0
 P2: sends C2→P3, recv B1     P3: sends D3→P0, recv C2
 
@@ -174,7 +174,7 @@ P0: [A0 A1 A2 A3+D3]         P1: [A0+B0 B1 B2 B3]
 P2: [C0 B1+C1 C2 C3]         P3: [D0 D1 C2+D2 D3]
         position 3                 position 0
 
-Step 2: GPU n sends chunk (n-1) mod P (the one just accumulated)
+Step 2: GPU r sends chunk (r-1) mod P (the one just accumulated)
 P0: sends (A3+D3)→P1         P1: sends (A0+B0)→P2
 P2: sends (B1+C1)→P3         P3: sends (C2+D2)→P0
 
@@ -193,7 +193,7 @@ P0: has Σ1 (chunk 1)    P1: has Σ2 (chunk 2)
 P2: has Σ3 (chunk 3)    P3: has Σ0 (chunk 0)
 ```
 
-Each process now holds 1/P of the fully reduced result. Due to the ring rotation, GPU $n$ ends up with chunk $(n+1) \mod P$.
+Each process now holds 1/P of the fully reduced result. Due to the ring rotation, GPU $r$ ends up with chunk $(r+1) \mod P$.
 
 ```mermaid
 flowchart TB
@@ -217,7 +217,7 @@ flowchart TB
     style D3 fill:#2ecc71,stroke:#27ae60,color:white
 ```
 
-Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ (the fully reduced chunk i). Note: GPU n owns chunk (n+1) mod P.
+Where Σᵢ = Aᵢ + Bᵢ + Cᵢ + Dᵢ (the fully reduced chunk i). Note: GPU r owns chunk (r+1) mod P.
 
 ### Phase 2: AllGather via Ring
 
@@ -227,7 +227,7 @@ In $P-1$ steps, each process:
 3. Stores received chunk (no reduction needed)
 
 ```
-After ReduceScatter (GPU n has chunk (n+1) mod P):
+After ReduceScatter (GPU r has chunk (r+1) mod P):
 P0: [. Σ1 . .]    P1: [. . Σ2 .]
 P2: [. . . Σ3]    P3: [Σ0 . . .]
 
@@ -300,11 +300,7 @@ Consider the total data that must be communicated. The AllReduce result is a vec
 
 **Lower bound argument**:
 
-Consider any process $p$. Initially, $p$ has only its own contribution (size $n$). After AllReduce, $p$ must have the complete reduced result (size $n$), which incorporates data from all other $P-1$ processes.
-
-The minimum data $p$ must receive: at least $(P-1)/P \cdot n$ bytes, because each of the other $P-1$ processes contributes $n/P$ bytes to the final result that $p$ doesn't initially have.
-
-Similarly, $p$ must send at least $(P-1)/P \cdot n$ bytes so that other processes can compute the portions of the result that depend on $p$'s contribution.
+Consider any process $p$. The final reduced vector has size $n$, but $p$ initially has no information about the other $P-1$ processes' contributions. By a cut-set argument, at least $(P-1)/P \cdot n$ bytes must enter $p$ to supply the missing information, and at least $(P-1)/P \cdot n$ bytes must leave $p$ so other ranks can incorporate $p$'s contribution.
 
 Total communication per process: at least $2(P-1)/P \cdot n$ bytes.
 
@@ -328,7 +324,7 @@ P0 ⟷ P1 ⟷ P2 ⟷ P3 ⟷ P0
 
 $$T_{\text{bidir}} = (P-1) \cdot \alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
-Half the steps of unidirectional ring.
+Half the steps of unidirectional ring for even $P$ on full-duplex links; odd $P$ requires one extra step.
 
 ## Tree AllReduce
 
@@ -431,11 +427,9 @@ $$T_{\text{tree}} = 2 \log_2 P \cdot \alpha + 2 \log_2 P \cdot \frac{n}{\beta}$$
 
 **Proof**:
 
-Consider the information flow constraint. Process $P_{P-1}$'s contribution must reach process $P_0$, and $P_0$'s contribution must reach $P_{P-1}$.
+Consider the information flow constraint. In each round of pairwise communication, the number of processes that can hold a given contribution can at most double. To make any one process's contribution reach all $P$ processes requires at least $\log_2 P$ rounds.
 
-In any communication graph, the minimum number of hops between two arbitrary processes is $\Omega(\log P)$ when using only pairwise communication (each step involves pairs).
-
-The tree achieves exactly $\log_2 P$ steps in each direction. $\square$
+Tree AllReduce achieves exactly $\log_2 P$ steps in the reduce phase and $\log_2 P$ steps in the broadcast phase, meeting this lower bound. $\square$
 
 ## Comparison: Ring vs Tree
 
@@ -766,7 +760,7 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [13, 14, 15, 16]  → chunks: [13] [14] [15] [16]
     ```
 
-    **Step 1:** GPU n sends chunk n, receives chunk (n-1) mod 4:
+    **Step 1:** GPU r sends chunk r, receives chunk (r-1) mod 4:
     - P0 sends chunk 0 (=1) → P1, receives chunk 3 (=16) from P3 → accumulates at position 3
     - P1 sends chunk 1 (=6) → P2, receives chunk 0 (=1) from P0 → accumulates at position 0
     - P2 sends chunk 2 (=11) → P3, receives chunk 1 (=6) from P1 → accumulates at position 1
@@ -780,7 +774,7 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [13, 14, 15+11=26, 16]   position 2 accumulated
     ```
 
-    **Step 2:** Send the chunk just accumulated (chunk (n-1) mod 4):
+    **Step 2:** Send the chunk just accumulated (chunk (r-1) mod 4):
     - P0 sends 20 (pos 3) → P1, receives 26 (pos 2) from P3 → accumulates at position 2
     - P1 sends 6 (pos 0) → P2, receives 20 (pos 3) from P0 → accumulates at position 3
     - P2 sends 16 (pos 1) → P3, receives 6 (pos 0) from P1 → accumulates at position 0
@@ -802,7 +796,7 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [13, 14+16=30, 26, 16]  pos 1 = D1+B1+C1
     ```
 
-    **Step 3:** Final round, send chunk (n-2) mod 4:
+    **Step 3:** Final round, send chunk (r-2) mod 4:
     - P0 sends 29 → P1, receives 30 from P3 → accumulates at position 1
     - P1 sends 28 → P2, receives 29 from P0 → accumulates at position 2
     - P2 sends 15 → P3, receives 28 from P1 → accumulates at position 3
@@ -816,7 +810,7 @@ PyTorch DDP uses 25MB buckets by default.
     P3: [13+15=28, 30, 26, 16]  → P3 has Σ0=28 at position 0 ✓
     ```
 
-    **Final result (GPU n owns chunk (n+1) mod P):**
+    **Final result (GPU r owns chunk (r+1) mod P):**
     ```
     P0: has Σ1 = 2+6+10+14 = 32   (sum of all second elements)
     P1: has Σ2 = 3+7+11+15 = 36   (sum of all third elements)
@@ -1078,7 +1072,7 @@ PyTorch DDP uses 25MB buckets by default.
     | Time | $2(P-1)\alpha + 2\frac{P-1}{P}\frac{n}{\beta}$ | $(P-1)\alpha + \frac{P-1}{P}\frac{n}{\beta}$ |
 
     **Conclusion:** Bidirectional ring achieves:
-    - **Half the latency** (half the steps)
+    - **Half the latency** (half the steps for even $P$ on full-duplex links)
     - **Same total data** (bandwidth-optimal)
     - **Requires full-duplex links** (both directions simultaneously)
 
