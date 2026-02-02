@@ -11,6 +11,10 @@ For years, the field scaled models without enough data. Chinchilla revealed the 
 **The Question**: GPT-3 has 175B parameters but trained on only 300B tokens—a ratio of 1.7:1. Chinchilla, with 70B parameters and 1.4T tokens (20:1), achieved the same loss with 4× less compute. What went wrong, and how do we compute "optimal"?
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $C$ = total compute. See [Notation](../appendices/notation.md).
+</div>
+
 ## The Pre-Chinchilla Era
 
 Before 2022, the dominant scaling strategy was: **make the model bigger**.

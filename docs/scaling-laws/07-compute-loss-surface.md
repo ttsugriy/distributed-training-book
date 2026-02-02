@@ -12,7 +12,7 @@ Loss is a function of two investments: model size and training data. Understandi
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $C$ = total compute, $\alpha,\beta$ = scaling exponents.
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $C$ = total compute, $\alpha,\beta$ = scaling exponents. See [Notation](../appendices/notation.md).
 </div>
 
 !!! abstract "Building On: Part I Foundations"

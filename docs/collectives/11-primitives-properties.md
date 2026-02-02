@@ -11,6 +11,10 @@ Every distributed training algorithm is built from a small set of collective ope
 **The Question**: Why is AllReduce = ReduceScatter ∘ AllGather? What properties must hold for this decomposition to be valid? What happens when these properties are violated?
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** $P$ = processes/GPUs, $n$ = message size (bytes), $\alpha$ = latency, $\beta$ = bandwidth. See [Notation](../appendices/notation.md).
+</div>
+
 !!! abstract "Building On: Parts I–II"
     This part builds on the **network ceiling** concept from the [extended roofline (Chapter 2)](../foundations/02-extended-roofline.md), the **α-β cost model** ([Chapter 4](../foundations/04-alpha-beta-model.md)), and the **memory hierarchy** of clusters ([Chapter 3](../foundations/03-cluster-memory-hierarchy.md)). From Part II, we understand that training at scale requires massive data movement. Now we formalize the communication primitives that make this movement possible.
 

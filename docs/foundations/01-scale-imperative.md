@@ -12,7 +12,7 @@ In 2017, a single GPU could train the largest language models. By 2024, the larg
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $B$ = batch tokens, $P$ = GPUs.
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $B$ = batch tokens, $P$ = GPUs. See [Notation](../appendices/notation.md).
 </div>
 
 ## The Three Walls

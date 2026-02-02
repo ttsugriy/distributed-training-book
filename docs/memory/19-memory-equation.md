@@ -12,7 +12,7 @@ Training large models is fundamentally a memory problem. Before we can solve it,
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $B$ = batch tokens, $S$ = sequence length, $H$ = hidden size, $L$ = layers.
+**Notation in this chapter:** $\Psi$ = parameters, $B$ = batch tokens, $S$ = sequence length, $H$ = hidden size, $L$ = layers. See [Notation](../appendices/notation.md).
 </div>
 
 !!! abstract "Building On: Parts I and IV"

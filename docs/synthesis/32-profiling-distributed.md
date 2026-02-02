@@ -11,6 +11,10 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 **The Question**: Your 64-GPU training run achieves 35% MFU (Model FLOP Utilization). Where is the other 65%? Is it communication? Memory bandwidth? Kernel launch overhead? Idle time? Without measurement, optimization is guesswork.
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** MFU = Model FLOP Utilization, $T_{\text{step}}$ = step time. See [Notation](../appendices/notation.md).
+</div>
+
 !!! abstract "Building On: All Previous Parts"
     This final part synthesizes everything. You understand **rooflines and estimation** ([Part I](../foundations/01-scale-imperative.md)), **optimal resource allocation** ([Part II](../scaling-laws/07-compute-loss-surface.md)), **collective costs** ([Part III](../collectives/11-primitives-properties.md)), **parallelism strategies** ([Part IV](../parallelism/14-data-parallelism-associativity.md)), **memory management** ([Part V](../memory/19-memory-equation.md)), **composition** ([Part VI](../composition/23-device-mesh.md)), and **efficiency techniques** ([Part VII](../efficiency/28-gradient-compression.md)). Now we apply this knowledge: diagnose real systems, investigate bottlenecks, and analyze state-of-the-art training runs.
 

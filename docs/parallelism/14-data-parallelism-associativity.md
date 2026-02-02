@@ -12,7 +12,7 @@ Data parallelism works because gradient accumulation is associative. This isn't 
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $B$ = global batch, $b$ = per-GPU batch, $P$ = GPUs.
+**Notation in this chapter:** $\Psi$ = parameters, $B$ = global batch, $b$ = per-GPU batch, $P$ = GPUs. See [Notation](../appendices/notation.md).
 </div>
 
 !!! abstract "Building On: Part III Collectives"
