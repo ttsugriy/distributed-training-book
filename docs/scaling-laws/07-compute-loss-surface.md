@@ -11,6 +11,10 @@ Loss is a function of two investments: model size and training data. Understandi
 **The Question**: You have a fixed compute budget C. Should you train a larger model on less data or a smaller model on more data? The loss surface tells us there's an optimal allocation—and most models before 2022 got it wrong.
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $C$ = total compute, $\alpha,\beta$ = scaling exponents.
+</div>
+
 !!! abstract "Building On: Part I Foundations"
     This part assumes familiarity with the **three walls** (memory, time, cost) from [Chapter 1](../foundations/01-scale-imperative.md), the **extended roofline** model from [Chapter 2](../foundations/02-extended-roofline.md), and the **estimation mindset** from [Chapter 6](../foundations/06-estimation-discipline.md). We'll now ask: given that we must distribute training, how do we allocate our compute budget optimally between model size and training data?
 
@@ -20,17 +24,17 @@ In 2020, researchers at OpenAI made a remarkable observation: language model los
 
 This isn't obvious. Complex systems often exhibit chaotic behavior. But neural language models, across many orders of magnitude, follow:
 
-$$L(\Psi) = \left(\frac{\Psi_c}{\Psi}\right)^{\alpha_N}$$
+$$L(\Psi) = \left(\frac{\Psi_c}{\Psi}\right)^{\alpha_{\Psi}}$$
 
 $$L(D) = \left(\frac{D_c}{D}\right)^{\alpha_D}$$
 
-Where $\Psi_c$, $D_c$ are critical scales and $\alpha_N$, $\alpha_D$ are power law exponents.
+Where $\Psi_c$, $D_c$ are critical scales and $\alpha_{\Psi}$, $\alpha_D$ are power law exponents.
 
 ## The Loss Surface
 
 Combining both dependencies:
 
-$$L(\Psi, D) = \left[\left(\frac{\Psi_c}{\Psi}\right)^{\alpha_N / \alpha} + \left(\frac{D_c}{D}\right)^{\alpha_D / \alpha}\right]^\alpha + L_\infty$$
+$$L(\Psi, D) = \left[\left(\frac{\Psi_c}{\Psi}\right)^{\alpha_{\Psi} / \alpha} + \left(\frac{D_c}{D}\right)^{\alpha_D / \alpha}\right]^\alpha + L_\infty$$
 
 Or in the simpler additive form often used:
 

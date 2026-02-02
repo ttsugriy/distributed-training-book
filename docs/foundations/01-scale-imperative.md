@@ -11,6 +11,10 @@ In 2017, a single GPU could train the largest language models. By 2024, the larg
 **The Question**: A model has 70 billion parameters. Each parameter is 2 bytes (FP16). That's 140GB just for weights—before gradients, optimizer states, or activations. A single H100 has 80GB of memory. How do we train this model at all?
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $B$ = batch tokens, $P$ = GPUs.
+</div>
+
 ## The Three Walls
 
 Training large models hits three fundamental limits:
