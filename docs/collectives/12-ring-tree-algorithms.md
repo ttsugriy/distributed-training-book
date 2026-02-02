@@ -555,15 +555,13 @@ Arrange processes in a 2D grid. AllReduce in two phases:
 **Phase 2**: AllReduce across rows (inter-node, slow)
 
 ```
-         Node 0           Node 1           Node 2
-        ┌───────────┐   ┌───────────┐   ┌───────────┐
-        │ G0 ↔ G1 ↔│G2↔│ G3 ↔ G4 ↔│G5↔│ G6 ↔ G7 │
-        │  ↕    ↕    │   │  ↕    ↕    │   │  ↕    ↕   │
-        │ G8 ↔ G9 ↔│...│           ...│   │          │
-        └───────────┘   └───────────┘   └───────────┘
-              ↑               ↑               ↑
-              └───────────────┼───────────────┘
-                    Inter-node ring
+Intra-node rings:
+Node 0: G0 ↔ G1 ↔ G2 ↔ G3 ↔ G0
+Node 1: G4 ↔ G5 ↔ G6 ↔ G7 ↔ G4
+Node 2: G8 ↔ G9 ↔ G10 ↔ G11 ↔ G8
+
+Inter-node ring (representatives):
+G3 ↔ G7 ↔ G11 ↔ G3
 ```
 
 **Phase 1** (intra-node): Ring AllReduce among GPUs in each node
