@@ -123,6 +123,7 @@ nav:
     - collectives/11-primitives-properties.md
     - collectives/12-ring-tree-algorithms.md
     - collectives/13-collective-cost-model.md
+    - collectives/13a-topology-aware-collectives.md
 
   - "Part IV: Parallelism from Properties":
     - parallelism/14-data-parallelism-associativity.md

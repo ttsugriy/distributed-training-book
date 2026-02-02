@@ -457,6 +457,9 @@ Always validate your model against measurements.
 3. **Protocol effects**: Small message protocol overhead
 4. **GPU memory pressure**: Thrashing affects copy bandwidth
 
+!!! tip "Next"
+    This chapter assumed a uniform network. The next chapter, [Topology-Aware Collectives](13a-topology-aware-collectives.md), extends the model to hierarchical topologies and contention-aware scheduling.
+
 ## Exercises
 
 1. **Formula verification**: For P=16, n=100 MB, α=10μs, β=100 GB/s, calculate:

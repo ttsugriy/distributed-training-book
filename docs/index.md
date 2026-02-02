@@ -84,7 +84,7 @@ The book is structured in eight parts that build on each other:
 |------|-------|----------|-------|
 | I | Foundations | 1–6 | Mental models—roofline, communication costs, estimation |
 | II | Scaling Laws | 7–10 | Compute budgets, model sizing, data sizing |
-| III | The Algebra of Collectives | 11–13 | Communication primitives as algebraic operations |
+| III | The Algebra of Collectives | 11–13a | Communication primitives as algebraic operations |
 | IV | Parallelism from Properties | 14–18 | Deriving each strategy from mathematical foundations |
 | V | Memory as a Dimension | 19–22 | Techniques that trade communication for memory |
 | VI | Composition and Resilience | 23–27 | Combining strategies and handling failures |

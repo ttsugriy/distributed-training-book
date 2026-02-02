@@ -476,6 +476,9 @@ $$n^* \approx \frac{10^{-6} \times 10^{11} \times 64}{6 - 1} = \frac{6.4 \times 
 - Messages < ~1.2 MB: use tree
 - Messages > ~1.2 MB: use ring
 
+!!! tip "Topology changes the crossover"
+    The crossover above assumes a uniform network. On hierarchical clusters, apply the topology-aware decision procedure in [Chapter 13a](13a-topology-aware-collectives.md).
+
 ### Visualization
 
 ```
