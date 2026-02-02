@@ -97,6 +97,9 @@ When $I_{\text{net}}$ is low:
 - Techniques: Gradient compression, overlap, reduced precision communication
 - Example: Gradient synchronization, parameter servers
 
+!!! note "Practice"
+    If NCCL/communication is >30% of step time, estimate $I_{\text{net}}$ and compare to the ridge point. For H100 + 400 Gbps InfiniBand, $I_{\text{ridge}} \approx 20k$ FLOPs/byte. Below that, increase batch/accumulation or move low-intensity collectives to faster links.
+
 ## Calculating Communication Intensity
 
 For different parallelism strategies:

@@ -70,6 +70,9 @@ For $D$ tokens:
 
 $$C = 6\Psi D \text{ FLOPs}$$
 
+!!! note "Practice"
+    If your budget is fixed, compute $(\Psi, D)$ pairs from $C = 6\Psi D$ first, then decide whether you are training for loss (Chinchilla) or for inference cost (overtrain smaller models).
+
 This creates a **constraint surface** in $(\Psi, D, C)$ space. For fixed $C$, we get a hyperbola:
 
 $$D = \frac{C}{6\Psi}$$

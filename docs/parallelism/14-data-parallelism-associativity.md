@@ -202,6 +202,9 @@ For FP16 training:
 
 $$R = \frac{3b \cdot \beta}{2F}$$
 
+!!! note "Practice"
+    If scaling stalls, compute $R$ with your actual $b$, $F$, and network $\beta$. When $R < 1$, you're communication-bound—increase local batch, accumulate gradients, or move to hierarchical AllReduce.
+
 **Example**: H100 with $F = 2 \times 10^{15}$ FLOP/s, NVLink $\beta = 900$ GB/s:
 
 $$R = \frac{3b \cdot 900 \times 10^9}{2 \times 2 \times 10^{15}} = \frac{3b \cdot 900}{4 \times 10^6} = \frac{675b}{10^6}$$

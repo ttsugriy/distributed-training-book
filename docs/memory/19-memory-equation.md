@@ -120,6 +120,9 @@ For mixed-precision training with AdamW:
 
 $$M_{\text{model}} = 16\Psi \text{ bytes}$$
 
+!!! note "Practice"
+    Before a large run, compute $16\Psi$ and compare it to GPU HBM. If $16\Psi$ > HBM, you must shard or offload before tuning batch size.
+
 For 7B parameters: $16 \times 7 \times 10^9 = 112$ GB
 
 **This is why training a 7B model requires ~8× the memory of just storing the weights.**

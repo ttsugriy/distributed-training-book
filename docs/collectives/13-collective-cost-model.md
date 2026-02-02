@@ -72,6 +72,9 @@ $$T_{\text{AllReduce}}^{\text{tree}} = 2\log_2 P \cdot \alpha + 2\log_2 P \cdot 
 
 $$T_{\text{AllReduce}}^{\text{RHD}} = 2\log_2 P \cdot \alpha + 2 \cdot \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
+!!! note "Practice"
+    Compare measured NCCL time to the formula above. If you're <70% of the model, you're likely latency-bound (too many small buckets) or bandwidth-bound (contention). Use bigger buckets for latency, or reduce overlap contention for bandwidth.
+
 ### AllGather
 
 **Ring algorithm**:
