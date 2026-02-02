@@ -80,7 +80,7 @@ Let:
 | Strategy | Memory | Forward Passes |
 |----------|--------|----------------|
 | Store all | $O(L)$ | $1$ |
-| Store none | $O(1)$ | $O(L)$ |
+| Store none | $O(1)$ | $\approx 2$ (one extra forward) |
 | Checkpoint every $\sqrt{L}$ | $O(\sqrt{L})$ | $\approx 2$ |
 
 The optimal checkpoint interval minimizes total cost.
@@ -133,7 +133,7 @@ class FullRecomputeFunction(torch.autograd.Function):
 ```
 
 **Memory**: $O(1)$—only input and current layer.
-**Compute**: $O(L)$ forward passes—one full recomputation.
+**Compute**: ~1 extra forward pass (≈33% overhead in practice).
 **Problem**: Too expensive for large $L$.
 
 ### Strategy 2: Uniform Checkpointing
@@ -702,7 +702,7 @@ def estimate_activation_memory(
         batch_size: Batch size
         seq_length: Sequence length
         checkpoint_strategy: 'none', 'full', 'sqrt', or 'selective'
-        checkpoint_attention: Whether to checkpoint attention scores
+        checkpoint_attention: Whether to checkpoint attention scores (recompute instead of storing)
         dtype_bytes: Bytes per element (2 for FP16)
 
     Returns:
@@ -711,13 +711,17 @@ def estimate_activation_memory(
     B, S, H, n, L = batch_size, seq_length, hidden_dim, num_heads, num_layers
 
     # Per-layer activation memory (without attention scores)
-    # Input, Q, K, V, attention output, FFN intermediate, output
-    linear_per_layer = (2 + 3 + 1 + 4 + 1) * B * S * H * dtype_bytes  # ~11 BSH
+    # Input, Q, K, V, attention output, FFN intermediate, misc
+    linear_per_layer = 20 * B * S * H * dtype_bytes  # ~20 BSH
 
     # Attention scores and softmax output
     attention_per_layer = 2 * B * n * S * S * dtype_bytes  # 2 * BnS²
 
-    if checkpoint_attention:
+    if checkpoint_strategy == 'none':
+        # Store everything (no recomputation)
+        stored_per_layer = linear_per_layer + attention_per_layer
+        recompute_per_layer = 0
+    elif checkpoint_attention:
         # Store Q, K, V; recompute scores
         stored_per_layer = linear_per_layer
         recompute_per_layer = attention_per_layer
@@ -734,7 +738,7 @@ def estimate_activation_memory(
     elif checkpoint_strategy == 'full':
         # Store only input, recompute all
         total_stored = B * S * H * dtype_bytes  # Just input
-        peak_recompute = L * stored_per_layer  # Need to hold during recompute
+        peak_recompute = stored_per_layer + recompute_per_layer  # One layer at a time
 
     elif checkpoint_strategy == 'sqrt':
         # Optimal sqrt(L) checkpointing
@@ -792,10 +796,10 @@ for strategy in strategies:
 
 Output:
 ```
-none      : 180.5 GB
-sqrt      : 45.1 GB  (4× reduction)
-selective : 90.3 GB  (2× reduction)
-full      : 5.6 GB   (32× reduction)
+none      : 104.0 GB
+sqrt      : 20.0 GB  (5× reduction)
+selective : 21.3 GB  (~5× reduction)
+full      : 3.3 GB   (~31× reduction)
 ```
 
 ## Practical Implementation Guide
@@ -981,46 +985,43 @@ model.gradient_checkpointing_enable()
     | FFN output | 64 MB | 4% |
     | **Total** | **2624 MB** | **100%** |
 
-    **Mixed strategy: Checkpoint attention scores, recompute FFN**
+    **Mixed strategy: Store Q/K/V, recompute attention scores + FFN**
 
     Store:
-    - Attention scores: 2048 MB (most expensive to recompute)
+    - Q, K, V: 192 MB
     - Layer input: 64 MB (for recomputing FFN)
 
     Recompute:
+    - Attention scores + softmax: 2048 MB saved
     - FFN activations: 320 MB saved
-    - Q, K, V: 192 MB saved
 
     **Memory per layer:**
-    $$M_{\text{mixed}} = 2048 + 64 = 2112 \text{ MB}$$
+    $$M_{\text{mixed}} = 192 + 64 = 256 \text{ MB}$$
 
     **Comparison:**
 
     | Strategy | Memory/Layer | Relative | Recompute Overhead |
     |----------|--------------|----------|-------------------|
     | No checkpointing | 2624 MB | 1.00× | 0% |
-    | Mixed (save attn scores) | 2112 MB | 0.80× | ~10% |
+    | Mixed (store QKV) | 256 MB | 0.10× | ~20% |
     | Full checkpointing | 64 MB | 0.02× | 33% |
 
     **When to use mixed strategy:**
 
     ```python
     class MixedCheckpointAttention(nn.Module):
-        """Saves attention scores, recomputes Q/K/V and FFN."""
+        """Stores Q/K/V, recomputes attention scores and FFN."""
 
         def forward(self, x):
-            # Compute and checkpoint attention scores
             q, k, v = self.qkv_proj(x).chunk(3, dim=-1)
 
-            # Save attention scores (expensive to recompute)
-            attn_scores = torch.einsum('bshd,bthd->bhst', q, k)
-            attn_scores = attn_scores / math.sqrt(self.head_dim)
+            def attn_core(q, k, v):
+                scores = torch.einsum('bshd,bthd->bhst', q, k) / math.sqrt(self.head_dim)
+                probs = torch.softmax(scores, dim=-1)
+                return torch.einsum('bhst,bthd->bshd', probs, v)
 
-            # Use custom autograd to save only scores
-            attn_probs = CheckpointedSoftmax.apply(attn_scores)
-
-            # Attention output
-            attn_out = torch.einsum('bhst,bthd->bshd', attn_probs, v)
+            # Recompute attention core in backward (scores not stored)
+            attn_out = checkpoint(attn_core, q, k, v, use_reentrant=False)
 
             # FFN with recomputation (cheap)
             return checkpoint(self.ffn, attn_out, use_reentrant=False)

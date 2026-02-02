@@ -301,11 +301,12 @@ For Adam optimizer with fp16 training, let $\Phi$ denote the number of model par
 | Component | Without Offload | With Offload |
 |-----------|-----------------|--------------|
 | Parameters (fp16) | 2Φ bytes | 2Φ bytes (GPU) |
-| Gradients (fp16) | 2Φ bytes | 2Φ bytes → 0 (after transfer) |
+| Gradients (fp16) | 2Φ bytes | 2Φ bytes (peak during backward) → 0 (after transfer) |
 | Master weights (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
 | Adam m (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
 | Adam v (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
-| **Total GPU** | **16Φ bytes** | **4Φ bytes** |
+| **Total GPU (steady-state)** | **16Φ bytes** | **2Φ bytes** |
+| **Total GPU (peak)** | **16Φ bytes** | **4Φ bytes** |
 
 **Memory reduction**: 4× on GPU memory.
 
@@ -438,7 +439,10 @@ class NVMeOffloadManager:
             )
 
             # Write initial values
-            mmap[:] = param.data.cpu().numpy()
+            if param.dtype == torch.bfloat16:
+                mmap[:] = param.data.cpu().view(torch.uint16).numpy()
+            else:
+                mmap[:] = param.data.cpu().numpy()
             mmap.flush()
 
             self.mmap_files[name] = mmap
@@ -461,7 +465,7 @@ class NVMeOffloadManager:
         mapping = {
             torch.float32: np.float32,
             torch.float16: np.float16,
-            torch.bfloat16: np.float16,  # Approximate
+            torch.bfloat16: np.uint16,  # Store raw bits
             torch.int32: np.int32,
             torch.int64: np.int64,
         }
@@ -471,13 +475,16 @@ class NVMeOffloadManager:
         """Asynchronously load parameter from NVMe."""
         mmap = self.mmap_files[name]
         buffer = self.prefetch_buffers[name]
+        shape, dtype, _ = self.param_info[name]
 
         # Async copy from mmap to buffer
         # In practice, use aiofiles or io_uring
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            lambda: buffer.copy_(torch.from_numpy(np.array(mmap)))
+            lambda: buffer.copy_(
+                torch.from_numpy(np.array(mmap)).view(dtype) if dtype == torch.bfloat16 else torch.from_numpy(np.array(mmap))
+            )
         )
 
         return buffer
@@ -485,11 +492,12 @@ class NVMeOffloadManager:
     async def _async_save(self, name: str, data: torch.Tensor):
         """Asynchronously save parameter to NVMe."""
         mmap = self.mmap_files[name]
+        _, dtype, _ = self.param_info[name]
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
-            lambda: np.copyto(mmap, data.cpu().numpy())
+            lambda: np.copyto(mmap, data.cpu().view(torch.uint16).numpy() if dtype == torch.bfloat16 else data.cpu().numpy())
         )
         mmap.flush()
 
@@ -746,9 +754,9 @@ $$\frac{12H^2 \cdot 2}{32 \times 10^9} \leq \frac{24BSH^2}{312 \times 10^{12}}$$
 
 Solving:
 
-$$BS \geq \frac{312 \times 10^{12} \cdot 24}{32 \times 10^9 \cdot 24} \approx 406$$
+$$BS \geq \frac{312 \times 10^{12}}{32 \times 10^9} \approx 9{,}750$$
 
-With batch size 1 and sequence 2048, overlap is achievable.
+With batch size 1 and sequence 2048, overlap is **not** achievable; you need larger $B \cdot S$ or faster interconnects.
 
 ## Complete Offloading System
 

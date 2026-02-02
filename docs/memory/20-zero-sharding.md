@@ -190,7 +190,7 @@ Instead of AllReduce → AllGather, use:
 
 **Total**: $\frac{4(P-1)\Psi}{P}$ bytes—same as AllReduce!
 
-**Key insight**: ZeRO-1 has **zero communication overhead** with the right collective pattern.
+**Key insight**: ZeRO-1 can have **no extra bandwidth overhead** relative to standard DP if you replace AllReduce with ReduceScatter + AllGather.
 
 ## ZeRO Stage 2: Gradient Sharding
 
@@ -267,7 +267,7 @@ $$\rho_2 = \frac{16\Psi}{2\Psi + 14\Psi/P} = \frac{16P}{2P + 14} = \frac{8P}{P +
 - Local computation on gradient shards
 - AllGather updated parameters: $\frac{(P-1) \cdot 2\Psi}{P}$ bytes
 
-**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—**still zero overhead!**
+**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—roughly **2×** standard DP bandwidth, trading communication for memory savings.
 
 ### Bucketing for Efficiency
 
@@ -960,7 +960,7 @@ Each stage has its own ZeRO group for sharding.
     | ZeRO-2 (8 GPUs) | 48.75 GB | Yes |
     | ZeRO-3 (32 GPUs) | 6.5 GB | Yes (room for activations) |
 
-2. **Communication volume**: Derive the exact communication volume for one training step with ZeRO-2. Show that it equals standard AllReduce volume.
+2. **Communication volume**: Derive the exact communication volume for one training step with ZeRO-2 and compare it to standard AllReduce.
 
 ??? success "Solution"
     **Standard Data Parallel (AllReduce):**
@@ -988,30 +988,12 @@ Each stage has its own ZeRO group for sharding.
     **Total ZeRO-2 volume:**
     $$V_{\text{ZeRO-2}} = 2\Psi \times \frac{P-1}{P} + 2\Psi \times \frac{P-1}{P} = 4\Psi \times \frac{P-1}{P}$$
 
-    Wait—this is 2× AllReduce! Let me reconsider...
+    **Comparison:**
 
-    **Correction:** ZeRO-2 only shards gradients and optimizer states. Parameters are updated in place (each GPU updates its own shard), so:
+    - Standard AllReduce: $2\Psi \times \frac{P-1}{P}$
+    - ZeRO-2 (ReduceScatter grads + AllGather params): $4\Psi \times \frac{P-1}{P}$
 
-    - ReduceScatter: $2\Psi \times \frac{P-1}{P}$ (gradients)
-    - No AllGather needed for ZeRO-2 (parameters remain sharded during optimizer step, then AllGather only if needed)
-
-    Actually, for ZeRO-2 during a step:
-    1. Gradients: ReduceScatter = $2\Psi \times \frac{P-1}{P}$
-    2. Parameters: Already replicated (no communication)
-
-    $$V_{\text{ZeRO-2}} = 2\Psi \times \frac{P-1}{P} \approx 2\Psi$$
-
-    **This equals standard AllReduce!** $\boxed{V_{\text{ZeRO-2}} = V_{\text{AllReduce}}}$
-
-    **Proof of equivalence:**
-
-    | Operation | AllReduce | ZeRO-2 |
-    |-----------|-----------|--------|
-    | Algorithm | Ring AllReduce | ReduceScatter |
-    | Data moved | $2\Psi \cdot \frac{P-1}{P}$ | $2\Psi \cdot \frac{P-1}{P}$ |
-    | Latency | $2(P-1)\alpha$ | $(P-1)\alpha$ |
-
-    ZeRO-2 actually has *lower* latency (half the steps) with identical bandwidth!
+    **Conclusion:** ZeRO-2 typically doubles bandwidth relative to standard DP, but enables substantial memory savings.
 
 3. **Breakeven analysis**: At what batch size does ZeRO-3's communication overhead become negligible compared to compute time? Assume $\alpha = 10\mu s$, $\beta = 100$ GB/s, and compute throughput of 150 TFLOPs.
 
@@ -1405,8 +1387,8 @@ Each stage has its own ZeRO group for sharding.
 
 2. **Three stages with different trade-offs**:
 
-   - ZeRO-1: 4× memory savings, zero communication overhead
-   - ZeRO-2: 8× savings, zero overhead
+   - ZeRO-1: 4× memory savings, no *additional* bandwidth if using RS+AG
+   - ZeRO-2: 8× savings, typically ~2× communication vs standard DP
    - ZeRO-3: Linear scaling, 50% overhead
 
 3. **ZeRO-3 enables arbitrary model sizes**: With enough GPUs, any model fits.

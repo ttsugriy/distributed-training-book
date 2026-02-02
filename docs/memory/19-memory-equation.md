@@ -725,18 +725,11 @@ Only 12.5% of memory holds actual model parameters!
 2. **Activation dominance**: At what sequence length do attention activations exceed linear activations for a model with H=4096, A=32?
 
 ??? success "Solution"
-    **Linear (non-attention) activations per token:**
+    **Linear (non-attention) activations per layer:**
 
-    For a transformer layer, linear activations include:
-    - LayerNorm outputs: $2H$ (two LayerNorms)
-    - FFN intermediate: $4H$ (typical expansion)
-    - Residual connections: $2H$
+    From the main derivation, the linear term is approximately:
 
-    $$M_{\text{linear}} \approx 8H \text{ bytes per token (bf16)}$$
-
-    With $B$ batch, $S$ sequence:
-
-    $$M_{\text{linear}} = 2 \times 8 \times B \times S \times H = 16BSH \text{ bytes}$$
+    $$M_{\text{linear}} \approx 11BSH \text{ elements} \;\; \Rightarrow \;\; 22BSH \text{ bytes (bf16)}$$
 
     **Attention activations per layer:**
 
@@ -750,25 +743,25 @@ Only 12.5% of memory holds actual model parameters!
 
     Attention exceeds linear when:
 
-    $$2BAS^2 > 16BSH$$
+    $$2BAS^2 > 22BSH$$
 
-    $$AS^2 > 8SH$$
+    $$AS^2 > 11SH$$
 
-    $$S > \frac{8H}{A}$$
+    $$S > \frac{11H}{A}$$
 
     With $H = 4096$, $A = 32$:
 
-    $$S > \frac{8 \times 4096}{32} = \frac{32768}{32} = \boxed{1024}$$
+    $$S > \frac{11 \times 4096}{32} = \frac{45056}{32} = \boxed{1408}$$
 
     **Interpretation:**
 
     | Sequence Length | Dominant Component | Ratio (Attn/Linear) |
     |-----------------|-------------------|---------------------|
-    | 512 | Linear | 0.5× |
-    | 1024 | Equal | 1.0× |
-    | 2048 | Attention | 2.0× |
-    | 4096 | Attention | 4.0× |
-    | 8192 | Attention | 8.0× |
+    | 512 | Linear | 0.36× |
+    | 1024 | Linear | 0.73× |
+    | 2048 | Attention | 1.45× |
+    | 4096 | Attention | 2.91× |
+    | 8192 | Attention | 5.82× |
 
     For modern long-context models with $S = 8192+$, attention activations dominate heavily.
 
@@ -786,35 +779,23 @@ Only 12.5% of memory holds actual model parameters!
     **Available for activations:**
     $$M_{\text{avail}} = 40 - 14 - 2 \text{ (overhead)} = 24\text{ GB}$$
 
-    **Activation memory per token (7B model, ~32 layers, H≈4096):**
+    **Activation memory per layer (bf16):**
 
-    Using the formula: $M_{\text{act}}^{\text{layer}} \approx BSH \cdot (34 + 5\frac{AS}{H})$
+    Using the main estimate: $M_{\text{act}}^{\text{layer}} \approx (11BSH + BAS^2) \times 2$ bytes.
 
-    For 7B: $L \approx 32$, $H \approx 4096$, $A \approx 32$
+    For 7B: $L \approx 32$, $H \approx 4096$, $A \approx 32$, $S=2048$:
 
-    Per layer: $M_{\text{act}}^{\text{layer}} = BS \times 4096 \times (34 + 5 \times \frac{32 \times 2048}{4096})$
-    $$= BS \times 4096 \times (34 + 80) = BS \times 4096 \times 114$$
+    $$M_{\text{act}}^{\text{layer}} \approx B \times 0.45 \text{ GB}$$
 
-    Total (32 layers, with checkpointing every 4 layers):
+    With checkpointing every 4 layers, approximate peak:
 
-    $$M_{\text{act}} \approx 8 \times BS \times 4096 \times 114 \times 2 \text{ bytes} \approx 7.5 \times BS \text{ GB}$$
+    $$M_{\text{act}} \approx \left(\frac{L}{4} + 4\right) \times 0.45B \approx 5.4B \text{ GB}$$
 
     **Solving for batch size:**
-    $$7.5 \times B \times 2048 \leq 24 \times 10^9$$
 
-    $$B \leq \frac{24 \times 10^9}{7.5 \times 2048} \approx 1560$$
+    $$5.4B \leq 24 \quad \Rightarrow \quad B \leq 4.4$$
 
-    Wait, let me recalculate more carefully.
-
-    **Simplified activation estimate:**
-    Per token across all layers: ~1.5 KB (with aggressive checkpointing)
-    $$M_{\text{act}} = B \times S \times 1.5\text{ KB} = B \times 2048 \times 1500 = 3.07B \text{ MB}$$
-
-    $$3.07B \text{ MB} \leq 24,000 \text{ MB}$$
-
-    $$B \leq 7.8$$
-
-    **Maximum batch size:** $\boxed{B = 7}$ (or 8 with micro-batching)
+    **Maximum batch size:** $\boxed{B = 4}$ (or 5 with careful tuning)
 
     **Practical verification:**
     - Total tokens per step: $7 \times 2048 = 14,336$ tokens
