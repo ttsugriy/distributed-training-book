@@ -613,7 +613,7 @@ class ZeROWithCheckpointing:
 
 **Combined memory**:
 
-- Model state: $16N/P$ (ZeRO-3)
+- Model state: $16\Psi/P$ (ZeRO-3)
 - Activations: $O(\sqrt{L})$ (checkpointing)
 
 ### Checkpointing + Tensor Parallelism

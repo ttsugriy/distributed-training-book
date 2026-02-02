@@ -232,7 +232,7 @@ class DeepSeekMoE(nn.Module):
 
 Standard MoE uses an auxiliary loss to encourage balanced expert utilization:
 
-$$\mathcal{L}_{\text{aux}} = \alpha \sum_{i=1}^{N} f_i \cdot P_i$$
+$$\mathcal{L}_{\text{aux}} = \alpha \sum_{i=1}^{E} f_i \cdot P_i$$
 
 Where $f_i$ is the fraction of tokens routed to expert $i$, and $P_i$ is the average routing probability.
 
@@ -642,7 +642,7 @@ config = {
 
 **Theoretical FLOPs per step**:
 
-$$F = 6 \times N_{\text{active}} \times T_{\text{batch}} = 6 \times 37\text{B} \times 4\text{M} = 8.9 \times 10^{17}$$
+$$F = 6 \times \Psi_{\text{active}} \times T_{\text{batch}} = 6 \times 37\text{B} \times 4\text{M} = 8.9 \times 10^{17}$$
 
 **Hardware capacity**:
 
@@ -951,7 +951,7 @@ if __name__ == "__main__":
 
     For $\mathcal{N}(0, 0.02)$ with 10M weights:
 
-    $$\max(|w|) \approx \sigma \times \sqrt{2\ln N} = 0.02 \times \sqrt{2\ln 10^7} \approx 0.02 \times 5.7 = 0.114$$
+$$\max(|w|) \approx \sigma \times \sqrt{2\ln n} = 0.02 \times \sqrt{2\ln 10^7} \approx 0.02 \times 5.7 = 0.114$$
 
     Scale: $s = \frac{0.114}{448} = 2.54 \times 10^{-4}$
 
@@ -1234,17 +1234,17 @@ if __name__ == "__main__":
 
     **Chinchilla-optimal dense model:**
 
-    Chinchilla scaling: $N_{opt} = 0.7 \times D^{0.5}$ (approximate)
+    Chinchilla scaling: $\Psi_{opt} = 0.7 \times D^{0.5}$ (approximate)
 
     For equivalent compute budget with dense model:
 
-    $$C = 6ND$$
+    $$C = 6\Psi D$$
 
-    Given C = $3.29 \times 10^{24}$ FLOPs and Chinchilla ratio $D = 20N$:
+Given C = $3.29 \times 10^{24}$ FLOPs and Chinchilla ratio $D = 20\Psi$:
 
-    $$3.29 \times 10^{24} = 6 \times N \times 20N = 120N^2$$
+$$3.29 \times 10^{24} = 6 \times \Psi \times 20\Psi = 120\Psi^2$$
 
-    $$N = \sqrt{\frac{3.29 \times 10^{24}}{120}} = 165B \text{ parameters}$$
+$$\Psi = \sqrt{\frac{3.29 \times 10^{24}}{120}} = 165B \text{ parameters}$$
 
     **But wait—MoE uses fewer FLOPs per token!**
 

@@ -311,11 +311,11 @@ For Adam optimizer with fp16 training, let $\Phi$ denote the number of model par
 
 ### Bandwidth Requirements
 
-For a step to complete in time $T$, let $N$ be the number of parameters:
+For a step to complete in time $T$, let $\Psi$ be the number of parameters:
 
-$$\text{Gradient transfer}: \frac{4N}{B_{\text{PCIe}}} < T_{\text{backward}}$$
+$$\text{Gradient transfer}: \frac{4\Psi}{B_{\text{PCIe}}} < T_{\text{backward}}$$
 
-$$\text{Weight transfer}: \frac{2N}{B_{\text{PCIe}}} < T_{\text{forward}}$$
+$$\text{Weight transfer}: \frac{2\Psi}{B_{\text{PCIe}}} < T_{\text{forward}}$$
 
 Where $B_{\text{PCIe}}$ is the PCIe bandwidth (32 GB/s for Gen4).
 
@@ -347,7 +347,7 @@ DeepSpeed's ZeRO-Infinity extends offloading to NVMe:
 │        │ Prefetch                                            │
 │  CPU:  ▼                                                     │
 │  ┌────────────────────────────────────────────────────┐      │
-│  │ Prefetch Buffer: Next N layers                     │      │
+│  │ Prefetch Buffer: Next $N$ layers                   │      │
 │  │ Optimizer State Partition (if CPU offload)         │      │
 │  └────────────────────────────────────────────────────┘      │
 │        ▲                                                     │
@@ -1261,7 +1261,7 @@ PP naturally stages memory across time. Combine with offloading:
 
     1. **CUDA events** instead of stream sync: ~0.1ms
     2. **Pinned memory**: Eliminates page fault overhead
-    3. **Fewer sync points**: Sync every N layers instead of every layer
+    3. **Fewer sync points**: Sync every $N$ layers instead of every layer
 
 4. **Double buffering**: Implement triple buffering for parameter loading. When would this be beneficial over double buffering?
 

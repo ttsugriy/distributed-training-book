@@ -134,9 +134,9 @@ Key cost optimizations:
 1. Calculate the GPU-hour cost to train a 70B dense model for 2T tokens on H100s at $4/hr, assuming 45% MFU.
 
 ??? success "Solution"
-    **Total FLOPs required** (using the $6ND$ approximation where $N$ = parameters, $D$ = tokens):
+    **Total FLOPs required** (using the $6\Psi D$ approximation where $\Psi$ = parameters, $D$ = tokens):
 
-    $$F_{\text{total}} = 6 \times N \times D = 6 \times 70 \times 10^9 \times 2 \times 10^{12} = 8.4 \times 10^{23} \text{ FLOPs}$$
+    $$F_{\text{total}} = 6 \times \Psi \times D = 6 \times 70 \times 10^9 \times 2 \times 10^{12} = 8.4 \times 10^{23} \text{ FLOPs}$$
 
     **Effective compute per GPU-hour:**
 

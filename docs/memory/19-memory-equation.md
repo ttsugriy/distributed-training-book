@@ -63,11 +63,11 @@ Model state memory is persistent throughout training. It holds everything needed
 
 The model weights themselves:
 
-$$M_{\text{params}} = N \times b_p$$
+$$M_{\text{params}} = \Psi \times b_p$$
 
 where:
 
-- $N$ = number of parameters
+- $\Psi$ = number of parameters
 - $b_p$ = bytes per parameter (2 for fp16/bf16, 4 for fp32)
 
 **Example**: 7B parameters in fp16 = $7 \times 10^9 \times 2$ = 14 GB
@@ -76,7 +76,7 @@ where:
 
 During backward pass, gradients are computed and accumulated:
 
-$$M_{\text{grads}} = N \times b_g$$
+$$M_{\text{grads}} = \Psi \times b_g$$
 
 Gradients are typically stored in the same precision as parameters.
 
@@ -88,18 +88,18 @@ Optimizers maintain additional state per parameter.
 
 **SGD with momentum**:
 
-- Momentum buffer: $N \times b_m$ bytes
+- Momentum buffer: $\Psi \times b_m$ bytes
 
-$$M_{\text{opt}}^{\text{SGD}} = N \times b_m$$
+$$M_{\text{opt}}^{\text{SGD}} = \Psi \times b_m$$
 
 **Adam/AdamW**:
 
-- First moment ($m$): $N \times b_m$ bytes
-- Second moment ($v$): $N \times b_v$ bytes
+- First moment ($m$): $\Psi \times b_m$ bytes
+- Second moment ($v$): $\Psi \times b_v$ bytes
 
 Both moments are typically fp32 for numerical stability:
 
-$$M_{\text{opt}}^{\text{Adam}} = 2 \times N \times 4 = 8N \text{ bytes}$$
+$$M_{\text{opt}}^{\text{Adam}} = 2 \times \Psi \times 4 = 8\Psi \text{ bytes}$$
 
 ### The Model State Equation
 
@@ -114,7 +114,7 @@ For mixed-precision training with AdamW:
 | Second moment | fp32 | 4 |
 | **Total** | | **16** |
 
-$$M_{\text{model}} = 16N \text{ bytes}$$
+$$M_{\text{model}} = 16\Psi \text{ bytes}$$
 
 For 7B parameters: $16 \times 7 \times 10^9 = 112$ GB
 
@@ -289,7 +289,7 @@ $$M_{\text{total}} = M_{\text{model}} + M_{\text{act}} + M_{\text{temp}} + M_{\t
 
 Expanding each term:
 
-$$M_{\text{total}} = \underbrace{16N}_{\text{model state}} + \underbrace{2LBSH(11 + S/128)}_{\text{activations}} + \underbrace{M_{\text{workspace}}}_{\text{temporary}} + \underbrace{f \cdot M_{\text{peak}}}_{\text{fragmentation}}$$
+$$M_{\text{total}} = \underbrace{16\Psi}_{\text{model state}} + \underbrace{2LBSH(11 + S/128)}_{\text{activations}} + \underbrace{M_{\text{workspace}}}_{\text{temporary}} + \underbrace{f \cdot M_{\text{peak}}}_{\text{fragmentation}}$$
 
 where $f$ is the fragmentation factor (typically 5-20%).
 
@@ -297,7 +297,7 @@ where $f$ is the fragmentation factor (typically 5-20%).
 
 Model specifications:
 
-- Parameters: $N = 7 \times 10^9$
+- Parameters: $\Psi = 7 \times 10^9$
 - Layers: $L = 32$
 - Hidden: $H = 4096$
 - Heads: $A = 32$
@@ -332,11 +332,11 @@ This exceeds the 80GB of an A100! Hence the need for memory optimization techniq
 
 Model state scales linearly with parameters:
 
-$$M_{\text{model}} \propto N$$
+$$M_{\text{model}} \propto \Psi$$
 
-Activation memory scales with $N$ as well (since $H \propto \sqrt{N}$ and $L \propto \sqrt{N}$ typically):
+Activation memory scales with $\Psi$ as well (since $H \propto \sqrt{\Psi}$ and $L \propto \sqrt{\Psi}$ typically):
 
-$$M_{\text{act}} \propto L \cdot H \propto N$$
+$$M_{\text{act}} \propto L \cdot H \propto \Psi$$
 
 **Total memory scales linearly with model size** (for fixed batch and sequence).
 
@@ -666,11 +666,11 @@ def validate_memory_estimate(model, batch, estimate):
 
 Define memory efficiency as:
 
-$$\eta_{\text{mem}} = \frac{M_{\text{params}}}{M_{\text{total}}} = \frac{N \cdot b_p}{M_{\text{total}}}$$
+$$\eta_{\text{mem}} = \frac{M_{\text{params}}}{M_{\text{total}}} = \frac{\Psi \cdot b_p}{M_{\text{total}}}$$
 
 For standard training with AdamW:
 
-$$\eta_{\text{mem}} = \frac{2N}{16N + M_{\text{act}}} \approx \frac{2}{16} = 12.5\%$$
+$$\eta_{\text{mem}} = \frac{2\Psi}{16\Psi + M_{\text{act}}} \approx \frac{2}{16} = 12.5\%$$
 
 Only 12.5% of memory holds actual model parameters!
 

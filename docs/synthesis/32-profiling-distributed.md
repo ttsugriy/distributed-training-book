@@ -562,7 +562,7 @@ def calculate_mfu(
     return achieved_flops / peak_flops
 
 # Example: GPT-3 175B on 1024 A100s
-model_flops = 6 * 175e9 * 2048  # ~2.15e15 FLOPs per sample (6 * N * seq_len)
+model_flops = 6 * 175e9 * 2048  # ~2.15e15 FLOPs per sample (6 * Psi * seq_len)
 batch_size = 1024
 step_time = 60.0  # seconds
 num_gpus = 1024

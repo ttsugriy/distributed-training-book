@@ -20,27 +20,27 @@ In 2020, researchers at OpenAI made a remarkable observation: language model los
 
 This isn't obvious. Complex systems often exhibit chaotic behavior. But neural language models, across many orders of magnitude, follow:
 
-$$L(N) = \left(\frac{N_c}{N}\right)^{\alpha_N}$$
+$$L(\Psi) = \left(\frac{\Psi_c}{\Psi}\right)^{\alpha_N}$$
 
 $$L(D) = \left(\frac{D_c}{D}\right)^{\alpha_D}$$
 
-Where $N_c$, $D_c$ are critical scales and $\alpha_N$, $\alpha_D$ are power law exponents.
+Where $\Psi_c$, $D_c$ are critical scales and $\alpha_N$, $\alpha_D$ are power law exponents.
 
 ## The Loss Surface
 
 Combining both dependencies:
 
-$$L(N, D) = \left[\left(\frac{N_c}{N}\right)^{\alpha_N / \alpha} + \left(\frac{D_c}{D}\right)^{\alpha_D / \alpha}\right]^\alpha + L_\infty$$
+$$L(\Psi, D) = \left[\left(\frac{\Psi_c}{\Psi}\right)^{\alpha_N / \alpha} + \left(\frac{D_c}{D}\right)^{\alpha_D / \alpha}\right]^\alpha + L_\infty$$
 
 Or in the simpler additive form often used:
 
-$$L(N, D) = \frac{A}{N^{\alpha}} + \frac{B}{D^{\beta}} + L_\infty$$
+$$L(\Psi, D) = \frac{A}{\Psi^{\alpha}} + \frac{B}{D^{\beta}} + L_\infty$$
 
 Where:
 
 | Symbol | Meaning | Typical Value |
 |--------|---------|---------------|
-| $N$ | Number of parameters | $10^6$ to $10^{12}$ |
+| $\Psi$ | Number of parameters | $10^6$ to $10^{12}$ |
 | $D$ | Training tokens | $10^9$ to $10^{13}$ |
 | $A$ | Parameter scaling constant | ~400 |
 | $B$ | Data scaling constant | ~400 |
@@ -54,75 +54,75 @@ The irreducible loss $L_\infty$ represents the entropy of natural language—eve
 
 Training compute is dominated by matrix multiplications. For a transformer:
 
-$$C \approx 6ND$$
+$$C \approx 6\Psi D$$
 
 **Derivation**: Each token passes through layers where:
 
-- Forward pass: ~$2N$ FLOPs (matrix multiply is $2 \times$ parameters)
-- Backward pass: ~$4N$ FLOPs (gradient computation + weight updates)
-- Total per token: ~$6N$ FLOPs
+- Forward pass: ~$2\Psi$ FLOPs (matrix multiply is $2 \times$ parameters)
+- Backward pass: ~$4\Psi$ FLOPs (gradient computation + weight updates)
+- Total per token: ~$6\Psi$ FLOPs
 
 For $D$ tokens:
 
-$$C = 6ND \text{ FLOPs}$$
+$$C = 6\Psi D \text{ FLOPs}$$
 
-This creates a **constraint surface** in $(N, D, C)$ space. For fixed $C$, we get a hyperbola:
+This creates a **constraint surface** in $(\Psi, D, C)$ space. For fixed $C$, we get a hyperbola:
 
-$$D = \frac{C}{6N}$$
+$$D = \frac{C}{6\Psi}$$
 
 ## Minimizing Loss Under Compute Constraint
 
-**Problem**: Minimize $L(N, D)$ subject to $C = 6ND$
+**Problem**: Minimize $L(\Psi, D)$ subject to $C = 6\Psi D$
 
 **Method**: Lagrange multipliers
 
 The Lagrangian:
 
-$$\mathcal{L} = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + \lambda(C - 6ND)$$
+$$\mathcal{L} = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + \lambda(C - 6\Psi D)$$
 
 Taking partial derivatives:
 
-$$\frac{\partial \mathcal{L}}{\partial N} = -\frac{A\alpha}{N^{\alpha+1}} - 6\lambda D = 0$$
+$$\frac{\partial \mathcal{L}}{\partial \Psi} = -\frac{A\alpha}{\Psi^{\alpha+1}} - 6\lambda D = 0$$
 
-$$\frac{\partial \mathcal{L}}{\partial D} = -\frac{B\beta}{D^{\beta+1}} - 6\lambda N = 0$$
+$$\frac{\partial \mathcal{L}}{\partial D} = -\frac{B\beta}{D^{\beta+1}} - 6\lambda \Psi = 0$$
 
 From the first equation:
 
-$$\lambda = -\frac{A\alpha}{6DN^{\alpha+1}}$$
+$$\lambda = -\frac{A\alpha}{6D\Psi^{\alpha+1}}$$
 
 Substituting into the second:
 
-$$\frac{B\beta}{D^{\beta+1}} = \frac{A\alpha N}{DN^{\alpha+1}} = \frac{A\alpha}{N^\alpha D}$$
+$$\frac{B\beta}{D^{\beta+1}} = \frac{A\alpha \Psi}{D\Psi^{\alpha+1}} = \frac{A\alpha}{\Psi^\alpha D}$$
 
 Therefore:
 
-$$\frac{B\beta}{D^\beta} = \frac{A\alpha}{N^\alpha}$$
+$$\frac{B\beta}{D^\beta} = \frac{A\alpha}{\Psi^\alpha}$$
 
 This says: **at the optimum, the marginal contribution to loss reduction from parameters equals that from data**.
 
 Rearranging:
 
-$$\frac{N^\alpha}{D^\beta} = \frac{A\alpha}{B\beta}$$
+$$\frac{\Psi^\alpha}{D^\beta} = \frac{A\alpha}{B\beta}$$
 
 ## The Optimal Allocation
 
-Using $C = 6ND$ to eliminate one variable:
+Using $C = 6\Psi D$ to eliminate one variable:
 
-$$N^* = \left(\frac{A\alpha}{B\beta}\right)^{\frac{\beta}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha+\beta}}$$
+$$\Psi^* = \left(\frac{A\alpha}{B\beta}\right)^{\frac{\beta}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha+\beta}}$$
 
 $$D^* = \left(\frac{B\beta}{A\alpha}\right)^{\frac{\alpha}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\alpha}{\alpha+\beta}}$$
 
-**Key insight**: Both $N^*$ and $D^*$ are power laws in $C$.
+**Key insight**: Both $\Psi^*$ and $D^*$ are power laws in $C$.
 
 If $\alpha \approx \beta$ (Chinchilla: $\alpha \approx 0.34$, $\beta \approx 0.28$):
 
-$$N^* \propto C^{0.5}, \quad D^* \propto C^{0.5}$$
+$$\Psi^* \propto C^{0.5}, \quad D^* \propto C^{0.5}$$
 
 The optimal ratio:
 
-$$\frac{D^*}{N^*} = \frac{B\beta}{A\alpha}$$
+$$\frac{D^*}{\Psi^*} = \frac{B\beta}{A\alpha}$$
 
-For Chinchilla parameters: $D^*/N^* \approx 20$
+For Chinchilla parameters: $D^*/\Psi^* \approx 20$
 
 **The 20:1 Rule**: Optimal training uses ~20 tokens per parameter.
 
@@ -130,12 +130,12 @@ For Chinchilla parameters: $D^*/N^* \approx 20$
 
 Two influential papers reached different conclusions:
 
-| Paper | $\alpha$ | $\beta$ | Optimal $N^* \propto$ | Optimal $D^* \propto$ | Tokens/Param |
+| Paper | $\alpha$ | $\beta$ | Optimal $\Psi^* \propto$ | Optimal $D^* \propto$ | Tokens/Param |
 |-------|----------|---------|----------------------|----------------------|--------------|
 | Kaplan (2020) | 0.076 | 0.095 | $C^{0.73}$ | $C^{0.27}$ | ~1.7 |
 | Chinchilla (2022) | 0.34 | 0.28 | $C^{0.50}$ | $C^{0.50}$ | ~20 |
 
-*Note: The Kaplan optimal scaling exponents (0.73, 0.27) were empirically fit rather than derived from α and β. The theoretical derivation $N^* \propto C^{\beta/(\alpha+\beta)}$ gives different values, suggesting different fitting methodologies.*
+*Note: The Kaplan optimal scaling exponents (0.73, 0.27) were empirically fit rather than derived from α and β. The theoretical derivation $\Psi^* \propto C^{\beta/(\alpha+\beta)}$ gives different values, suggesting different fitting methodologies.*
 
 **Why the difference?**
 
@@ -161,7 +161,7 @@ L (loss)
 1.7 ├─────●────╲──────────────────
     │    ↗      ╲
     └────┴───────┴────────────────→
-        10⁹    10¹⁰    10¹¹      N
+        10⁹    10¹⁰    10¹¹      \Psi
 ```
 
 The optimal path traces the ridge where iso-compute lines are tangent to iso-loss curves.
@@ -188,7 +188,7 @@ Chinchilla-optimal models are expensive to serve: same quality, bigger model, mo
 
 Many practitioners deliberately **overtrain** smaller models:
 
-$$L_{\text{overtrained}}(N_{\text{small}}, D_{\text{large}}) = L_{\text{optimal}}(N_{\text{large}}, D_{\text{optimal}})$$
+$$L_{\text{overtrained}}(\Psi_{\text{small}}, D_{\text{large}}) = L_{\text{optimal}}(\Psi_{\text{large}}, D_{\text{optimal}})$$
 
 LLaMA models train on 1-2T tokens, far exceeding Chinchilla ratios, to reduce serving costs.
 
@@ -196,7 +196,7 @@ LLaMA models train on 1-2T tokens, far exceeding Chinchilla ratios, to reduce se
 
 Combining scaling laws with hardware:
 
-$$\text{Time} = \frac{6ND}{\text{GPUs} \times \text{FLOPs/GPU} \times \text{MFU}}$$
+$$\text{Time} = \frac{6\Psi D}{\text{GPUs} \times \text{FLOPs/GPU} \times \text{MFU}}$$
 
 Where MFU (Model FLOP Utilization) is typically 30-50%.
 
@@ -213,12 +213,12 @@ $$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 9.89 \times 10^{14} \times
 Recent research suggests the surface is more complex:
 
 ### Data Quality
-$$L(N, D, q) = \frac{A}{N^\alpha} + \frac{B}{(qD)^\beta} + L_\infty$$
+$$L(\Psi, D, q) = \frac{A}{\Psi^\alpha} + \frac{B}{(qD)^\beta} + L_\infty$$
 
 Where $q$ is a data quality multiplier. High-quality data can shift the optimal ratio.
 
 ### Architecture Efficiency
-Different architectures have different $A$ values. MoE models achieve lower loss at the same $N_{\text{active}}$.
+Different architectures have different $A$ values. MoE models achieve lower loss at the same $\Psi_{\text{active}}$.
 
 ### Emergent Capabilities
 Some capabilities emerge suddenly at scale, not following smooth power laws. The surface has discontinuities.
@@ -230,26 +230,26 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 ??? success "Solution"
     **Using the 20:1 rule for Chinchilla-optimal allocation:**
 
-    The optimal ratio is $D^*/N^* \approx 20$.
+    The optimal ratio is $D^*/\Psi^* \approx 20$.
 
-    Substituting into the compute constraint $C = 6ND$:
+    Substituting into the compute constraint $C = 6\Psi D$:
 
-    $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
+    $$C = 6 \times \Psi^* \times 20\Psi^* = 120(\Psi^*)^2$$
 
     **Solving for optimal model size:**
-    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}}$$
+    $$\Psi^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}}$$
 
-    $$N^* = 2.89 \times 10^{10.5} \approx \boxed{91\text{B parameters}}$$
+    $$\Psi^* = 2.89 \times 10^{10.5} \approx \boxed{91\text{B parameters}}$$
 
     **Optimal token count:**
-    $$D^* = 20 \times N^* = 20 \times 91 \times 10^9 = \boxed{1.82\text{T tokens}}$$
+    $$D^* = 20 \times \Psi^* = 20 \times 91 \times 10^9 = \boxed{1.82\text{T tokens}}$$
 
     **Verification:**
     $$C = 6 \times 91 \times 10^9 \times 1.82 \times 10^{12} = 9.94 \times 10^{23} \approx 10^{24} \checkmark$$
 
     | Parameter | Value |
     |-----------|-------|
-    | Optimal $N^*$ | 91B |
+    | Optimal $\Psi^*$ | 91B |
     | Optimal $D^*$ | 1.82T |
     | Tokens/parameter | 20 |
 
@@ -294,7 +294,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
     Using the 20:1 rule:
 
-    $$D^* = 20 \times N = 20 \times 7 \times 10^9 = \boxed{140\text{B tokens}}$$
+    $$D^* = 20 \times \Psi = 20 \times 7 \times 10^9 = \boxed{140\text{B tokens}}$$
 
     **Part 2: Overtraining factor**
 
@@ -302,7 +302,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
     **Part 3: Loss difference estimation**
 
-    Using $L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$ with Chinchilla exponents ($\alpha = 0.34$, $\beta = 0.28$):
+    Using $L(\Psi, D) = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$ with Chinchilla exponents ($\alpha = 0.34$, $\beta = 0.28$):
 
     The data-dependent term improvement:
 
@@ -318,73 +318,73 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
     **Key insight**: Overtraining trades training compute for inference efficiency. LLaMA-2 7B performs comparably to a ~15-20B Chinchilla-optimal model while being 2-3× cheaper to serve.
 
-4. **Iso-loss curve**: Derive the equation for an iso-loss curve $L(N, D) = L_0$ in the $(N, D)$ plane. What is its shape?
+4. **Iso-loss curve**: Derive the equation for an iso-loss curve $L(\Psi, D) = L_0$ in the $(\Psi, D)$ plane. What is its shape?
 
 ??? success "Solution"
     **Starting from the loss equation:**
 
-    $$L_0 = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
+    $$L_0 = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
     **Rearranging for the iso-loss curve:**
 
     Let $L' = L_0 - L_\infty$ (the reducible loss):
 
-    $$L' = \frac{A}{N^\alpha} + \frac{B}{D^\beta}$$
+    $$L' = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta}$$
 
-    **Solving for $D$ as a function of $N$:**
+    **Solving for $D$ as a function of $\Psi$:**
 
-    $$\frac{B}{D^\beta} = L' - \frac{A}{N^\alpha}$$
+    $$\frac{B}{D^\beta} = L' - \frac{A}{\Psi^\alpha}$$
 
-    $$D^\beta = \frac{B}{L' - A/N^\alpha} = \frac{BN^\alpha}{L'N^\alpha - A}$$
+    $$D^\beta = \frac{B}{L' - A/\Psi^\alpha} = \frac{B\Psi^\alpha}{L'\Psi^\alpha - A}$$
 
-    $$\boxed{D = \left(\frac{BN^\alpha}{L'N^\alpha - A}\right)^{1/\beta}}$$
+    $$\boxed{D = \left(\frac{B\Psi^\alpha}{L'\Psi^\alpha - A}\right)^{1/\beta}}$$
 
     **Shape analysis:**
 
     | Property | Value |
     |----------|-------|
-    | Vertical asymptote | $N = (A/L')^{1/\alpha}$ |
+    | Vertical asymptote | $\Psi = (A/L')^{1/\alpha}$ |
     | Horizontal asymptote | $D = (B/L')^{1/\beta}$ |
     | Shape | Hyperbola-like curve in first quadrant |
     | Curvature | Convex toward origin |
 
     **Geometric interpretation:**
 
-    - For fixed loss $L_0$, there's a family of $(N, D)$ pairs that achieve it
+    - For fixed loss $L_0$, there's a family of $(\Psi, D)$ pairs that achieve it
     - Larger models need less data to reach the same loss (and vice versa)
     - The curve asymptotes show the minimum resources needed even with infinite investment in the other dimension
 
-5. **Marginal returns**: At the current training point $(N_0, D_0)$, you can either double parameters or double data. Which reduces loss more? Derive the condition for indifference.
+5. **Marginal returns**: At the current training point $(\Psi_0, D_0)$, you can either double parameters or double data. Which reduces loss more? Derive the condition for indifference.
 
 ??? success "Solution"
-    **Loss reduction from doubling $N$:**
+    **Loss reduction from doubling $\Psi$:**
 
-    $$\Delta L_N = \frac{A}{N_0^\alpha} - \frac{A}{(2N_0)^\alpha} = \frac{A}{N_0^\alpha}\left(1 - \frac{1}{2^\alpha}\right) = \frac{A}{N_0^\alpha}(1 - 2^{-\alpha})$$
+    $$\Delta L_\Psi = \frac{A}{\Psi_0^\alpha} - \frac{A}{(2\Psi_0)^\alpha} = \frac{A}{\Psi_0^\alpha}\left(1 - \frac{1}{2^\alpha}\right) = \frac{A}{\Psi_0^\alpha}(1 - 2^{-\alpha})$$
 
     **Loss reduction from doubling $D$:**
 
     $$\Delta L_D = \frac{B}{D_0^\beta} - \frac{B}{(2D_0)^\beta} = \frac{B}{D_0^\beta}(1 - 2^{-\beta})$$
 
-    **Indifference condition ($\Delta L_N = \Delta L_D$):**
+    **Indifference condition ($\Delta L_\Psi = \Delta L_D$):**
 
-    $$\frac{A}{N_0^\alpha}(1 - 2^{-\alpha}) = \frac{B}{D_0^\beta}(1 - 2^{-\beta})$$
+    $$\frac{A}{\Psi_0^\alpha}(1 - 2^{-\alpha}) = \frac{B}{D_0^\beta}(1 - 2^{-\beta})$$
 
-    $$\boxed{\frac{A(1 - 2^{-\alpha})}{N_0^\alpha} = \frac{B(1 - 2^{-\beta})}{D_0^\beta}}$$
+    $$\boxed{\frac{A(1 - 2^{-\alpha})}{\Psi_0^\alpha} = \frac{B(1 - 2^{-\beta})}{D_0^\beta}}$$
 
     **For Chinchilla ($\alpha = \beta$, $A = B$):**
 
     The condition simplifies to:
 
-    $$N_0^\alpha = D_0^\alpha \implies N_0 = D_0$$
+    $$\Psi_0^\alpha = D_0^\alpha \implies \Psi_0 = D_0$$
 
-    But the 20:1 rule ($D^*/N^* = 20$) suggests $A \neq B$. The actual indifference point is at the Chinchilla optimum where marginal returns are equal.
+    But the 20:1 rule ($D^*/\Psi^* = 20$) suggests $A \neq B$. The actual indifference point is at the Chinchilla optimum where marginal returns are equal.
 
     **Decision rule:**
 
     | Condition | Action |
     |-----------|--------|
-    | $\frac{A(1-2^{-\alpha})}{N_0^\alpha} > \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double parameters |
-    | $\frac{A(1-2^{-\alpha})}{N_0^\alpha} < \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double data |
+    | $\frac{A(1-2^{-\alpha})}{\Psi_0^\alpha} > \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double parameters |
+    | $\frac{A(1-2^{-\alpha})}{\Psi_0^\alpha} < \frac{B(1-2^{-\beta})}{D_0^\beta}$ | Double data |
     | Equal | Either choice equivalent |
 
     **Practical implication:** If you're at a Chinchilla-optimal point, doubling either has equal marginal benefit. Most pre-2022 models were undertrained on data, making doubling $D$ more valuable.
@@ -395,7 +395,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
 2. **The 20:1 rule**: Chinchilla-optimal training uses ~20 tokens per parameter.
 
-3. **Optimal allocation**: Both $N^*$ and $D^*$ scale as $C^{0.5}$—double compute, $\sqrt{2}\times$ each.
+3. **Optimal allocation**: Both $\Psi^*$ and $D^*$ scale as $C^{0.5}$—double compute, $\sqrt{2}\times$ each.
 
 4. **Marginal balance**: At optimum, the last FLOP spent on parameters vs data yields equal loss reduction.
 

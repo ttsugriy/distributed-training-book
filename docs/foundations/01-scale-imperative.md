@@ -35,11 +35,11 @@ No single accelerator holds this. We *must* distribute.
 
 Even if memory weren't a constraint, training time would be:
 
-$$T = \frac{6 \cdot N \cdot D}{F}$$
+$$T = \frac{6 \cdot \Psi \cdot D}{F}$$
 
 Where:
 
-- $N$: parameters
+- $\Psi$: parameters
 - $D$: training tokens
 - $F$: FLOP/s of the device
 - Factor of 6: forward (2) + backward (4) FLOPs per parameter per token
@@ -142,7 +142,7 @@ Let's begin with the foundations.
 ??? success "Solution"
     **Training time formula:**
 
-    $$T = \frac{6 \cdot N \cdot D}{F \cdot \eta}$$
+    $$T = \frac{6 \cdot \Psi \cdot D}{F \cdot \eta}$$
 
     Where $\eta$ is the utilization factor (0.5).
 
@@ -181,6 +181,6 @@ Let's begin with the foundations.
 
 ## Key Takeaways
 
-1. **Training compute is dominated by $6ND$**: Parameter count and token count set the irreducible FLOP budget.
+1. **Training compute is dominated by $6\Psi D$**: Parameter count and token count set the irreducible FLOP budget.
 2. **Wall-clock time is a utilization problem**: MFU and parallelism are the levers that turn years into weeks.
 3. **Budget waste is often performance, not hardware**: Small MFU gains translate to millions of dollars at scale.

@@ -29,11 +29,11 @@ Let's derive these numbers and understand the constraints.
 
 Using the Chinchilla optimal scaling (Chapter 8):
 
-$$C = 6ND$$
+$$C = 6\Psi D$$
 
 where:
 
-- $N = 405 \times 10^9$ parameters
+- $\Psi = 405 \times 10^9$ parameters
 - $D = 15.6 \times 10^{12}$ tokens
 
 $$C = 6 \times (405 \times 10^9) \times (15.6 \times 10^{12}) \approx 3.79 \times 10^{25} \text{ FLOPs}$$
@@ -266,7 +266,7 @@ Computing MFU for LLaMA 3 405B:
 
 **Forward FLOPs per token**:
 
-$$F_{\text{fwd}} = 2 \times N \times 2 = 4N = 4 \times 405 \times 10^9 = 1.62 \times 10^{12}$$
+$$F_{\text{fwd}} = 2 \times \Psi \times 2 = 4\Psi = 4 \times 405 \times 10^9 = 1.62 \times 10^{12}$$
 
 (Factor of 2 for forward, factor of 2 for backward = 4× total, but we count 6× including backward activations)
 

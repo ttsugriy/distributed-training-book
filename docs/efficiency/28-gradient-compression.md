@@ -20,9 +20,9 @@ In data-parallel training, each step requires:
 
 $$\text{AllReduce}(g) = \frac{1}{P} \sum_{i=0}^{P-1} g_i$$
 
-For a model with $N$ parameters in FP32:
+For a model with $\Psi$ parameters in FP32:
 
-- Communication volume: $2N \cdot 4$ bytes per step (ring AllReduce)
+- Communication volume: $2\Psi \cdot 4$ bytes per step (ring AllReduce)
 - For GPT-3 (175B parameters): 1.4 TB per step
 
 At 400 Gbps inter-node bandwidth:

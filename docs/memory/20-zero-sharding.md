@@ -22,17 +22,17 @@ In data parallel training, every GPU maintains:
 
 | Component | Size per GPU | Redundancy Factor |
 |-----------|--------------|-------------------|
-| Parameters (FP16) | $2N$ bytes | $P$× |
-| Gradients (FP16) | $2N$ bytes | $P$× |
-| Master weights (FP32) | $4N$ bytes | $P$× |
-| Momentum (FP32) | $4N$ bytes | $P$× |
-| Variance (FP32) | $4N$ bytes | $P$× |
+| Parameters (FP16) | $2\Psi$ bytes | $P$× |
+| Gradients (FP16) | $2\Psi$ bytes | $P$× |
+| Master weights (FP32) | $4\Psi$ bytes | $P$× |
+| Momentum (FP32) | $4\Psi$ bytes | $P$× |
+| Variance (FP32) | $4\Psi$ bytes | $P$× |
 
-With $P$ GPUs, we store $16NP$ bytes total, but only $16N$ bytes are unique.
+With $P$ GPUs, we store $16\Psi P$ bytes total, but only $16\Psi$ bytes are unique.
 
 **Memory efficiency of data parallelism**:
 
-$$\eta_{DP} = \frac{\text{Unique data}}{\text{Total storage}} = \frac{16N}{16NP} = \frac{1}{P}$$
+$$\eta_{DP} = \frac{\text{Unique data}}{\text{Total storage}} = \frac{16\Psi}{16\Psi P} = \frac{1}{P}$$
 
 With 1024 GPUs, we waste 99.9% of aggregate memory on redundant copies.
 
@@ -52,38 +52,38 @@ ZeRO partitions training state progressively:
 
 | Stage | Sharded Component | Memory per GPU | Communication |
 |-------|-------------------|----------------|---------------|
-| ZeRO-1 | Optimizer states | $4N + \frac{12N}{P}$ | +0% |
-| ZeRO-2 | + Gradients | $2N + \frac{14N}{P}$ | +0% |
-| ZeRO-3 | + Parameters | $\frac{16N}{P}$ | +50% |
+| ZeRO-1 | Optimizer states | $4\Psi + \frac{12\Psi}{P}$ | +0% |
+| ZeRO-2 | + Gradients | $2\Psi + \frac{14\Psi}{P}$ | +0% |
+| ZeRO-3 | + Parameters | $\frac{16\Psi}{P}$ | +50% |
 
 ```mermaid
 flowchart LR
     subgraph baseline["Data Parallel (No ZeRO)"]
         direction TB
-        B_P["Params (2N)"]
-        B_G["Gradients (2N)"]
-        B_O["Optimizer (12N)"]
+        B_P["Params (2\Psi)"]
+        B_G["Gradients (2\Psi)"]
+        B_O["Optimizer (12\Psi)"]
     end
 
     subgraph zero1["ZeRO Stage 1"]
         direction TB
-        Z1_P["Params (2N)"]
-        Z1_G["Gradients (2N)"]
-        Z1_O["Optimizer (12N/P)"]
+        Z1_P["Params (2\Psi)"]
+        Z1_G["Gradients (2\Psi)"]
+        Z1_O["Optimizer (12\Psi/P)"]
     end
 
     subgraph zero2["ZeRO Stage 2"]
         direction TB
-        Z2_P["Params (2N)"]
-        Z2_G["Gradients (2N/P)"]
-        Z2_O["Optimizer (12N/P)"]
+        Z2_P["Params (2\Psi)"]
+        Z2_G["Gradients (2\Psi/P)"]
+        Z2_O["Optimizer (12\Psi/P)"]
     end
 
     subgraph zero3["ZeRO Stage 3"]
         direction TB
-        Z3_P["Params (2N/P)"]
-        Z3_G["Gradients (2N/P)"]
-        Z3_O["Optimizer (12N/P)"]
+        Z3_P["Params (2\Psi/P)"]
+        Z3_G["Gradients (2\Psi/P)"]
+        Z3_O["Optimizer (12\Psi/P)"]
     end
 
     baseline --> zero1 --> zero2 --> zero3
@@ -106,7 +106,7 @@ Let's derive each stage rigorously.
 
 ### The Algorithm
 
-Each GPU $r$ owns optimizer states for parameters in range $[rN/P, (r+1)N/P)$.
+Each GPU $r$ owns optimizer states for parameters in range $[r\Psi/P, (r+1)\Psi/P)$.
 
 **Forward pass**: Unchanged—all GPUs have full parameters.
 
@@ -132,23 +132,23 @@ GPU 0                 GPU 1                 GPU 2                 GPU 3
 
 Before ZeRO-1 (per GPU):
 
-- Parameters: $2N$ bytes (FP16)
-- Gradients: $2N$ bytes (FP16)
-- Optimizer states: $12N$ bytes (master weights + momentum + variance)
+- Parameters: $2\Psi$ bytes (FP16)
+- Gradients: $2\Psi$ bytes (FP16)
+- Optimizer states: $12\Psi$ bytes (master weights + momentum + variance)
 
-Total: $16N$ bytes
+Total: $16\Psi$ bytes
 
 After ZeRO-1 (per GPU):
 
-- Parameters: $2N$ bytes (FP16)
-- Gradients: $2N$ bytes (FP16)
-- Optimizer states: $12N/P$ bytes (sharded)
+- Parameters: $2\Psi$ bytes (FP16)
+- Gradients: $2\Psi$ bytes (FP16)
+- Optimizer states: $12\Psi/P$ bytes (sharded)
 
-Total: $4N + 12N/P$ bytes
+Total: $4\Psi + 12\Psi/P$ bytes
 
 **Memory reduction factor**:
 
-$$\rho_1 = \frac{16N}{4N + 12N/P} = \frac{16P}{4P + 12} = \frac{4P}{P + 3}$$
+$$\rho_1 = \frac{16\Psi}{4\Psi + 12\Psi/P} = \frac{16P}{4P + 12} = \frac{4P}{P + 3}$$
 
 | GPUs ($P$) | Memory Reduction |
 |------------|-----------------|
@@ -157,7 +157,7 @@ $$\rho_1 = \frac{16N}{4N + 12N/P} = \frac{16P}{4P + 12} = \frac{4P}{P + 3}$$
 | 64 | 3.8× |
 | ∞ | 4× |
 
-**Asymptotic limit**: ZeRO-1 saves up to 4× (eliminating the 12N optimizer overhead).
+**Asymptotic limit**: ZeRO-1 saves up to 4× (eliminating the 12\Psi optimizer overhead).
 
 ### Communication Analysis
 
@@ -165,12 +165,12 @@ ZeRO-1 requires an AllGather after the optimizer step to reconstruct parameters.
 
 **Per-step communication**:
 
-- AllReduce gradients: $2 \cdot \frac{P-1}{P} \cdot 2N = \frac{4(P-1)N}{P}$ bytes
-- AllGather parameters: $\frac{P-1}{P} \cdot 2N = \frac{2(P-1)N}{P}$ bytes
+- AllReduce gradients: $2 \cdot \frac{P-1}{P} \cdot 2\Psi = \frac{4(P-1)\Psi}{P}$ bytes
+- AllGather parameters: $\frac{P-1}{P} \cdot 2\Psi = \frac{2(P-1)\Psi}{P}$ bytes
 
-**Total**: $\frac{6(P-1)N}{P}$ bytes
+**Total**: $\frac{6(P-1)\Psi}{P}$ bytes
 
-Standard data parallelism: $\frac{4(P-1)N}{P}$ bytes (AllReduce only)
+Standard data parallelism: $\frac{4(P-1)\Psi}{P}$ bytes (AllReduce only)
 
 **Communication overhead**: 50% increase.
 
@@ -185,10 +185,10 @@ Instead of AllReduce → AllGather, use:
 
 **Communication**:
 
-- ReduceScatter: $\frac{(P-1)N \cdot 2}{P}$ bytes
-- AllGather: $\frac{(P-1)N \cdot 2}{P}$ bytes
+- ReduceScatter: $\frac{(P-1)\Psi \cdot 2}{P}$ bytes
+- AllGather: $\frac{(P-1)\Psi \cdot 2}{P}$ bytes
 
-**Total**: $\frac{4(P-1)N}{P}$ bytes—same as AllReduce!
+**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—same as AllReduce!
 
 **Key insight**: ZeRO-1 has **zero communication overhead** with the right collective pattern.
 
@@ -237,15 +237,15 @@ def backward_with_gradient_sharding(loss, model, rank, world_size):
 
 After ZeRO-2 (per GPU):
 
-- Parameters: $2N$ bytes (FP16)
-- Gradients: $2N/P$ bytes (sharded)
-- Optimizer states: $12N/P$ bytes (sharded)
+- Parameters: $2\Psi$ bytes (FP16)
+- Gradients: $2\Psi/P$ bytes (sharded)
+- Optimizer states: $12\Psi/P$ bytes (sharded)
 
-Total: $2N + 14N/P$ bytes
+Total: $2\Psi + 14\Psi/P$ bytes
 
 **Memory reduction factor**:
 
-$$\rho_2 = \frac{16N}{2N + 14N/P} = \frac{16P}{2P + 14} = \frac{8P}{P + 7}$$
+$$\rho_2 = \frac{16\Psi}{2\Psi + 14\Psi/P} = \frac{16P}{2P + 14} = \frac{8P}{P + 7}$$
 
 | GPUs ($P$) | Memory Reduction |
 |------------|-----------------|
@@ -260,14 +260,14 @@ $$\rho_2 = \frac{16N}{2N + 14N/P} = \frac{16P}{2P + 14} = \frac{8P}{P + 7}$$
 
 **Backward pass**:
 
-- ReduceScatter gradients: $\frac{(P-1) \cdot 2N}{P}$ bytes
+- ReduceScatter gradients: $\frac{(P-1) \cdot 2\Psi}{P}$ bytes
 
 **Optimizer step**:
 
 - Local computation on gradient shards
-- AllGather updated parameters: $\frac{(P-1) \cdot 2N}{P}$ bytes
+- AllGather updated parameters: $\frac{(P-1) \cdot 2\Psi}{P}$ bytes
 
-**Total**: $\frac{4(P-1)N}{P}$ bytes—**still zero overhead!**
+**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—**still zero overhead!**
 
 ### Bucketing for Efficiency
 
@@ -322,7 +322,7 @@ class GradientBucket:
 
 The final step: shard parameters themselves.
 
-Each GPU $r$ stores only parameters in range $[rN/P, (r+1)N/P)$.
+Each GPU $r$ stores only parameters in range $[r\Psi/P, (r+1)\Psi/P)$.
 
 **Forward pass**:
 1. AllGather parameters before each layer
@@ -347,15 +347,15 @@ Backward: AllGather → Compute → ReduceScatter → Discard
 
 After ZeRO-3 (per GPU):
 
-- Parameters: $2N/P$ bytes (sharded)
-- Gradients: $2N/P$ bytes (sharded)
-- Optimizer states: $12N/P$ bytes (sharded)
+- Parameters: $2\Psi/P$ bytes (sharded)
+- Gradients: $2\Psi/P$ bytes (sharded)
+- Optimizer states: $12\Psi/P$ bytes (sharded)
 
-Total: $16N/P$ bytes
+Total: $16\Psi/P$ bytes
 
 **Memory reduction factor**:
 
-$$\rho_3 = \frac{16N}{16N/P} = P$$
+$$\rho_3 = \frac{16\Psi}{16\Psi/P} = P$$
 
 **Linear scaling!** With $P$ GPUs, each GPU holds $1/P$ of the training state.
 
@@ -372,18 +372,18 @@ Now we pay for parameter gathering:
 
 **Forward pass** (per layer $l$):
 
-- AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2N_l}{P}$ bytes
+- AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2\Psi_l}{P}$ bytes
 
 **Backward pass** (per layer $l$):
 
-- AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2N_l}{P}$ bytes (need params for gradient computation)
-- ReduceScatter gradients: $\frac{(P-1) \cdot 2N_l}{P}$ bytes
+- AllGather layer $l$ parameters: $\frac{(P-1) \cdot 2\Psi_l}{P}$ bytes (need params for gradient computation)
+- ReduceScatter gradients: $\frac{(P-1) \cdot 2\Psi_l}{P}$ bytes
 
 **Total per step**:
 
-$$V_{ZeRO-3} = 3 \cdot \frac{(P-1)}{P} \cdot 2N = \frac{6(P-1)N}{P}$$
+$$V_{ZeRO-3} = 3 \cdot \frac{(P-1)}{P} \cdot 2\Psi = \frac{6(P-1)\Psi}{P}$$
 
-Standard data parallelism: $\frac{4(P-1)N}{P}$ bytes
+Standard data parallelism: $\frac{4(P-1)\Psi}{P}$ bytes
 
 **Communication overhead**: 50% increase.
 
@@ -739,17 +739,17 @@ For mixed-precision AdamW training:
 
 | Stage | Memory per GPU | Limit as $P \to \infty$ |
 |-------|----------------|-------------------------|
-| None | $16N$ | $16N$ |
-| ZeRO-1 | $4N + 12N/P$ | $4N$ |
-| ZeRO-2 | $2N + 14N/P$ | $2N$ |
-| ZeRO-3 | $16N/P$ | $0$ |
+| None | $16\Psi$ | $16\Psi$ |
+| ZeRO-1 | $4\Psi + 12\Psi/P$ | $4\Psi$ |
+| ZeRO-2 | $2\Psi + 14\Psi/P$ | $2\Psi$ |
+| ZeRO-3 | $16\Psi/P$ | $0$ |
 
 ### Practical Example
 
 Consider a 7B parameter model:
 
-- $N = 7 \times 10^9$ parameters
-- Base memory: $16N = 112$ GB
+- $\Psi = 7 \times 10^9$ parameters
+- Base memory: $16\Psi = 112$ GB
 
 | Stage | 4 GPUs | 8 GPUs | 64 GPUs | 256 GPUs |
 |-------|--------|--------|---------|----------|
@@ -815,13 +815,13 @@ The fundamental trade-off:
 ```
 Memory per GPU
      │
-     │●  No ZeRO (16N)
+     │●  No ZeRO (16\Psi)
      │
-     │    ●  ZeRO-1 (4N + 12N/P)
+     │    ●  ZeRO-1 (4\Psi + 12\Psi/P)
      │
-     │        ●  ZeRO-2 (2N + 14N/P)
+     │        ●  ZeRO-2 (2\Psi + 14\Psi/P)
      │
-     │            ●  ZeRO-3 (16N/P)
+     │            ●  ZeRO-3 (16\Psi/P)
      │                    ●
      │                        ●  ──→ 0
      └────────────────────────────────→

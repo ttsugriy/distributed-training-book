@@ -17,7 +17,7 @@ Before 2022, the dominant scaling strategy was: **make the model bigger**.
 
 This belief came from Kaplan et al. (2020), which suggested:
 
-- Model size should scale as $N \propto C^{0.73}$
+- Model size should scale as $\Psi \propto C^{0.73}$
 - Data should scale as $D \propto C^{0.27}$
 
 Under this prescription, doubling compute meant:
@@ -44,20 +44,20 @@ Three independent methods converged on the same answer:
 
 ### Method 1: Fixed Model, Varying Data
 
-For each model size $N$, fit:
+For each model size $\Psi$, fit:
 
-$$L(D) = \frac{B}{D^\beta} + L_\infty(N)$$
+$$L(D) = \frac{B}{D^\beta} + L_\infty(\Psi)$$
 
-Extract $L_\infty(N)$ for each size, then fit:
+Extract $L_\infty(\Psi)$ for each size, then fit:
 
-$$L_\infty(N) = \frac{A}{N^\alpha}$$
+$$L_\infty(\Psi) = \frac{A}{\Psi^\alpha}$$
 
 ### Method 2: IsoFLOP Curves
 
-Fix compute budget $C$. Train many $(N, D)$ pairs satisfying $C = 6ND$.
-Plot loss vs $N$, find minimum.
+Fix compute budget $C$. Train many $(\Psi, D)$ pairs satisfying $C = 6\PsiD$.
+Plot loss vs $\Psi$, find minimum.
 
-For each $C$, there's an optimal $N^*(C)$:
+For each $C$, there's an optimal $\Psi^*(C)$:
 
 ```
 Loss
@@ -65,34 +65,34 @@ Loss
   │  ●                              C = 10²¹
   │   ●  ●
   │      ↘  ●
-  │         ↘ ● ← Optimal N
+  │         ↘ ● ← Optimal \Psi
   │            ● ●
   │               ●
-  └──────────────────────────────→ N
+  └──────────────────────────────→ \Psi
 ```
 
 ### Method 3: Parametric Fitting
 
 Fit all data simultaneously to:
 
-$$L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
+$$L(\Psi, D) = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
-Where $L_\infty$ is the irreducible loss (the minimum achievable loss with infinite compute). With Lagrange constraint $C = 6ND$, derive optimal scaling.
+Where $L_\infty$ is the irreducible loss (the minimum achievable loss with infinite compute). With Lagrange constraint $C = 6\PsiD$, derive optimal scaling.
 
-**All three methods agreed**: $N^* \propto C^{0.50}$, $D^* \propto C^{0.50}$.
+**All three methods agreed**: $\Psi^* \propto C^{0.50}$, $D^* \propto C^{0.50}$.
 
 ## The 20:1 Ratio Derivation
 
 From the optimal allocation (Chapter 7):
 
-$$\frac{D^*}{N^*} = \frac{B\beta}{A\alpha}$$
+$$\frac{D^*}{\Psi^*} = \frac{B\beta}{A\alpha}$$
 
 Substituting Chinchilla's fitted values:
 
 - $A = 406.4$, $\alpha = 0.34$
 - $B = 410.7$, $\beta = 0.28$
 
-$$\frac{D^*}{N^*} = \frac{410.7 \times 0.28}{406.4 \times 0.34} = \frac{115.0}{138.2} \approx 0.83$$
+$$\frac{D^*}{\Psi^*} = \frac{410.7 \times 0.28}{406.4 \times 0.34} = \frac{115.0}{138.2} \approx 0.83$$
 
 Wait—that's less than 1, not 20. What gives?
 
@@ -100,33 +100,33 @@ Wait—that's less than 1, not 20. What gives?
 
 More precisely, from the paper:
 
-$$N_{\text{opt}} = 0.6225 \cdot C^{0.4957}$$
+$$\Psi_{\text{opt}} = 0.6225 \cdot C^{0.4957}$$
 
 $$D_{\text{opt}} = 1.8421 \cdot C^{0.5043}$$
 
 At $C = 10^{21}$ FLOPs:
 
-- $N_{\text{opt}} \approx 1.9 \times 10^{10}$ (19B)
+- $\Psi_{\text{opt}} \approx 1.9 \times 10^{10}$ (19B)
 - $D_{\text{opt}} \approx 4.0 \times 10^{11}$ (400B)
-- Ratio: $D/N \approx 21$
+- Ratio: $D/\Psi \approx 21$
 
 The **20:1 rule** is a useful approximation:
 
-$$D_{\text{optimal}} \approx 20 \cdot N$$
+$$D_{\text{optimal}} \approx 20 \cdot \Psi$$
 
 ## Computing Optimal Allocations
 
 Given compute budget $C$:
 
 **Step 1**: Estimate optimal parameters
-$$N^* \approx \sqrt{\frac{C}{6 \times 20}} = \sqrt{\frac{C}{120}}$$
+$$\Psi^* \approx \sqrt{\frac{C}{6 \times 20}} = \sqrt{\frac{C}{120}}$$
 
 **Step 2**: Estimate optimal tokens
-$$D^* \approx 20 \cdot N^*$$
+$$D^* \approx 20 \cdot \Psi^*$$
 
 **Worked Example**: $C = 10^{24}$ FLOPs (≈GPT-4 training budget)
 
-$$N^* \approx \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}} \approx 2.9 \times 10^{10}$$
+$$\Psi^* \approx \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}} \approx 2.9 \times 10^{10}$$
 
 $$D^* \approx 20 \times 2.9 \times 10^{10} = 5.8 \times 10^{11}$$
 
@@ -140,13 +140,13 @@ How "wrong" were pre-Chinchilla models?
 
 ### GPT-3 Analysis
 
-- Parameters: $N = 175 \times 10^9$
+- Parameters: $\Psi = 175 \times 10^9$
 - Tokens: $D = 300 \times 10^9$
-- Compute: $C = 6ND = 3.15 \times 10^{23}$
+- Compute: $C = 6\PsiD = 3.15 \times 10^{23}$
 
 Chinchilla-optimal for this compute:
 
-$$N^* = \sqrt{\frac{3.15 \times 10^{23}}{120}} \approx 51B$$
+$$\Psi^* = \sqrt{\frac{3.15 \times 10^{23}}{120}} \approx 51B$$
 
 $$D^* = 20 \times 51B = 1.02T$$
 
@@ -154,19 +154,19 @@ GPT-3 used **3.4× too many parameters** and **3.4× too few tokens**.
 
 The loss penalty:
 
-$$\Delta L \approx \frac{A}{N_{\text{GPT-3}}^\alpha} + \frac{B}{D_{\text{GPT-3}}^\beta} - \frac{A}{N^{*\alpha}} - \frac{B}{D^{*\beta}}$$
+$$\Delta L \approx \frac{A}{\Psi_{\text{GPT-3}}^\alpha} + \frac{B}{D_{\text{GPT-3}}^\beta} - \frac{A}{\Psi^{*\alpha}} - \frac{B}{D^{*\beta}}$$
 
 Chinchilla achieved GPT-3's loss with ~4× less compute.
 
 ### Gopher Analysis
 
-- Parameters: $N = 280 \times 10^9$
+- Parameters: $\Psi = 280 \times 10^9$
 - Tokens: $D = 300 \times 10^9$
 - Compute: $C = 5.04 \times 10^{23}$
 
 Chinchilla-optimal:
 
-$$N^* \approx 65B, \quad D^* \approx 1.3T$$
+$$\Psi^* \approx 65B, \quad D^* \approx 1.3T$$
 
 Gopher was **4.3× overparameterized**.
 
@@ -218,7 +218,7 @@ If inference cost >> training cost, overtrain smaller models.
 
 **Break-even analysis**: Let $r = \frac{\text{inference tokens}}{\text{training tokens}}$
 
-Overtraining by factor $k$ (using $kD$ tokens on $N/k$ parameters) is profitable when:
+Overtraining by factor $k$ (using $kD$ tokens on $\Psi/k$ parameters) is profitable when:
 
 $$r > \frac{k^2 \cdot \text{training cost per token}}{\text{inference cost per param}}$$
 
@@ -228,7 +228,7 @@ For typical ratios, overtraining pays off when serving >$10^{13}$ tokens.
 
 If high-quality data is exhausted at $D_{\text{max}}$:
 
-$$N^* = \frac{D_{\text{max}}}{20}$$
+$$\Psi^* = \frac{D_{\text{max}}}{20}$$
 
 Training a larger model wastes compute on undertrained parameters.
 
@@ -254,7 +254,7 @@ Recent work has refined and extended Chinchilla:
 
 Chinchilla optimizes pretraining loss. But downstream task performance may have different scaling:
 
-$$\text{Accuracy}(N, D) \neq f(L(N, D))$$
+$$\text{Accuracy}(\Psi, D) \neq f(L(\Psi, D))$$
 
 Some tasks benefit more from model size; others from data.
 
@@ -262,13 +262,13 @@ Some tasks benefit more from model size; others from data.
 
 MoE models have different scaling:
 
-- $N_{\text{total}}$ vs $N_{\text{active}}$
+- $\Psi_{\text{total}}$ vs $\Psi_{\text{active}}$
 - Only active parameters contribute to FLOPs per token
 - More total parameters can improve loss at fixed compute
 
 Scaling law for MoE:
 
-$$L(N_{\text{active}}, N_{\text{total}}, D) = \frac{A}{N_{\text{total}}^{\alpha_1} N_{\text{active}}^{\alpha_2}} + \frac{B}{D^\beta} + L_\infty$$
+$$L(\Psi_{\text{active}}, \Psi_{\text{total}}, D) = \frac{A}{\Psi_{\text{total}}^{\alpha_1} \Psi_{\text{active}}^{\alpha_2}} + \frac{B}{D^\beta} + L_\infty$$
 
 Where $\alpha_1$ and $\alpha_2$ are fitted exponents for total and active parameters respectively.
 
@@ -276,7 +276,7 @@ Where $\alpha_1$ and $\alpha_2$ are fitted exponents for total and active parame
 
 What if $D > D_{\text{unique}}$? Muennighoff et al. (2023) showed:
 
-$$L(N, D, r) = L(N, D_{\text{unique}}) + \gamma \cdot \log(r)$$
+$$L(\Psi, D, r) = L(\Psi, D_{\text{unique}}) + \gamma \cdot \log(r)$$
 
 Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an empirically fitted coefficient that captures the diminishing value of repeated data.
 
@@ -289,17 +289,17 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Using the Chinchilla 20:1 rule:**
 
-    From $C = 6ND$ and $D^* = 20N^*$:
+    From $C = 6\PsiD$ and $D^* = 20\Psi^*$:
 
-    $$C = 6 \times N^* \times 20N^* = 120(N^*)^2$$
+    $$C = 6 \times \Psi^* \times 20\Psi^* = 120(\Psi^*)^2$$
 
     **Solving for optimal model size:**
-    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{22}}{120}} = \sqrt{8.33 \times 10^{19}}$$
+    $$\Psi^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{10^{22}}{120}} = \sqrt{8.33 \times 10^{19}}$$
 
-    $$N^* = 9.13 \times 10^9 \approx \boxed{9.1\text{B parameters}}$$
+    $$\Psi^* = 9.13 \times 10^9 \approx \boxed{9.1\text{B parameters}}$$
 
     **Optimal token count:**
-    $$D^* = 20 \times N^* = 20 \times 9.1 \times 10^9 = \boxed{182\text{B tokens}}$$
+    $$D^* = 20 \times \Psi^* = 20 \times 9.1 \times 10^9 = \boxed{182\text{B tokens}}$$
 
     **Verification:**
     $$C = 6 \times 9.1 \times 10^9 \times 182 \times 10^9 = 9.94 \times 10^{21} \approx 10^{22} \checkmark$$
@@ -307,7 +307,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
     | Parameter | Value |
     |-----------|-------|
     | Compute budget | $10^{22}$ FLOPs |
-    | Optimal $N^*$ | 9.1B |
+    | Optimal $\Psi^*$ | 9.1B |
     | Optimal $D^*$ | 182B |
     | Tokens/parameter | 20 |
 
@@ -319,19 +319,19 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Part 1: Compute used**
 
-    $$C = 6ND = 6 \times 30 \times 10^9 \times 150 \times 10^9 = \boxed{2.7 \times 10^{22} \text{ FLOPs}}$$
+    $$C = 6\PsiD = 6 \times 30 \times 10^9 \times 150 \times 10^9 = \boxed{2.7 \times 10^{22} \text{ FLOPs}}$$
 
     **Part 2: Chinchilla-optimal allocation**
 
-    $$N^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{2.7 \times 10^{22}}{120}} = \sqrt{2.25 \times 10^{20}}$$
+    $$\Psi^* = \sqrt{\frac{C}{120}} = \sqrt{\frac{2.7 \times 10^{22}}{120}} = \sqrt{2.25 \times 10^{20}}$$
 
-    $$N^* = 1.5 \times 10^{10} = \boxed{15\text{B parameters}}$$
+    $$\Psi^* = 1.5 \times 10^{10} = \boxed{15\text{B parameters}}$$
 
-    $$D^* = 20 \times N^* = 20 \times 15 \times 10^9 = \boxed{300\text{B tokens}}$$
+    $$D^* = 20 \times \Psi^* = 20 \times 15 \times 10^9 = \boxed{300\text{B tokens}}$$
 
     **Part 3: Over/underparameterization factor**
 
-    $$\text{Overparameterization} = \frac{N_{\text{actual}}}{N^*} = \frac{30\text{B}}{15\text{B}} = \boxed{2\times \text{ overparameterized}}$$
+    $$\text{Overparameterization} = \frac{\Psi_{\text{actual}}}{\Psi^*} = \frac{30\text{B}}{15\text{B}} = \boxed{2\times \text{ overparameterized}}$$
 
     $$\text{Undertraining} = \frac{D^*}{D_{\text{actual}}} = \frac{300\text{B}}{150\text{B}} = 2\times \text{ undertrained on data}$$
 
@@ -389,12 +389,12 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Using the Chinchilla 20:1 rule in reverse:**
 
-    If $D_{\text{max}} = 500\text{B}$ tokens and optimal ratio is $D^*/N^* = 20$:
+    If $D_{\text{max}} = 500\text{B}$ tokens and optimal ratio is $D^*/\Psi^* = 20$:
 
-    $$N^* = \frac{D_{\text{max}}}{20} = \frac{500 \times 10^9}{20} = \boxed{25\text{B parameters}}$$
+    $$\Psi^* = \frac{D_{\text{max}}}{20} = \frac{500 \times 10^9}{20} = \boxed{25\text{B parameters}}$$
 
     **Compute required:**
-    $$C = 6ND = 6 \times 25 \times 10^9 \times 500 \times 10^9 = 7.5 \times 10^{22} \text{ FLOPs}$$
+    $$C = 6\PsiD = 6 \times 25 \times 10^9 \times 500 \times 10^9 = 7.5 \times 10^{22} \text{ FLOPs}$$
 
     **Why not larger?**
 
@@ -419,29 +419,29 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Dense 70B model:**
 
-    Using $L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$:
+    Using $L(\Psi, D) = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$:
 
     $$L_{\text{dense}} \propto \frac{1}{(70\text{B})^\alpha}$$
 
     **MoE model analysis:**
 
     The MoE has:
-    - Active parameters: $N_{\text{active}} = 70\text{B}$
-    - Total parameters: $N_{\text{total}} = 1\text{T}$
+    - Active parameters: $\Psi_{\text{active}} = 70\text{B}$
+    - Total parameters: $\Psi_{\text{total}} = 1\text{T}$
 
     With 1.5× loss reduction from total parameters:
 
-    $$L_{\text{MoE}} \propto \frac{1}{(N_{\text{active}})^\alpha \cdot (N_{\text{total}}/N_{\text{active}})^{\alpha/2}}$$
+    $$L_{\text{MoE}} \propto \frac{1}{(\Psi_{\text{active}})^\alpha \cdot (\Psi_{\text{total}}/\Psi_{\text{active}})^{\alpha/2}}$$
 
     The effective parameter count for loss scaling:
 
-    $$N_{\text{eff}} = N_{\text{active}} \cdot \left(\frac{N_{\text{total}}}{N_{\text{active}}}\right)^{0.5} = 70\text{B} \cdot \left(\frac{1000\text{B}}{70\text{B}}\right)^{0.5}$$
+    $$\Psi_{\text{eff}} = \Psi_{\text{active}} \cdot \left(\frac{\Psi_{\text{total}}}{\Psi_{\text{active}}}\right)^{0.5} = 70\text{B} \cdot \left(\frac{1000\text{B}}{70\text{B}}\right)^{0.5}$$
 
-    $$N_{\text{eff}} = 70\text{B} \cdot 3.78 = 265\text{B}$$
+    $$\Psi_{\text{eff}} = 70\text{B} \cdot 3.78 = 265\text{B}$$
 
     **Loss comparison:**
 
-    | Model | Effective $N$ | Relative Loss Term |
+    | Model | Effective $\Psi$ | Relative Loss Term |
     |-------|---------------|-------------------|
     | Dense 70B | 70B | $(70\text{B})^{-0.34} = 1.00$ |
     | MoE 70B/1T | 265B | $(265\text{B})^{-0.34} = 0.69$ |

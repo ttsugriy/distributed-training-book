@@ -119,7 +119,7 @@ Caballero et al. (2023) identified a richer phase structure in the $(D_{\text{da
 
 The model is too small to represent the target function.
 
-$$L \approx L_{\infty}(N) = \frac{A}{N^\alpha}$$
+$$L \approx L_{\infty}(\Psi) = \frac{A}{\Psi^\alpha}$$
 
 Loss is determined by model size, independent of data or optimization.
 
@@ -159,19 +159,19 @@ $$L \approx \frac{B}{D^\beta}$$
 
 The balanced regime where Chinchilla optimality holds.
 
-$$L = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + L_\infty$$
+$$L = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
 *Symptoms*:
 
 - Both model size and data matter
 - Smooth power law scaling
-- Optimal allocation is $D \approx 20N$
+- Optimal allocation is $D \approx 20\Psi$
 
 ### The Three Transition Zones
 
 Between phases, behavior is complex:
 
-**I→IV Transition**: As $N$ increases, you move from capacity-limited to balanced.
+**I→IV Transition**: As $\Psi$ increases, you move from capacity-limited to balanced.
 
 **II→IV Transition**: As $B$ increases, optimizer noise decreases until data/compute limits dominate.
 
@@ -241,7 +241,7 @@ Given current trends, when will capability $c$ appear?
 
 **Method 1**: Extrapolate loss curve, estimate $L_c$
 
-$$N_c \approx \left(\frac{A}{L_c - L_\infty}\right)^{1/\alpha}$$
+$$\Psi_c \approx \left(\frac{A}{L_c - L_\infty}\right)^{1/\alpha}$$
 
 **Method 2**: Use linear probes
 
@@ -298,9 +298,9 @@ Some evidence that training order affects phase transitions:
 
 If targeting a specific capability:
 
-$$C_{\text{needed}} = 6 \cdot N_c \cdot D_{\text{opt}}(N_c)$$
+$$C_{\text{needed}} = 6 \cdot \Psi_c \cdot D_{\text{opt}}(\Psi_c)$$
 
-Where $N_c$ is the capability threshold model size.
+Where $\Psi_c$ is the capability threshold model size.
 
 Underprovisioning compute below $C_{\text{needed}}$ wastes everything—you'll never reach the threshold.
 
@@ -360,7 +360,7 @@ This suggests capabilities have **nested phase structures**: easier variants eme
 
     The model has insufficient capacity to generalize better. Adding data improves training loss (more optimization steps) but not validation loss (representation bottleneck).
 
-    $$L_{\text{val}} \approx L_\infty(N) = \frac{A}{N^\alpha} + \text{irreducible}$$
+    $$L_{\text{val}} \approx L_\infty(\Psi) = \frac{A}{\Psi^\alpha} + \text{irreducible}$$
 
     **Evidence against other phases:**
 
@@ -368,9 +368,9 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     |-------|-------------------|-----------|
     | Data-limited | More data → lower val loss | No ✗ |
     | Optimizer-limited | Large batch → lower loss | Not tested |
-    | Compute-optimal | Both N and D matter | Only N matters |
+    | Compute-optimal | Both \Psi and D matter | Only \Psi matters |
 
-    **Recommendation:** Scale model size (increase N) rather than data or training time.
+    **Recommendation:** Scale model size (increase \Psi) rather than data or training time.
 
 2. **Emergence prediction**: A capability appears at 50% accuracy for 50B parameters. At 10B parameters, accuracy is 5%. Assuming the transition follows a sigmoid with $\tau = 0.1$ nats, estimate the loss threshold $L_c$ for this capability.
 
@@ -403,7 +403,7 @@ This suggests capabilities have **nested phase structures**: easier variants eme
 
     **Estimating the losses:**
 
-    Using scaling law $L(N) \propto N^{-\alpha}$ with $\alpha \approx 0.34$:
+    Using scaling law $L(\Psi) \propto \Psi^{-\alpha}$ with $\alpha \approx 0.34$:
 
     $$\frac{L_{10B} - L_\infty}{L_{50B} - L_\infty} = \left(\frac{50}{10}\right)^{0.34} = 5^{0.34} = 1.70$$
 
@@ -454,11 +454,11 @@ This suggests capabilities have **nested phase structures**: easier variants eme
 
     At interpolation threshold:
 
-    $$N \approx D_{\text{train}}$$
+    $$\Psi \approx D_{\text{train}}$$
 
-    Scaling to $2N$ while keeping $D$ fixed:
+    Scaling to $2\Psi$ while keeping $D$ fixed:
 
-    $$\frac{N_{\text{new}}}{D} = 2 \gg 1$$
+    $$\frac{\Psi_{\text{new}}}{D} = 2 \gg 1$$
 
     This moves firmly into the overparameterized regime where implicit regularization helps generalization.
 
@@ -467,9 +467,9 @@ This suggests capabilities have **nested phase structures**: easier variants eme
 ??? success "Solution"
     **Compute required for 60B Chinchilla-optimal:**
 
-    Using $D^* = 20N$ and $C = 6ND$:
+    Using $D^* = 20\Psi$ and $C = 6\Psi D$:
 
-    $$C_{\text{needed}} = 6 \times N \times 20N = 120N^2$$
+    $$C_{\text{needed}} = 6 \times \Psi \times 20\Psi = 120\Psi^2$$
 
     $$C_{\text{needed}} = 120 \times (60 \times 10^9)^2 = 120 \times 3.6 \times 10^{21}$$
 
@@ -484,12 +484,12 @@ This suggests capabilities have **nested phase structures**: easier variants eme
     **Options with $C = 10^{23}$:**
 
     **Option 1: Smaller Chinchilla-optimal model**
-    $$N^* = \sqrt{\frac{10^{23}}{120}} = 2.89 \times 10^{10} \approx 29\text{B}$$
+    $$\Psi^* = \sqrt{\frac{10^{23}}{120}} = 2.89 \times 10^{10} \approx 29\text{B}$$
 
     This is below the 60B threshold—**chain-of-thought won't emerge**.
 
     **Option 2: Undertrained 60B model**
-    $$D = \frac{C}{6N} = \frac{10^{23}}{6 \times 60 \times 10^9} = 278\text{B tokens}$$
+    $$D = \frac{C}{6\Psi} = \frac{10^{23}}{6 \times 60 \times 10^9} = 278\text{B tokens}$$
 
     Tokens/param = $278/60 = 4.6$ (severely undertrained)
 
