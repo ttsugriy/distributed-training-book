@@ -15,13 +15,13 @@ A single machine has a memory hierarchy: registers, L1, L2, L3, DRAM. A cluster 
 
 | Level | Technology | Bandwidth | Latency | Typical Use |
 |-------|-----------|-----------|---------|-------------|
-| On-chip | SRAM (L1/L2) | ~80 TB/s | ~1 ns | Kernel intermediates |
-| Device memory | HBM3 | ~3.35 TB/s | ~100 ns | Model weights, activations |
+| On-chip | SRAM (L1/L2) | ~80 TB/s | ~1-10 ns | Kernel intermediates |
+| Device memory | HBM3 | ~3.35 TB/s | ~200-500 ns | Model weights, activations |
 | Intra-node | NVLink 4.0 | ~900 GB/s | ~1 μs | Tensor parallelism |
 | Inter-node (fast) | InfiniBand NDR | ~50 GB/s | ~1-2 μs | Pipeline, data parallelism |
-| Inter-node (slow) | Ethernet 100G | ~12 GB/s | ~5 μs | Fallback, some clouds |
+| Inter-node (slow) | Ethernet 100G | ~12 GB/s | ~10-50 μs | Fallback, some clouds |
 
-The bandwidth drops by **~20×** from NVLink to InfiniBand. This single fact explains most placement decisions.
+The bandwidth drops by **~20×** from NVLink to InfiniBand. This, along with latency and topology, explains most placement decisions.
 
 ## Intra-Node Topology
 
@@ -40,7 +40,7 @@ NVSwitch provides **non-blocking full bisection bandwidth**: any GPU can communi
 
 ### PCIe-Only Systems
 
-Without NVLink, GPUs communicate through PCIe (64 GB/s for Gen5) and potentially through CPU memory. This adds latency and reduces bandwidth, making tensor parallelism across GPUs less attractive.
+Without NVLink, GPUs communicate through PCIe (Gen5 x16: ~32 GB/s per direction, ~64 GB/s bidirectional) and potentially through CPU memory. This adds latency and reduces bandwidth, making tensor parallelism across GPUs less attractive.
 
 ## Inter-Node Topology
 
@@ -102,7 +102,7 @@ Messages smaller than the crossover point are latency-bound.
 
 ### Tensor Parallelism
 
-Requires AllReduce of activation tensors **every layer**. Communication volume is proportional to batch × sequence × hidden.
+Requires collective communication of activation tensors **every layer** (AllGather/ReduceScatter in common TP schemes). Communication volume is proportional to batch × sequence × hidden.
 
 - Within node (NVLink): ~900 GB/s → viable
 - Across nodes (InfiniBand): ~50 GB/s → often bottleneck
@@ -164,7 +164,7 @@ This hierarchy emerges directly from the bandwidth hierarchy of the cluster.
 
     $$BW_{eff} = 900 \times \frac{8}{2 \times 7} = 900 \times \frac{8}{14} \approx 514 \text{ GB/s}$$
 
-    In practice, NCCL achieves ~700-800 GB/s with optimized ring algorithms.
+    In practice, NCCL can reach ~500-600 GB/s on large messages, depending on topology and measurement definition.
 
     **(b) 32-way AllReduce across 4 nodes:**
 
@@ -238,7 +238,7 @@ This hierarchy emerges directly from the bandwidth hierarchy of the cluster.
     - Point-to-point: 1 hop latency (~1-5 μs per activation transfer)
     - AllReduce: 7 hops minimum, all stages synchronized
 
-    Pipeline bubbles would grow from $\frac{P-1}{M+P-1}$ to nearly 100% utilization loss.
+    Pipeline bubbles would grow from $\frac{P-1}{M+P-1}$ to a much larger fraction, potentially overwhelming useful work for typical $M$.
 
     **Key insight:** PP exploits the *sequential* nature of neural network layers. Collectives are for *parallel* operations on the same data.
 

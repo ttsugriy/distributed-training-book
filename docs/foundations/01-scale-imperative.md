@@ -4,7 +4,7 @@ subtitle: "Why Distributed Training Is No Longer Optional"
 ---
 
 <div class="chapter-opener" markdown>
-In 2017, a single GPU could train the largest language models. By 2024, the largest models require thousands of GPUs running for months. This is not a temporary inconvenience—it is the new reality of machine learning.
+In 2017, the largest language models could be trained on a single node or small cluster. By 2024, the largest models require thousands of GPUs running for months. This is not a temporary inconvenience—it is the new reality of machine learning.
 </div>
 
 <div class="investigation-question" markdown>
@@ -109,7 +109,9 @@ Performance (FLOP/s)
        +-----------------------> Arithmetic Intensity (FLOPs/byte)
 ```
 
-Most distributed training is **communication-bound**, not compute-bound. Understanding this changes everything about how we design systems.
+Here, "intensity" refers to FLOPs per byte moved for the relevant resource (memory or network).
+
+In practice, distributed training is **often communication-bound** at scale, though memory- and compute-bound regimes still appear depending on batch size and kernel mix. Understanding this changes everything about how we design systems.
 
 ## What We'll Build
 
@@ -162,7 +164,7 @@ Let's begin with the foundations.
 
     This is why we need hundreds of GPUs—to reduce this to weeks or months.
 
-3. A training run achieves 35% Model FLOP Utilization (MFU). If you're paying $2 per GPU-hour, what fraction of your compute budget is being "wasted" on inefficiency? If the total training cost is $10 million, how much money is lost to this inefficiency?
+3. A training run achieves 35% Model FLOP Utilization (MFU). If you're paying \$2 per GPU-hour, what fraction of your compute budget is being "wasted" on inefficiency? If the total training cost is \$10 million, how much money is lost to this inefficiency?
 
 ??? success "Solution"
     **Efficiency analysis:**
@@ -181,7 +183,7 @@ Let's begin with the foundations.
 
     $$\text{Wasted cost} = \$10M \times 0.30 = \$3M$$
 
-    **Key insight:** Improving from 35% to 50% MFU would either save $3M or equivalently allow 43% more training for the same budget.
+    **Key insight:** Improving from 35% to 50% MFU would either save \$3M or equivalently allow 43% more training for the same budget.
 
 ## Key Takeaways
 

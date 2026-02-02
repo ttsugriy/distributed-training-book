@@ -33,9 +33,11 @@ Where **communication intensity** is:
 
 $$I_{\text{net}} = \frac{\text{FLOPs}}{\text{Bytes communicated}}$$
 
+When plotting, interpret intensity relative to the resource you're comparing: $I_{\text{mem}}$ for memory ceilings and $I_{\text{net}}$ for network ceilings.
+
 This third ceiling often dominates. Consider AllReduce of a 10GB gradient tensor:
 
-- Communication: ~20GB total traffic (ReduceScatter + AllGather)
+- Communication: ~20GB per GPU (ReduceScatter + AllGather); total network volume scales with $P$
 - At 400 Gbps InfiniBand: $\frac{20 \times 8}{400} = 0.4$ seconds
 - Compute for same step might be 0.1 seconds
 
@@ -43,7 +45,7 @@ We're 4× communication-bound.
 
 ## Visualizing the Extended Roofline
 
-The extended roofline model bounds performance by three ceilings. The chart below shows performance vs. arithmetic intensity on log-log axes:
+The extended roofline model bounds performance by three ceilings. The chart below shows performance vs. arithmetic intensity on schematic axes:
 
 ```mermaid
 xychart-beta
@@ -78,7 +80,7 @@ $$I_{ridge}^{net} = \frac{989 \times 10^{12} \text{ FLOP/s}}{50 \times 10^9 \tex
 When $I_{\text{net}}$ and $I_{\text{mem}}$ are high:
 
 - GPU utilization is near peak
-- Adding more GPUs helps linearly (strong scaling)
+- Adding more GPUs can help linearly while communication and memory overheads stay subdominant
 - Example: Large batch matrix multiplications
 
 ### Memory-Bound
@@ -106,18 +108,19 @@ For different parallelism strategies:
 
 ### Data Parallelism
 
-Per step: $6\Psi B$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param). Using $s=2$ (FP16) gives $I_{\text{net}}^{\text{DP}} = 1.5B$.
+Let $B$ be batch size (sequences), $S$ sequence length, and $s$ bytes per parameter (e.g., $s=2$ for FP16/BF16).
+Per step: $6\Psi B S$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param)
 
-$$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B}{2\Psi s} = \frac{3B}{s}$$
+$$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B S}{2\Psi s} = \frac{3BS}{s}$$
 
-As token batch $B$ increases, communication intensity increases → less communication-bound.
+As token batch $B \cdot S$ increases, communication intensity increases → less communication-bound.
 
 ### Tensor Parallelism
 
 Per layer with hidden dim $H$, batch $B$, sequence $S$:
 
 - FLOPs: $O(BSH^2)$
-- Communication: $O(BSH)$ (AllReduce activations)
+- Communication: $O(BSH)$ (AllGather/ReduceScatter activations across tensor-parallel ranks)
 
 $$I_{\text{net}}^{\text{TP}} = O(H)$$
 
@@ -163,12 +166,12 @@ The extended roofline is our primary tool for analyzing distributed training bot
     **Given:**
 
     - Parameters: $\Psi = 7 \times 10^9$
-    - Tokens per step: $B = 1 \times 10^6$
+    - Tokens per step: $B_{\text{tok}} = 1 \times 10^6$
     - GPUs: $P = 64$ (data parallel)
 
     **FLOPs per step:**
 
-    $$\text{FLOPs} = 6 \times \Psi \times B = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
+    $$\text{FLOPs} = 6 \times \Psi \times B_{\text{tok}} = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
 
     **Bytes communicated (AllReduce gradients in FP16):**
 
@@ -176,9 +179,9 @@ The extended roofline is our primary tool for analyzing distributed training bot
 
     **Communication intensity:**
 
-    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte} = 1.5B$$
+    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
 
-    This is far above the ridge point (~40,000 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
+    This is far above the ridge point (~19,780 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
 
 2. An H100 DGX system has 900 GB/s NVLink bandwidth within the node and 400 Gbps InfiniBand across nodes. What's the ratio of ridge points for intra-node vs inter-node communication?
 
@@ -228,7 +231,7 @@ The extended roofline is our primary tool for analyzing distributed training bot
     2. Check communication/compute overlap in timeline
     3. Measure achieved bandwidth vs theoretical
     4. Check arithmetic intensity of dominant operations
-    5. If pipeline parallel, calculate bubble fraction: $\frac{P-1}{P+M-1}$
+    5. If pipeline parallel, calculate bubble fraction: $\frac{p-1}{m+p-1}$
 
 ## Key Takeaways
 

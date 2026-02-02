@@ -59,15 +59,15 @@ Per-layer activation memory (without checkpointing):
 
 $$M_{\text{act}}^{\text{layer}} \approx BSH \cdot (34 + 5\frac{AS}{H})$$
 
-Where $B$ = batch, $S$ = sequence, $H$ = hidden, $A$ = heads.
+Where $B$ = batch, $S$ = sequence, $H$ = hidden, $A$ = heads. This coefficient is a rough heuristic based on counting common activation tensors.
 
 Total activation memory:
 
 $$M_{\text{act}} = L \cdot M_{\text{act}}^{\text{layer}}$$
 
-With activation checkpointing (recompute every $k$ layers):
+With activation checkpointing (recompute every $k$ layers), a common peak-memory approximation is:
 
-$$M_{\text{act}}^{\text{ckpt}} = \frac{L}{k} \cdot M_{\text{act}}^{\text{layer}}$$
+$$M_{\text{act}}^{\text{ckpt}} \approx \left(\frac{L}{k} + k\right) \cdot M_{\text{act}}^{\text{layer}}$$
 
 ### Quick Estimation Table
 
@@ -130,11 +130,11 @@ AllReduce volume per step: $2\Psi$ bytes
 
 AllReduce time (ring, P GPUs, bandwidth $\beta$):
 
-$$T_{\text{AR}} = \frac{2\Psi}{\beta} \times \frac{P-1}{P}$$
+$$T_{\text{AR}} = \frac{2(P-1)}{P} \cdot \frac{2\Psi}{\beta}$$
 
 For 70B across 128 GPUs at 50 GB/s:
 
-$$T_{\text{AR}} = \frac{140 \times 10^9}{50 \times 10^9} \times \frac{127}{128} \approx 2.8 \text{ seconds}$$
+$$T_{\text{AR}} = 2 \times \frac{127}{128} \times \frac{140 \times 10^9}{50 \times 10^9} \approx 5.6 \text{ seconds}$$
 
 ### Tensor Parallelism
 
@@ -212,22 +212,20 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     **With activation checkpointing** (checkpoint every 4 layers):
 
-    $$M_{act}^{total} = \frac{40}{4} \times 8.1 \approx 81 \text{ GB}$$
+    $$M_{act}^{total} \approx \left(\frac{40}{4} + 4\right) \times 8.1 \approx 113 \text{ GB}$$
 
-    Wait—this exceeds GPU memory! Let's apply more aggressive checkpointing (every layer):
-
-    $$M_{act}^{total} \approx 2 \times 8.1 = 16.2 \text{ GB}$$
+    This is still too large, indicating that this batch/sequence combination is unrealistic without further parallelism, smaller batches, or reduced sequence length.
 
     **Total memory per GPU:**
 
     | Component | Memory |
     |-----------|--------|
     | Static (ZeRO-3) | 6.5 GB |
-    | Activations (TP=4, checkpointing) | ~15-20 GB |
+    | Activations (TP=4, checkpointing) | ~100+ GB (too large) |
     | Temporary buffers | ~5 GB |
     | **Total** | **~27-32 GB** |
 
-    Fits comfortably in 80GB H100.
+    This does **not** fit in 80GB; you'd need more TP/PP, smaller batch/sequence, or more aggressive recompute.
 
 2. A training run achieves 150K tokens/s on 64 H100s for a 7B model. Calculate the MFU.
 
@@ -261,11 +259,11 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
 
     At 45% MFU, expected throughput would be:
 
-    $$\text{tokens/s} = \frac{0.45 \times 126,656 \times 10^{12}}{42 \times 10^9} = 1.36\text{M tokens/s}$$
+    $$\text{tokens/s} = \frac{0.45 \times 63,296 \times 10^{12}}{42 \times 10^9} \approx 0.68\text{M tokens/s}$$
 
     The observed 150K is only 11% of this potential.
 
-3. You need to train a 30B model in 30 days on a budget of $2M. Estimate the minimum number of H100s required (at $4/hr) and the required MFU to meet the timeline.
+3. You need to train a 30B model in 30 days on a budget of USD 2M. Estimate the minimum number of H100s required (at USD 4/hr) and the required MFU to meet the timeline.
 
 ??? success "Solution"
     **Budget constraint:**
@@ -313,8 +311,8 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     | Scenario | Tokens | GPUs | Required MFU |
     |----------|--------|------|--------------|
     | Chinchilla (600B) | 600B | 640 | 6.6% |
-    | Extended (2T) | 2T | 640 | 11% |
-    | Budget-limited | 2T | 512 | 14% |
+    | Extended (2T) | 2T | 640 | 22% |
+    | Budget-limited | 2T | 512 | ~28% |
 
 ## Key Takeaways
 

@@ -8,7 +8,7 @@ Hardware is expensive. Time is expensive. Inefficiency is waste. Capacity Engine
 </div>
 
 <div class="investigation-question" markdown>
-**The Question**: You have a $10M budget to train a 70B parameter model. Do you rent 1000 H100s for 2 weeks or 500 H100s for 4 weeks? The answer depends on efficiency curves, not just total GPU-hours.
+**The Question**: You have a USD 10M budget to train a 70B parameter model. Do you rent 1000 H100s for 2 weeks or 500 H100s for 4 weeks? The answer depends on efficiency curves, not just total GPU-hours.
 </div>
 
 ## The Basic Cost Equation
@@ -20,7 +20,7 @@ $$C_{\text{total}} = \underbrace{P \cdot R \cdot T}_{\text{GPU cost}} + \underbr
 Where:
 
 - $P$: number of GPUs
-- $R$: hourly rate per GPU ($/hr)
+- $R$: hourly rate per GPU (USD/hr)
 - $T$: training time in hours
 - $C_{\text{network}}$: networking costs (inter-node bandwidth, cross-region transfer)
 - $C_{\text{storage}}$: storage costs (training data, checkpoints, logs)
@@ -34,19 +34,19 @@ GPU cost typically dominates (80%+ of total), so we often approximate $C_{\text{
 
 | GPU | On-Demand | Reserved (1yr) | Spot |
 |-----|-----------|----------------|------|
-| H100 80GB | $4-5/hr | $2-3/hr | $1-2/hr |
-| A100 80GB | $2-3/hr | $1.50-2/hr | $0.50-1/hr |
-| H200 | ~$6/hr | ~$4-5/hr | Limited |
+| H100 80GB | USD 4-5/hr | USD 2-3/hr | USD 1-2/hr |
+| A100 80GB | USD 2-3/hr | USD 1.50-2/hr | USD 0.50-1/hr |
+| H200 | ~USD 6/hr | ~USD 4-5/hr | Limited |
 
 Spot instances can provide 2-3× cost reduction but require checkpoint resilience.
 
 ### On-Prem vs Cloud Break-Even
 
-On-prem H100 costs ~$30,000 + infrastructure. At $4/hr cloud pricing:
+On-prem H100 costs ~USD 30,000 + infrastructure. At USD 4/hr cloud pricing:
 
 $$\text{Break-even} = \frac{\$30,000}{\$4/\text{hr}} = 7,500 \text{ GPU-hours} \approx 10.4 \text{ months}$$
 
-If you'll run GPUs >50% utilization for >1 year, on-prem may be cheaper.
+If you'll run GPUs at ~50% utilization for ~1.7 years (or ~100% for ~0.86 years), on-prem may be cheaper.
 
 ## Efficiency Metrics
 
@@ -68,7 +68,7 @@ HFU > MFU when using activation checkpointing.
 
 $$C_{\text{token}} = \frac{C_{\text{total}}}{D}$$
 
-Where $D$ is the total number of tokens trained on. For Chinchilla-optimal training of large models, expect $0.01-0.05 per billion tokens.
+Where $D$ is the total number of tokens trained on. For Chinchilla-optimal training of large models, expect on the order of USD 100-10,000 per billion tokens depending on model size, hardware, and MFU.
 
 ## The Efficiency-Scale Trade-off
 
@@ -112,11 +112,11 @@ Solution: Find minimum $P$ that meets deadline, accounting for efficiency.
 
 ### Optimal Operating Point
 
-For a given model, there's often a "sweet spot" of parallelism where $/FLOP is minimized. This requires empirical measurement of the efficiency curve.
+For a given model, there's often a "sweet spot" of parallelism where cost per FLOP is minimized. This requires empirical measurement of the efficiency curve.
 
-## Case Study: DeepSeek's $5.6M Training
+## Case Study: DeepSeek's USD 5.6M Training
 
-DeepSeek V3 (671B MoE, 37B active) is reported/estimated to have trained for ~$5.6M:
+DeepSeek V3 (671B MoE, 37B active) is reported/estimated to have trained for ~USD 5.6M:
 
 - 2048 H800 GPUs
 - 14.8T tokens
@@ -131,7 +131,7 @@ Key cost optimizations:
 
 ## Exercises
 
-1. Calculate the GPU-hour cost to train a 70B dense model for 2T tokens on H100s at $4/hr, assuming 45% MFU.
+1. Calculate the GPU-hour cost to train a 70B dense model for 2T tokens on H100s at USD 4/hr, assuming 45% MFU.
 
 ??? success "Solution"
     **Total FLOPs required** (using the $6\Psi D$ approximation where $\Psi$ = parameters, $D$ = tokens):
@@ -185,7 +185,7 @@ Key cost optimizations:
 
     **Lesson**: Efficiency matters more than parallelism degree for cost optimization. Only scale up if you can maintain high MFU.
 
-3. A spot instance costs $1.50/hr but has 5% chance of preemption per hour. On-demand costs $4/hr. If checkpointing overhead is 5% of training time, at what preemption frequency does spot become more expensive than on-demand?
+3. A spot instance costs USD 1.50/hr but has 5% chance of preemption per hour. On-demand costs USD 4/hr. If checkpointing overhead is 5% of training time, at what preemption frequency does spot become more expensive than on-demand?
 
 ??? success "Solution"
     **Setup:**
@@ -214,7 +214,7 @@ Key cost optimizations:
 
     For hourly checkpoints ($c = 1$) with 5% overhead:
 
-    $$T_{eff} = T(1.05 + 0.5p \times T_{eff})$$
+    $$T_{eff} = 1.05T + 0.5p \times T_{eff}$$
 
     Solving: $T_{eff} = \frac{1.05T}{1 - 0.5p}$ (for small $pT$)
 

@@ -177,7 +177,7 @@ flowchart LR
 
 ### AllReduce
 
-Optimal (ring) algorithm for $P$ processes with $n$ bytes each:
+Bandwidth-optimal (ring) algorithm for large messages with $P$ processes and $n$ bytes each:
 
 $$T_{\text{AllReduce}}(n, P) = 2(P-1)\alpha + \frac{2(P-1)}{P} \cdot \frac{n}{\beta}$$
 
@@ -186,6 +186,7 @@ As $P \to \infty$:
 $$T_{\text{AllReduce}} \approx 2P\alpha + \frac{2n}{\beta}$$
 
 The latency term grows with $P$, but the bandwidth term is independent of $P$ (for ring algorithm).
+For small messages, tree/recursive-doubling algorithms reduce the latency term to $O(\log P)$.
 
 ### Breakdown of AllReduce Costs
 
@@ -205,7 +206,7 @@ Each GPU starts with a tensor of size $n$. After ReduceScatter, each GPU holds $
 
 $$T_{\text{AllGather}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
-Each GPU starts with a piece of size $n/P$ and ends with the complete tensor of size $n$. The ring algorithm passes each piece around the ring, requiring $P-1$ steps. AllGather is the inverse of ReduceScatter and the second half of ring AllReduce.
+Each GPU starts with a piece of size $n/P$ and ends with the complete tensor of size $n$. The ring algorithm passes each piece around the ring, requiring $P-1$ steps. AllGather is the complementary second half of ring AllReduce.
 
 ### AllToAll
 
@@ -224,7 +225,7 @@ Think of it as a matrix transpose where rows are source GPUs and columns are des
 
 After AllToAll, GPU $j$ holds column $j$: the chunks that were in position $j$ on every GPU.
 
-**Why the same cost as AllGather?** Despite the different semantics, each GPU sends $(P-1)/P$ of its data (everything except the chunk it keeps) and receives $(P-1)/P$ from others. The total data movement is identical.
+**Why the same cost as AllGather?** For the direct-exchange implementation, each GPU sends $(P-1)/P$ of its data (everything except the chunk it keeps) and receives $(P-1)/P$ from others. The total data movement is identical; other algorithms have different constants.
 
 **Use cases:**
 
