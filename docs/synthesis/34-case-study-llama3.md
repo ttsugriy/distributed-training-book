@@ -112,7 +112,7 @@ LLaMA 3 405B architecture:
 
 ### Per-Layer Memory
 
-**Attention block**:
+**Attention block (QKV only)**:
 
 $$M_{\text{attn}} = 4 \times d_{\text{model}}^2 = 4 \times 16384^2 \times 2 = 2.15 \text{ GB}$$
 
@@ -121,6 +121,12 @@ Wait—this uses GQA with 8 KV heads, so:
 $$M_{QKV} = d_{\text{model}} \times (d_{\text{model}} + 2 \times \frac{d_{\text{model}} \times n_{\text{kv}}}{n_{\text{heads}}}) \times 2$$
 
 $$= 16384 \times (16384 + 2 \times \frac{16384 \times 8}{128}) \times 2 = 16384 \times (16384 + 2048) \times 2 \approx 0.61 \text{ GB}$$
+
+**Output projection**:
+
+$$M_{O} = d_{\text{model}}^2 \times 2 \approx 0.54 \text{ GB}$$
+
+**Attention total** (QKV + output): ~1.15 GB
 
 **FFN block** (SwiGLU has 3 matrices):
 
@@ -154,11 +160,11 @@ LLaMA 3 uses TP=8, matching the 8 GPUs per node connected via NVLink.
 
 For TP across NVLink (900 GB/s bidirectional on H100):
 
-$$T_{\text{comm}} = \alpha + \frac{4 \times B \times S \times d_{\text{model}}}{8 \times \beta}$$
+$$T_{\text{comm}} = \alpha + \frac{4 \times B \times S \times d_{\text{model}} \times 2}{8 \times \beta}$$
 
 For $B=1$, $S=8192$, $d=16384$:
 
-$$\text{Data per AllReduce} = 4 \times 1 \times 8192 \times 16384 = 537 \text{ MB}$$
+$$\text{Data per AllReduce} = 4 \times 1 \times 8192 \times 16384 \times 2 \approx 1.07 \text{ GB}$$
 
 With ring AllReduce:
 
@@ -186,11 +192,11 @@ This leaves ~32 GB for activations, optimizer states (sharded), and working memo
 
 For 1F1B schedule with micro-batch count $m$:
 
-$$\text{Bubble fraction} = \frac{p-1}{m}$$
+$$\text{Bubble fraction} = \frac{p-1}{m+p-1}$$
 
 With $p=16$ and $m=64$ micro-batches:
 
-$$\text{Bubble} = \frac{15}{64} \approx 23\%$$
+$$\text{Bubble} = \frac{15}{79} \approx 19\%$$
 
 This represents a significant efficiency loss, but is necessary for memory constraints.
 
@@ -266,9 +272,9 @@ Computing MFU for LLaMA 3 405B:
 
 **Forward FLOPs per token**:
 
-$$F_{\text{fwd}} = 2 \times \Psi \times 2 = 4\Psi = 4 \times 405 \times 10^9 = 1.62 \times 10^{12}$$
+$$F_{\text{fwd}} \approx 2N = 2 \times 405 \times 10^9 = 8.1 \times 10^{11}$$
 
-(Factor of 2 for forward, factor of 2 for backward = 4× total, but we count 6× including backward activations)
+(Backward is ~4N, so total per token is ~6N.)
 
 **Per step with 1M tokens**:
 
@@ -280,7 +286,7 @@ $$F_{\text{peak}} = 16384 \times 989 \times 10^{12} = 1.62 \times 10^{19} \text{
 
 If step takes 0.3 seconds:
 
-$$\text{MFU} = \frac{2.43 \times 10^{18}}{3.24 \times 10^{19} \times 0.3} \approx 0.50 = 50\%$$
+$$\text{MFU} = \frac{2.43 \times 10^{18}}{1.62 \times 10^{19} \times 0.3} \approx 0.50 = 50\%$$
 
 ### Efficiency Breakdown
 
@@ -288,7 +294,7 @@ Where does the efficiency go?
 
 | Factor | Efficiency Loss |
 |--------|----------------|
-| Pipeline bubble | 23% |
+| Pipeline bubble | 19% |
 | Communication overhead | 15% |
 | Memory operations | 10% |
 | Load imbalance | 5% |
@@ -372,7 +378,9 @@ $$C_{\text{ckpt}} = 810\text{ GB (params)} + 3240\text{ GB (opt)} = 4.05 \text{ 
 
 **Checkpoint time** (to parallel filesystem):
 
-$$T_{\text{ckpt}} = \frac{4.05 \text{ TB}}{16384 \text{ GPUs} \times 5 \text{ GB/s}} \approx 50 \text{ seconds}$$
+Assuming **aggregate** filesystem bandwidth of 5 GB/s:
+
+$$T_{\text{ckpt}} = \frac{4.05 \text{ TB}}{5 \text{ GB/s}} \approx 810 \text{ s} \approx 13.5 \text{ min}$$
 
 With asynchronous checkpointing, this overlaps with training.
 
@@ -406,7 +414,7 @@ class ReplicatedCheckpoint:
 
         # Replicate to partner node
         partner_rank = get_partner_rank(dist.get_rank())
-        dist.send(state, partner_rank)
+        dist.send_object_list([state], partner_rank)
 
     def restore(self, failed_ranks):
         # If our checkpoint is valid, provide to failed ranks
@@ -424,11 +432,11 @@ LLaMA 3 was trained on 8K context, then extended to 128K.
 
 **Memory scaling with sequence length**:
 
-$$M_{\text{attn}} = O(B \times L \times S^2)$$
+$$M_{\text{attn}} = O(B \times L \times n_{\text{heads}} \times S^2)$$
 
 For $S = 128K$:
 
-$$M_{\text{attn}} = 126 \times 128 \times 8192 \times 128000^2 \times 2 / \text{TP} \rightarrow \text{Explodes!}$$
+$$M_{\text{attn}} \approx 126 \times 128 \times 128000^2 \times 2 \text{ bytes} \approx 500 \text{ TB}$$
 
 ### Context Parallelism
 
@@ -523,7 +531,7 @@ class LLaMA3Analyzer:
         # Hardware
         self.gpus = 16384
         self.gpu_memory = 80  # GB
-        self.nvlink_bw = 600  # GB/s
+        self.nvlink_bw = 900  # GB/s (aggregate; use lower for effective bw)
         self.ib_bw = 50  # GB/s
         self.peak_flops = 989e12  # FP16/BF16 dense
 
@@ -610,7 +618,7 @@ class LLaMA3Analyzer:
 
     def pipeline_bubble_fraction(self, microbatches: int):
         """Calculate pipeline bubble overhead."""
-        return (self.pp - 1) / microbatches
+        return (self.pp - 1) / (microbatches + self.pp - 1)
 
     def estimate_mfu(self, tokens_per_step: int, step_time: float):
         """Estimate Model FLOP Utilization."""

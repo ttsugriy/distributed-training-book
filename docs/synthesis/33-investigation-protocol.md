@@ -64,10 +64,12 @@ Each phase has specific questions, tools, and outputs.
 ### Quick Health Check
 
 ```python
-def triage_check():
+import time
+
+def triage_check(heartbeat_store):
     """First-response triage for distributed training."""
     checks = {
-        'processes_alive': check_all_ranks_alive(),
+        'processes_alive': check_all_ranks_alive(heartbeat_store),
         'gpus_visible': check_gpu_visibility(),
         'nccl_initialized': check_nccl_init(),
         'memory_available': check_memory_headroom(),
@@ -90,18 +92,16 @@ def triage_check():
         'warning': warning,
     }
 
-def check_all_ranks_alive():
-    """Check if all distributed processes are running."""
-    try:
-        alive_tensor = torch.ones(1, device='cuda')
-        dist.all_reduce(alive_tensor, op=dist.ReduceOp.SUM)
-        expected = dist.get_world_size()
-        if alive_tensor.item() == expected:
-            return 'OK'
-        else:
-            return 'FAIL'
-    except Exception as e:
-        return 'FAIL'
+def check_all_ranks_alive(heartbeat_store) -> str:
+    """Non-blocking liveness check using an external heartbeat store."""
+    now = time.time()
+    heartbeat_store.write(dist.get_rank(), now)
+
+    if dist.get_rank() == 0:
+        timestamps = heartbeat_store.read_all()
+        stale = any(now - t > 30 for t in timestamps.values())
+        return 'FAIL' if stale else 'OK'
+    return 'OK'
 
 def check_memory_headroom():
     """Check for sufficient GPU memory."""
@@ -420,8 +420,13 @@ class PerformanceRegression:
 Divide and conquer to find the problematic component.
 
 ```python
+from typing import Tuple
+
 class BisectionDebugger:
     """Systematic isolation through bisection."""
+
+    def __init__(self, input_shape: Tuple[int, ...]):
+        self.input_shape = input_shape
 
     def bisect_scale(self, working_scale: int, failing_scale: int):
         """
@@ -621,13 +626,15 @@ class TopologyAnalyzer:
         tensor_size = 100 * 1024 * 1024  # 100MB
 
         for src, dst in sample_ranks:
+            # Ensure all ranks synchronize for each measurement
+            dist.barrier()
+
             if rank == src or rank == dst:
                 tensor = torch.zeros(tensor_size // 4, dtype=torch.float32, device='cuda')
 
                 if rank == src:
                     tensor.fill_(1.0)
 
-                dist.barrier()
                 start = time.perf_counter()
 
                 if rank == src:
@@ -671,10 +678,8 @@ class FiveWhysAnalyzer:
         """
         Guide through Five Whys analysis.
 
-        Returns a chain of causes leading to root cause.
+        Returns a template chain of causes for common symptoms.
         """
-        chain = [{'level': 0, 'what': symptom, 'why': None}]
-
         templates = {
             'OOM': [
                 "Memory allocation exceeded GPU capacity",

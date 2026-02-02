@@ -394,10 +394,10 @@ class FP8GradScaler:
 
 FP8 tensor cores provide 2× throughput vs BF16:
 
-| GPU | BF16 TFLOPs | FP8 TFLOPs |
-|-----|-------------|------------|
-| H100 SXM | 1,979 | 3,958 |
-| H800 | ~1,600 | ~3,200 |
+| GPU | BF16 TFLOPs (dense) | FP8 TFLOPs (dense) |
+|-----|---------------------|--------------------|
+| H100 SXM | ~989 | ~1,979 |
+| H800 | ~1,000 | ~2,000 |
 
 With careful quantization, DeepSeek achieves ~1.8× speedup using FP8.
 
@@ -405,9 +405,9 @@ With careful quantization, DeepSeek achieves ~1.8× speedup using FP8.
 
 Standard 1F1B (one-forward-one-backward) has bubble fraction:
 
-$$\text{Bubble} = \frac{p-1}{m}$$
+$$\text{Bubble} = \frac{p-1}{m+p-1}$$
 
-For $p=16$ stages and $m=32$ micro-batches: $47\%$ bubble!
+For $p=16$ stages and $m=32$ micro-batches: $15/47 \approx 32\%$ bubble.
 
 ### The DualPipe Innovation
 
@@ -577,15 +577,17 @@ def expert_forward(tokens, routing_indices, routing_weights):
 
 ### Communication Volume
 
-**Per layer All-to-All**:
+**Per layer All-to-All** (per expert-parallel group):
 
-$$V_{\text{A2A}} = 2 \times (n-1)/n \times B \times S \times d_{\text{model}} \times \text{top-k}/n_{\text{experts}}$$
+Let $E_p$ be the expert-parallel group size and $E$ the number of experts.
 
-With 2048 GPUs, $B \times S = 4M$ tokens, $d=7168$, top-k=8, 256 experts:
+$$V_{\text{A2A}} = 2 \times \frac{E_p-1}{E_p} \times B \times S \times d_{\text{model}} \times \frac{\text{top-k}}{E}$$
 
-$$V_{\text{A2A}} = 2 \times 0.9995 \times 4M \times 7168 \times 8/256 \times 2 \text{ bytes}$$
+With 2048 GPUs, $B \times S = 4M$ tokens, $d=7168$, top-k=8, $E=256$, and $E_p=16$:
 
-$$\approx 3.5 \text{ GB per rank per layer}$$
+$$V_{\text{A2A}} \approx 2 \times \frac{15}{16} \times 4M \times 7168 \times \frac{8}{256} \times 2 \text{ bytes}$$
+
+$$\approx 3.3 \text{ GB per rank per layer}$$
 
 For 60 layers:
 
@@ -613,11 +615,12 @@ DeepSeek-V3 training infrastructure:
 config = {
     'tensor_parallel': 1,      # No TP (small experts)
     'pipeline_parallel': 16,   # 16 stages
-    'expert_parallel': 256,    # All experts distributed
+    'expert_parallel': 16,     # Expert-parallel group size
+    'num_experts': 256,
     'data_parallel': 8,        # 8 replicas of expert groups
     'context_parallel': 1,     # Single sequence per rank
 
-    'total_gpus': 1 * 16 * 256 * 8 / 256 = 2048,
+    'total_gpus': 1 * 16 * 16 * 8 = 2048,
 
     'microbatches': 64,
     'global_batch_tokens': 15M,
@@ -670,7 +673,7 @@ $$\text{Cost} = 2.788\text{M hours} \times \$2 = \$5.58\text{M}$$
 
 Compared to dense training:
 
-$$\text{Dense equivalent} = \frac{5.96 \times 10^{25}}{6.55 \times 10^{18} \times 0.3} \times 2048 \approx 100\text{M hours}$$
+$$\text{Dense equivalent} = \frac{5.96 \times 10^{25}}{6.55 \times 10^{18} \times 0.3} \times \frac{2048}{3600} \approx 17\text{M GPU-hours}$$
 
 The MoE sparsity provides ~36× compute efficiency, reduced to ~18× accounting for communication overhead.
 

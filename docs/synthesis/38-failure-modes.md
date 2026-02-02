@@ -58,7 +58,7 @@ Start with the invariants:
 - Imbalanced stage assignment
 
 **Fast checks**:
-- Compute bubble fraction: $(P-1)/(m+P-1)$
+- Compute bubble fraction: $(p-1)/(m+p-1)$ (p = pipeline stages)
 - Increase micro-batches or rebalance layers
 
 ### 4. Divergence at Scale

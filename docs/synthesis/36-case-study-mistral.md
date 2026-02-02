@@ -114,13 +114,13 @@ class SlidingWindowKVCache:
 
 ### Effective Context Through Stacking
 
-With $L$ layers and window size $w$, the effective receptive field grows:
+With $L$ layers and window size $w$, the effective receptive field grows (upper bound):
 
-$$\text{Effective context} = L \cdot w$$
+$$\text{Effective context} \leq L \cdot w$$
 
 For Mistral 7B with $L = 32$ layers and $w = 4096$:
 
-$$\text{Effective context} = 32 \times 4096 = 131072 \text{ tokens}$$
+$$\text{Effective context} \leq 32 \times 4096 = 131072 \text{ tokens}$$
 
 Information propagates through the network even though each layer only sees $w$ tokens.
 
@@ -153,7 +153,7 @@ def sliding_window_mask(seq_len: int, window_size: int) -> torch.Tensor:
 
     # Window: can only attend to positions within window
     positions = torch.arange(seq_len)
-    window = (positions.unsqueeze(0) - positions.unsqueeze(1)) < window_size
+    window = (positions.unsqueeze(1) - positions.unsqueeze(0)) < window_size
 
     return causal & window
 
@@ -542,10 +542,10 @@ class EfficientMoE(nn.Module):
 
         # Build permutation indices
         # Group tokens by their assigned experts
-        sorted_indices, expert_counts = self._compute_permutation(expert_indices_flat)
+        sorted_token_ids, expert_counts = self._compute_permutation(expert_indices_flat)
 
         # Permute tokens by expert assignment
-        x_permuted = x_flat[sorted_indices]  # Tokens grouped by expert
+        x_permuted = x_flat[sorted_token_ids]  # Tokens grouped by expert
 
         # Compute expert outputs using batched matrix multiply
         expert_outputs = self._batched_expert_forward(x_permuted, expert_counts)
@@ -553,7 +553,7 @@ class EfficientMoE(nn.Module):
         # Unpermute back to original order
         output_flat = torch.zeros_like(x_flat)
         output_flat = self._weighted_accumulate(
-            expert_outputs, sorted_indices, expert_weights_flat, expert_indices_flat
+            expert_outputs, sorted_token_ids, expert_weights_flat, expert_indices_flat
         )
 
         output = output_flat.view(batch, seq_len, d_model)
@@ -571,14 +571,16 @@ class EfficientMoE(nn.Module):
 
         # Flatten expert selections
         flat_indices = expert_indices.view(-1)  # [n_tokens * top_k]
+        token_ids = torch.arange(n_tokens, device=expert_indices.device).repeat_interleave(self.top_k)
 
         # Sort by expert index
         _, perm = flat_indices.sort(stable=True)
+        sorted_token_ids = token_ids[perm]
 
         # Count tokens per expert
         expert_counts = torch.bincount(flat_indices, minlength=self.n_experts)
 
-        return perm, expert_counts
+        return sorted_token_ids, expert_counts
 
     def _batched_expert_forward(
         self, x: torch.Tensor, expert_counts: torch.Tensor
@@ -1004,7 +1006,7 @@ ratio = compute_active_ratio(
 
 ### Training Speed
 
-Mixtral 8x7B processes tokens at similar speed to Mistral 7B despite 6.5× more total parameters:
+Mixtral 8x7B processes tokens **slower** than Mistral 7B despite 6.5× more total parameters:
 
 $$\text{Speed ratio} \approx \frac{\text{Active params}}{\text{Mistral params}} = \frac{12.9B}{7.3B} \approx 1.8\times$$
 
@@ -1022,7 +1024,7 @@ Training is ~1.8× slower per token than Mistral 7B, but achieves LLaMA 2 70B qu
     With window size $w$ and $L$ layers, information propagates through layers:
     - Layer 1: Each token sees $w$ tokens
     - Layer 2: Each token sees tokens that saw $w$ tokens each → effective $2w$
-    - Layer $L$: Effective context = $L \times w$
+    - Layer $L$: Effective context $\leq L \times w$
 
     **Effective context length:**
     $$C_{eff} = L \times w$$

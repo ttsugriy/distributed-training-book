@@ -21,7 +21,7 @@ Three equations form the backbone of distributed training analysis:
 
 **The Memory Equation** (Chapter 19):
 
-$$M = \underbrace{P \cdot b_p}_{\text{parameters}} + \underbrace{P \cdot b_o}_{\text{optimizer}} + \underbrace{P \cdot b_g}_{\text{gradients}} + \underbrace{A(B, S, d)}_{\text{activations}}$$
+$$M = \underbrace{\Psi \cdot b_p}_{\text{parameters}} + \underbrace{\Psi \cdot b_o}_{\text{optimizer}} + \underbrace{\Psi \cdot b_g}_{\text{gradients}} + \underbrace{A(B, S, d)}_{\text{activations}}$$
 
 Every parallelism strategy is a different factorization of this equation across GPUs.
 
@@ -33,7 +33,7 @@ Every collective operation obeys this model. Latency-bound operations (small $n$
 
 **The Compute Efficiency Model** (Chapter 6):
 
-$$\text{MFU} = \frac{\text{Achieved FLOPs}}{\text{Peak FLOPs}} = \frac{6 \cdot P \cdot \text{tokens}}{\text{time} \cdot \text{peak FLOPs}}$$
+$$\text{MFU} = \frac{\text{Achieved FLOPs}}{\text{Peak FLOPs}} = \frac{6 \cdot \Psi \cdot \text{tokens}}{\text{time} \cdot \text{peak FLOPs}}$$
 
 This reveals what fraction of hardware capability we actually use. The gap between peak and achieved is where optimization lives.
 
@@ -46,7 +46,7 @@ All parallelism strategies answer one question differently: **what do you replic
 | Data Parallel | Data | Model | AllReduce gradients |
 | Tensor Parallel | Model (intra-layer) | Data | AllReduce activations |
 | Pipeline Parallel | Model (inter-layer) | Data | Point-to-point activations |
-| Expert Parallel | Experts | Router, attention | AlltoAll tokens |
+| Expert Parallel | Experts | Router, attention | All-to-All tokens |
 | Sequence Parallel | Sequence | Model | AllGather/ReduceScatter |
 | Context Parallel | Context (attention) | Model | Ring attention |
 

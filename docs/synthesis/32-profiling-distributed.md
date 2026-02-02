@@ -20,7 +20,7 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 
 ## The Profiling Imperative
 
-At scale, inefficiency compounds. A 10% inefficiency on one GPU becomes 640 GPU-hours wasted per day on 64 GPUs. Understanding *exactly* where time goes is essential.
+At scale, inefficiency compounds. A 10% inefficiency on one GPU becomes ~154 GPU-hours wasted per day on 64 GPUs. Understanding *exactly* where time goes is essential.
 
 ### What We Measure
 
@@ -41,7 +41,7 @@ Distributed training profiling examines four domains:
 **3. Memory**
 - Peak allocation
 - Fragmentation
-- Data movement (HBM ↔ device, host ↔ device)
+- Data movement (HBM ↔ host, host ↔ device)
 - Cache hit rates
 
 **4. Orchestration**
@@ -56,7 +56,7 @@ Every training step has a fixed time budget:
 
 $$T_{\text{step}} = T_{\text{forward}} + T_{\text{backward}} + T_{\text{comm}} + T_{\text{optimizer}} + T_{\text{other}}$$
 
-The goal: minimize $T_{\text{step}}$ while maintaining model quality.
+The goal: minimize $T_{\text{step}}$ while maintaining model quality. Here, $T_{\text{compute}}$ typically means forward + backward + optimizer kernel time.
 
 With perfect overlap:
 
@@ -573,7 +573,7 @@ num_gpus = 1024
 peak_per_gpu = 312e12  # A100 FP16 peak
 
 mfu = calculate_mfu(model_flops, batch_size, step_time, num_gpus, peak_per_gpu)
-print(f"MFU: {mfu:.1%}")  # Typically 30-50% for large models
+print(f"MFU: {mfu:.1%}")  # ~11% for these numbers; higher MFU needs shorter step time
 ```
 
 ### Hardware FLOP Utilization (HFU)
@@ -772,22 +772,22 @@ class CollectiveTimePredictor:
         return num_steps * self.alpha + effective_size / self.beta
 
     def allgather(self, size_bytes: int) -> float:
-        """Predict AllGather time."""
-        # Each rank gathers (P-1) chunks of size n
+        """Predict AllGather time (size_bytes is per-rank input)."""
+        # Each rank receives (P-1) chunks of size size_bytes
         effective_size = (self.world_size - 1) * size_bytes
         num_steps = self.world_size - 1
         return num_steps * self.alpha + effective_size / self.beta
 
     def reduce_scatter(self, size_bytes: int) -> float:
-        """Predict ReduceScatter time."""
-        # Similar to AllGather
+        """Predict ReduceScatter time (size_bytes is per-rank input)."""
+        # Each rank sends/receives (P-1)/P of its input
         effective_size = (self.world_size - 1) / self.world_size * size_bytes
         num_steps = self.world_size - 1
         return num_steps * self.alpha + effective_size / self.beta
 
     def alltoall(self, size_bytes: int) -> float:
-        """Predict AlltoAll time."""
-        # Each rank sends (P-1) messages
+        """Predict AlltoAll time (size_bytes is per-rank total input)."""
+        # Each rank sends (P-1)/P of its input
         effective_size = (self.world_size - 1) / self.world_size * size_bytes
         num_steps = self.world_size - 1
         return num_steps * self.alpha + effective_size / self.beta
@@ -987,14 +987,19 @@ class ZeROProfiler:
         """Analyze memory savings vs communication overhead."""
         print(f"\n=== ZeRO Stage {self.stage} Analysis ===")
 
-        # Memory reduction factors
-        memory_factors = {1: self.world_size, 2: self.world_size, 3: self.world_size}
+        # Memory reduction factors (for total model state: params + grads + optimizer)
+        P = self.world_size
+        mem_factors = {
+            1: 16 / (4 + 12 / P),
+            2: 16 / (2 + 14 / P),
+            3: P,
+        }
 
-        # Communication overhead factors (relative to data parallelism)
-        comm_factors = {1: 1.0, 2: 1.0, 3: 1.5}  # Stage 3 adds AllGather
+        # Communication overhead factors (rough bandwidth relative to DP)
+        comm_factors = {1: 1.0, 2: 2.0, 3: 3.0}
 
-        print(f"Memory reduction: {memory_factors[self.stage]}x")
-        print(f"Communication overhead: {comm_factors[self.stage]:.1f}x vs DP")
+        print(f"Memory reduction: {mem_factors[self.stage]:.1f}x (approx)")
+        print(f"Communication overhead: {comm_factors[self.stage]:.1f}x vs DP (approx)")
 ```
 
 ## Distributed Profiling Coordination
