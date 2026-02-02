@@ -69,7 +69,7 @@ import numpy as np
 @dataclass
 class QuantizedTensor:
     """Quantized representation of a tensor."""
-    data: np.ndarray        # Quantized values (int8, int4, etc.)
+    data: np.ndarray        # Quantized values (uint8, int4 packed, etc.)
     scale: float            # Scaling factor
     zero_point: float       # Zero point for asymmetric quantization
     original_shape: Tuple[int, ...]
@@ -93,7 +93,7 @@ class NaiveQuantizer:
         # Handle degenerate case
         if t_max == t_min:
             return QuantizedTensor(
-                data=np.zeros(tensor.shape, dtype=np.int8),
+                data=np.zeros(tensor.shape, dtype=np.uint8),
                 scale=1.0,
                 zero_point=0.0,
                 original_shape=tensor.shape
@@ -104,7 +104,7 @@ class NaiveQuantizer:
         zero_point = t_min / scale
 
         # Quantize
-        quantized = np.round(tensor / scale - zero_point).astype(np.int8)
+        quantized = np.round(tensor / scale - zero_point).astype(np.uint8)
 
         return QuantizedTensor(
             data=quantized,
@@ -156,7 +156,7 @@ class QSGDQuantizer:
         # Compute norm and signs
         norm = np.linalg.norm(gradient)
         if norm == 0:
-            return np.zeros_like(gradient, dtype=np.int8), 0.0, np.zeros(gradient.shape)
+            return np.zeros_like(gradient, dtype=np.int8), 0.0, np.zeros(gradient.shape, dtype=np.uint8)
 
         signs = np.sign(gradient).astype(np.int8)
 
@@ -170,7 +170,7 @@ class QSGDQuantizer:
 
         # Random rounding
         random_vals = np.random.random(gradient.shape)
-        levels = np.where(random_vals < prob, lower + 1, lower).astype(np.int8)
+        levels = np.where(random_vals < prob, lower + 1, lower).astype(np.uint8)
 
         return signs, norm, levels
 
@@ -461,12 +461,13 @@ class DeepGradientCompressor:
         if self.warmup_epochs == 0:
             return []
 
-        # Exponential warmup: 75% -> 93.75% -> 98.4% -> 99.6% -> 99.9%
+        # Linear warmup from 75% to target sparsity
         schedule = []
-        current = 0.75
-        for _ in range(self.warmup_epochs):
-            schedule.append(current)
-            current = 1 - (1 - current) * (1 - self.sparsity) / (1 - current)
+        start = 0.75
+        end = self.sparsity
+        for i in range(self.warmup_epochs):
+            frac = (i + 1) / self.warmup_epochs
+            schedule.append(start + (end - start) * frac)
         return schedule
 
     def compress(self, gradient: np.ndarray, epoch: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -703,7 +704,7 @@ class PowerSGDOptimizer:
         # Create compressor for each parameter
         self.compressors = {}
         for i, param in enumerate(model_parameters):
-            if param.size >= min_compression_dim:
+            if param.numel() >= min_compression_dim:
                 # Reshape to 2D for matrix compression
                 shape_2d = self._to_2d_shape(param.shape)
                 self.compressors[i] = PowerSGD(shape_2d, rank)

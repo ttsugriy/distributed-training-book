@@ -53,22 +53,22 @@ Define:
 - $T_m$: Communication time (AllReduce)
 - $\alpha$: Overlap fraction (0 = no overlap, 1 = perfect overlap)
 
-Total time with overlap:
+Total time with overlap (capped by the longer of compute/comm):
 
-$$T_{\text{total}} = T_c + (1 - \alpha) \cdot T_m$$
+$$T_{\text{total}} = T_c + T_m - \alpha \cdot \min(T_c, T_m)$$
 
 **Speedup**:
 
-$$\text{Speedup} = \frac{T_c + T_m}{T_c + (1 - \alpha) \cdot T_m} = \frac{1 + T_m/T_c}{1 + (1-\alpha) \cdot T_m/T_c}$$
+$$\text{Speedup} = \frac{T_c + T_m}{T_c + T_m - \alpha \cdot \min(T_c, T_m)}$$
 
-For perfect overlap ($\alpha = 1$): Speedup $= 1 + T_m/T_c$
+For perfect overlap ($\alpha = 1$): Speedup $= \frac{T_c + T_m}{\max(T_c, T_m)}$
 
 | $T_m/T_c$ | No Overlap | 50% Overlap | Perfect Overlap |
 |-----------|------------|-------------|-----------------|
 | 0.25 | 1.0× | 1.11× | 1.25× |
 | 0.50 | 1.0× | 1.20× | 1.50× |
 | 1.00 | 1.0× | 1.33× | 2.00× |
-| 2.00 | 1.0× | 1.50× | 3.00× |
+| 2.00 | 1.0× | 1.20× | 1.50× |
 
 When communication dominates ($T_m \gg T_c$), overlap becomes critical.
 
@@ -536,9 +536,10 @@ class DoubleBufferedOptimizer:
     Use two sets of weights to overlap update with next iteration.
     """
 
-    def __init__(self, model, base_optimizer):
+    def __init__(self, model, base_optimizer, lr: float):
         self.model = model
         self.base_optimizer = base_optimizer
+        self.lr = lr
 
         # Two sets of weights
         self.weights_a = {
@@ -666,7 +667,7 @@ class ZeRO1WithOverlap:
                     device=flat_grad.device
                 )
                 handle = dist.reduce_scatter(
-                    output, [flat_grad.chunk(self.world_size)],
+                    output, list(flat_grad.chunk(self.world_size)),
                     group=self.process_group,
                     async_op=True
                 )

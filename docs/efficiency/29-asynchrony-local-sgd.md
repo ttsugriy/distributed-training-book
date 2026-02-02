@@ -197,9 +197,9 @@ Worker $i$ computes $g_i = \nabla L(w^{(t-\tau_i)}, x_i)$ but applies to $w^{(t)
 
 **Staleness** $\tau_i$ is the number of updates since worker pulled weights.
 
-With $P$ workers and equal compute times:
+With $P$ workers and equal compute times, average staleness is closer to:
 
-$$\mathbb{E}[\tau] = P - 1$$
+$$\mathbb{E}[\tau] \approx \frac{P - 1}{2}$$
 
 **Convergence impact**: Stale gradients introduce bias.
 
@@ -213,11 +213,11 @@ Where:
 - $\eta$ = learning rate
 - $G$ = gradient bound
 
-**Key insight**: Must reduce learning rate to compensate for staleness:
+**Key insight**: Must reduce learning rate to compensate for staleness. A common heuristic is:
 
-$$\eta_{\text{async}} = \frac{\eta_{\text{sync}}}{\tau}$$
+$$\eta_{\text{async}} = \frac{\eta_{\text{sync}}}{1 + c\tau}$$
 
-This partially negates the throughput advantage!
+This partially negates the throughput advantage, and different heuristics are used in practice.
 
 ### Staleness-Adaptive Learning Rate
 

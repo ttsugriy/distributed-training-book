@@ -134,7 +134,7 @@ Weights are stored and updated in FP32:
 
 ```python
 class MixedPrecisionOptimizer:
-    def __init__(self, model, base_optimizer):
+    def __init__(self, model, base_optimizer, lr: float):
         # Master weights in FP32
         self.master_weights = {
             name: param.data.float().clone()
@@ -142,6 +142,7 @@ class MixedPrecisionOptimizer:
         }
         self.model = model
         self.base_optimizer = base_optimizer
+        self.lr = lr
 
     def step(self):
         # Gradients accumulated in FP16, now in master copy
@@ -354,8 +355,8 @@ BF16 trades mantissa bits for exponent bits:
 ```python
 def fp32_to_bf16(x: np.ndarray) -> np.ndarray:
     """Convert FP32 to BF16 by truncating mantissa."""
-    # View as 32-bit int
-    x_int = x.view(np.int32)
+    # View as 32-bit unsigned int to avoid sign issues
+    x_int = x.view(np.uint32)
 
     # Round to nearest (add 0x8000 for rounding, not truncation)
     x_int = x_int + 0x8000
