@@ -84,9 +84,9 @@ title: "References"
 
 ## Hardware References
 
-- NVIDIA H100 Tensor Core GPU Architecture Whitepaper (2022)
-- NVIDIA DGX H100 System Architecture Guide
-- InfiniBand Trade Association. **InfiniBand Architecture Specification**
+- NVIDIA (2022). **H100 Tensor Core GPU Architecture Whitepaper**.
+- NVIDIA. **DGX H100 System Architecture Guide**.
+- InfiniBand Trade Association. **InfiniBand Architecture Specification**.
 
 ## Classic Distributed Computing
 

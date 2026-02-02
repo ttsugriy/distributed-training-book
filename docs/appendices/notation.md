@@ -31,8 +31,8 @@ $$T(n) = \alpha + \frac{n}{\beta}$$
 | $\Psi$ | Parameters | count |
 | $N$ | Parameters (legacy in some chapters) | count |
 | $D$ | Training tokens | tokens |
-| $B$ | Global batch (tokens) | tokens/step |
-| $b$ | Per-GPU batch (tokens) | tokens/step |
+| $B$ | Global batch (sequences) | sequences/step |
+| $b$ | Per-GPU batch (sequences) | sequences/step |
 | $S$ | Sequence length | tokens |
 | $H$ | Hidden size | dimension |
 | $L$ | Layers | count |
@@ -42,6 +42,8 @@ $$T(n) = \alpha + \frac{n}{\beta}$$
 | $\alpha$ | Latency | seconds |
 | $T$ | Time | seconds |
 | MFU | Model FLOP Utilization | ratio |
+
+Total tokens per step are $B \cdot S$ unless stated otherwise.
 
 ## Interpretation Tags
 

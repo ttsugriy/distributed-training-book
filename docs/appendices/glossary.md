@@ -6,9 +6,9 @@ title: "Glossary"
 
 **AllGather**: Collective operation where each process contributes a shard; result is the concatenation of all shards on all processes.
 
-**AllReduce**: Collective operation combining values from all processes and distributing the result to all. Equivalent to ReduceScatter followed by AllGather.
+**AllReduce**: Collective operation combining values from all processes and distributing the result to all. Equivalent to ReduceScatter followed by AllGather for associative/commutative reductions (algorithmic equivalence, not a semantic inverse).
 
-**AlltoAll**: Collective operation performing a transpose; each process sends different data to each other process.
+**All-to-All (AlltoAll)**: Collective operation performing a transpose; each process sends different data to each other process.
 
 **Arithmetic Intensity**: Ratio of FLOPs to bytes accessed from memory. Determines whether an operation is compute-bound or memory-bound.
 
@@ -38,7 +38,7 @@ title: "Glossary"
 
 ## F
 
-**FSDP**: Fully Sharded Data Parallel. PyTorch implementation of ZeRO-3.
+**FSDP**: Fully Sharded Data Parallel. PyTorch's ZeRO-style sharding (supports multiple sharding modes, including ZeRO-3-like).
 
 ## G
 
@@ -46,7 +46,7 @@ title: "Glossary"
 
 ## H
 
-**HBM**: High Bandwidth Memory. GPU memory type with ~3 TB/s bandwidth.
+**HBM**: High Bandwidth Memory. GPU memory type with up to ~3 TB/s bandwidth (device-dependent).
 
 ## L
 
