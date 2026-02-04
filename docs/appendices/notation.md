@@ -40,6 +40,9 @@ $$T(n) = \alpha + \frac{n}{\beta}$$
 | $F$ | Peak throughput per GPU | FLOP/s |
 | $\beta$ | Bandwidth | bytes/s |
 | $\alpha$ | Latency | seconds |
+| $b_{\text{tok}}$ | Bytes per token | bytes/token |
+| $\rho$ | Read amplification | ratio |
+| $I_{\text{io}}$ | Data I/O intensity | FLOPs/byte |
 | $T$ | Time | seconds |
 | MFU | Model FLOP Utilization | ratio |
 
