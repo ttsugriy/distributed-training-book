@@ -109,6 +109,7 @@ nav:
     - foundations/01-scale-imperative.md
     - foundations/02-extended-roofline.md
     - foundations/03-cluster-memory-hierarchy.md
+    - foundations/03a-data-pipeline-io.md
     - foundations/04-alpha-beta-model.md
     - foundations/05-economics-of-compute.md
     - foundations/06-estimation-discipline.md
