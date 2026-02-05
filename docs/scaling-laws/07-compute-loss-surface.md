@@ -236,7 +236,7 @@ Some capabilities emerge suddenly at scale, not following smooth power laws. The
 
 ## Exercises
 
-1. **Optimal allocation**: Given $C = 10^{24}$ FLOPs and Chinchilla scaling ($\alpha = \beta = 0.5$, $A = B = 400$), calculate the optimal model size and token count.
+1. **Optimal allocation**: Given $C = 10^{24}$ FLOPs and the empirical Chinchilla 20:1 rule ($D^*/\Psi^* \approx 20$), calculate the optimal model size and token count.
 
 ??? success "Solution"
     **Using the 20:1 rule for Chinchilla-optimal allocation:**
