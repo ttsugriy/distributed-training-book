@@ -151,6 +151,7 @@ nav:
     - efficiency/29-asynchrony-local-sgd.md
     - efficiency/30-reduced-precision.md
     - efficiency/31-overlapping-communication.md
+    - efficiency/31a-architectural-efficiency.md
 
   - "Part VIII: Synthesis":
     - synthesis/32-profiling-distributed.md
