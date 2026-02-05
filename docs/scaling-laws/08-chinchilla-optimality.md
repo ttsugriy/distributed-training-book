@@ -58,7 +58,7 @@ $$L_\infty(\Psi) = \frac{A}{\Psi^\alpha}$$
 
 ### Method 2: IsoFLOP Curves
 
-Fix compute budget $C$. Train many $(\Psi, D)$ pairs satisfying $C = 6\PsiD$.
+Fix compute budget $C$. Train many $(\Psi, D)$ pairs satisfying $C = 6\Psi D$.
 Plot loss vs $\Psi$, find minimum.
 
 For each $C$, there's an optimal $\Psi^*(C)$:
@@ -81,7 +81,7 @@ Fit all data simultaneously to:
 
 $$L(\Psi, D) = \frac{A}{\Psi^\alpha} + \frac{B}{D^\beta} + L_\infty$$
 
-Where $L_\infty$ is the irreducible loss (the minimum achievable loss with infinite compute). With Lagrange constraint $C = 6\PsiD$, derive optimal scaling.
+Where $L_\infty$ is the irreducible loss (the minimum achievable loss with infinite compute). With Lagrange constraint $C = 6\Psi D$, derive optimal scaling.
 
 **All three methods agreed**: $\Psi^* \propto C^{0.50}$, $D^* \propto C^{0.50}$.
 
@@ -146,7 +146,7 @@ How "wrong" were pre-Chinchilla models?
 
 - Parameters: $\Psi = 175 \times 10^9$
 - Tokens: $D = 300 \times 10^9$
-- Compute: $C = 6\PsiD = 3.15 \times 10^{23}$
+- Compute: $C = 6\Psi D = 3.15 \times 10^{23}$
 
 Chinchilla-optimal for this compute:
 
@@ -293,7 +293,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Using the Chinchilla 20:1 rule:**
 
-    From $C = 6\PsiD$ and $D^* = 20\Psi^*$:
+    From $C = 6\Psi D$ and $D^* = 20\Psi^*$:
 
     $$C = 6 \times \Psi^* \times 20\Psi^* = 120(\Psi^*)^2$$
 
@@ -323,7 +323,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
 ??? success "Solution"
     **Part 1: Compute used**
 
-    $$C = 6\PsiD = 6 \times 30 \times 10^9 \times 150 \times 10^9 = \boxed{2.7 \times 10^{22} \text{ FLOPs}}$$
+    $$C = 6\Psi D = 6 \times 30 \times 10^9 \times 150 \times 10^9 = \boxed{2.7 \times 10^{22} \text{ FLOPs}}$$
 
     **Part 2: Chinchilla-optimal allocation**
 
@@ -398,7 +398,7 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
     $$\Psi^* = \frac{D_{\text{max}}}{20} = \frac{500 \times 10^9}{20} = \boxed{25\text{B parameters}}$$
 
     **Compute required:**
-    $$C = 6\PsiD = 6 \times 25 \times 10^9 \times 500 \times 10^9 = 7.5 \times 10^{22} \text{ FLOPs}$$
+    $$C = 6\Psi D = 6 \times 25 \times 10^9 \times 500 \times 10^9 = 7.5 \times 10^{22} \text{ FLOPs}$$
 
     **Why not larger?**
 
