@@ -300,10 +300,11 @@ Where does the efficiency go?
 | Load imbalance | 5% |
 | Failures/restarts | 5% |
 
-Combined: $0.77 \times 0.85 \times 0.90 \times 0.95 \times 0.95 \approx 0.53$
+Combined distributed efficiency: $0.81 \times 0.85 \times 0.90 \times 0.95 \times 0.95 \approx 0.56$
 
-Theoretical MFU with perfect scaling: ~50%
-Actual: ~25-30%
+Single-GPU kernel efficiency (memory bandwidth, non-matmul ops, etc.): ~50% of peak FLOP/s
+
+**Estimated MFU**: $0.50 \times 0.56 \approx 0.28$, consistent with the reported ~30% MFU for LLaMA 3 405B training. The gap between single-GPU efficiency (~50%) and end-to-end MFU (~30%) is entirely attributable to the distributed overheads above.
 
 ## Training Stability Techniques
 
