@@ -267,7 +267,7 @@ $$\rho_2 = \frac{16\Psi}{2\Psi + 14\Psi/P} = \frac{16P}{2P + 14} = \frac{8P}{P +
 - Local computation on gradient shards
 - AllGather updated parameters: $\frac{(P-1) \cdot 2\Psi}{P}$ bytes
 
-**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—roughly **2×** standard DP bandwidth, trading communication for memory savings.
+**Total**: $\frac{4(P-1)\Psi}{P}$ bytes—the **same** as standard DP AllReduce (which also transfers $\frac{2(P-1)\Psi}{P}$ in each of its ReduceScatter and AllGather phases). ZeRO-2 achieves memory savings with **no additional communication overhead**.
 
 ### Bucketing for Efficiency
 
@@ -990,10 +990,10 @@ Each stage has its own ZeRO group for sharding.
 
     **Comparison:**
 
-    - Standard AllReduce: $2\Psi \times \frac{P-1}{P}$
+    - Standard ring AllReduce: $2\Psi \times \frac{P-1}{P}$ (ReduceScatter phase) + $2\Psi \times \frac{P-1}{P}$ (AllGather phase) = $4\Psi \times \frac{P-1}{P}$
     - ZeRO-2 (ReduceScatter grads + AllGather params): $4\Psi \times \frac{P-1}{P}$
 
-    **Conclusion:** ZeRO-2 typically doubles bandwidth relative to standard DP, but enables substantial memory savings.
+    **Conclusion:** ZeRO-2 has the **same** total communication volume as standard DP AllReduce. The ring AllReduce already consists of a ReduceScatter followed by an AllGather internally—ZeRO-2 simply makes this decomposition explicit and inserts the optimizer step between the two phases. The memory savings come at **no additional communication cost**.
 
 3. **Breakeven analysis**: At what batch size does ZeRO-3's communication overhead become negligible compared to compute time? Assume $\alpha = 10\mu s$, $\beta = 100$ GB/s, and compute throughput of 150 TFLOPs.
 
