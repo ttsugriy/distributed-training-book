@@ -2015,6 +2015,109 @@ Profile step breakdown
     | 5 | Compare to baseline | Detect any regressions |
     | 6 | Generate report | Document verification results |
 
+## Failure-Mode Quick Reference
+
+The investigation protocol above works on any failure. This section catalogs the five most common failure modes so you can jump straight to the right invariant.
+
+### Invariant Triage
+
+Every failure violates one of three invariants:
+
+1. **Memory**: OOMs, allocator fragmentation, activation spikes
+2. **Compute**: Low MFU, under-occupied kernels, idle gaps
+3. **Communication**: Exposed collectives, high latency sensitivity, stragglers
+
+### Failure Mode 1: Out-of-Memory (OOM)
+
+**Symptom**: Immediate crash, or late-stage OOM after several steps.
+
+**Likely causes**:
+
+- Activation growth from larger batch/sequence
+- Fragmentation from dynamic shapes
+- Excessive AllGather buffers (ZeRO-3)
+
+**Fast checks**:
+
+- Compare peak allocated vs reserved memory (`torch.cuda.memory_stats()`)
+- Disable dynamic shapes; fix sequence length
+- Enable activation checkpointing or reduce batch
+
+### Failure Mode 2: Communication Stall
+
+**Symptom**: NCCL/collective time dominates the step.
+
+**Likely causes**:
+
+- Low communication intensity ($I_{\text{net}}$ below ridge point)
+- Missing overlap with compute
+- Suboptimal topology placement (TP across nodes)
+
+**Fast checks**:
+
+- Profile timeline for exposed AllReduce
+- Increase local batch or gradient accumulation steps
+- Verify NIC saturation vs expected bandwidth with `nccl-tests`
+
+### Failure Mode 3: Pipeline Bubbles
+
+**Symptom**: Periodic idle gaps in pipeline stages.
+
+**Likely causes**:
+
+- Too few micro-batches ($m < 4p$)
+- Imbalanced stage assignment (unequal FLOPs per stage)
+
+**Fast checks**:
+
+- Compute bubble fraction: $(p-1)/(m+p-1)$
+- Increase micro-batches or rebalance layers across stages
+
+### Failure Mode 4: Divergence at Scale
+
+**Symptom**: Loss blows up after scaling GPUs or batch size.
+
+**Likely causes**:
+
+- Learning rate too high for new effective batch
+- Reduced gradient noise crossing $B_{\text{crit}}$
+
+**Fast checks**:
+
+- Reduce LR or use longer warmup
+- Apply gradient clipping
+- Switch to sqrt LR scaling above $B_{\text{crit}}$ (Chapter 10)
+
+### Failure Mode 5: Straggler Domination
+
+**Symptom**: Step time equals slowest rank; high variance across ranks.
+
+**Likely causes**:
+
+- CPU data pipeline bottleneck on one node
+- Uneven expert routing (MoE models)
+- Host-side overhead (logging, checkpointing)
+
+**Fast checks**:
+
+- Measure per-rank step time and find the outlier
+- Inspect data-loader queue occupancy
+- Add expert load-balance loss (Chapter 18)
+
+### Diagnostic Lookup Table
+
+| Symptom | Invariant | First Test | Typical Fix |
+|---------|-----------|------------|-------------|
+| OOM | Memory | Peak allocated vs reserved | Checkpointing, ZeRO, offload |
+| Low MFU | Compute | Kernel occupancy | Precision, fusion, better batching |
+| Exposed NCCL | Communication | Timeline overlap | Bucketing, overlap, topology |
+| Bubble gaps | Compute+Comm | Bubble fraction | More micro-batches, rebalance |
+| Divergence | Compute | LR sensitivity sweep | Warmup, LR scaling rule |
+| Straggler | Communication | Per-rank step time | Data pipeline, load balancing |
+
+!!! tip "Rule of thumb"
+    Map the symptom to the invariant first, then apply the minimal fix. One well-placed change (batch size, overlap, topology) often recovers most of the lost performance.
+
 ## Key Takeaways
 
 1. **Systematic beats ad-hoc**: The five-phase protocol ensures nothing is missed.
@@ -2030,4 +2133,6 @@ Profile step breakdown
 6. **Prevent, don't just react**: Checklists and monitoring prevent known issues.
 
 7. **Document everything**: Your investigation today helps the next person tomorrow.
+
+8. **Know the five failure modes**: OOM, communication stall, pipeline bubbles, divergence, and stragglers cover the vast majority of issues.
 
