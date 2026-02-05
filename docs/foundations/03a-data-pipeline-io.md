@@ -209,7 +209,7 @@ At low $I_{\text{io}}$, performance scales with storage bandwidth. At high $I_{\
 
     **Bandwidth**:
 
-$$B_{\text{req}} = 73,000 \cdot 1.5 \times 10^3 \cdot 1.3 \approx 142 \;\text{MB/s}$$
+    $$B_{\text{req}} = 73,000 \cdot 1.5 \times 10^3 \cdot 1.3 \approx 142 \;\text{MB/s}$$
 
 2. Your dataset loader spends 0.25s decoding and 0.05s transferring to GPU. Step time is 0.6s. What fraction of step time is data-bound, and how much can you hide with prefetch?
 
