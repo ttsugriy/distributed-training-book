@@ -304,12 +304,14 @@ Use when: GPU memory limits effective batch size, but $B_{\text{crit}}$ hasn't b
 
 $B_{\text{crit}}$ increases during training. Optimal strategy: **increase batch size during training**.
 
-### LLAMA's Approach
+### LLaMA's Approach
 
-LLaMA increased batch size mid-training:
+LLaMA 2 (and later LLaMA 3) increased batch size mid-training:
 
-- Start: batch size 2M tokens
-- After $t$ steps: increase to 4M tokens
+- Start: smaller batch size (e.g., 2M tokens for LLaMA 2)
+- Ramp up to 4M tokens after initial training phase
+
+*Note: LLaMA 1 used a constant batch size of ~4M tokens throughout training. The batch size ramp was introduced in LLaMA 2.*
 
 Benefits:
 1. Early training: smaller batch for exploration
