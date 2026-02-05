@@ -18,6 +18,9 @@ A distributed training run consumes thousands of GPU-hours. Yet most practitione
 !!! abstract "Building On: All Previous Parts"
     This final part synthesizes everything. You understand **rooflines and estimation** ([Part I](../foundations/01-scale-imperative.md)), **optimal resource allocation** ([Part II](../scaling-laws/07-compute-loss-surface.md)), **collective costs** ([Part III](../collectives/11-primitives-properties.md)), **parallelism strategies** ([Part IV](../parallelism/14-data-parallelism-associativity.md)), **memory management** ([Part V](../memory/19-memory-equation.md)), **composition** ([Part VI](../composition/23-device-mesh.md)), and **efficiency techniques** ([Part VII](../efficiency/28-gradient-compression.md)). Now we apply this knowledge: diagnose real systems, investigate bottlenecks, and analyze state-of-the-art training runs.
 
+!!! note "Code style in Part VIII"
+    The code examples in Part VIII are **pedagogical skeletons** — they show essential logic and interfaces but omit error handling, edge cases, and production hardening. They are meant to illustrate profiling *strategies*, not serve as drop-in tools. For production profiling, use PyTorch Profiler, Nsight Systems, and NCCL debug logging directly.
+
 ## The Profiling Imperative
 
 At scale, inefficiency compounds. A 10% inefficiency on one GPU becomes ~154 GPU-hours wasted per day on 64 GPUs. Understanding *exactly* where time goes is essential.

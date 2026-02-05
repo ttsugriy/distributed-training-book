@@ -11,6 +11,9 @@ With 5 parallelism dimensions and dozens of hyperparameters, the configuration s
 **The Question**: Given a model architecture, target batch size, and cluster specification, how do you systematically find the configuration that minimizes training time while satisfying memory constraints? Can we do better than exhaustive search?
 </div>
 
+!!! note "Code style"
+    Code examples in this chapter illustrate search *algorithms and data structures*. They are simplified for clarity — production configuration search tools (e.g., Alpa, Megatron's auto-parallelism) handle many additional constraints. Focus on the algorithmic ideas, not the implementation details.
+
 ## The Configuration Space
 
 ### Dimensions of Configuration
