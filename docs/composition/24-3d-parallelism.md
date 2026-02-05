@@ -796,13 +796,13 @@ Rank 3: [Layer 18-23] + [Layer 42-47]
 
 **Reduced bubble**:
 
-$$\text{Bubble} = \frac{P - 1}{P + M - 1} \to \frac{P/v - 1}{P/v + M - 1}$$
+$$\text{Bubble} = \frac{P - 1}{P + M - 1} \to \frac{P - 1}{M \cdot v + P - 1}$$
 
-With $v$ virtual stages per rank.
+With $v$ virtual stages per rank (Narayanan et al., 2021). Each micro-batch passes through $P \cdot v$ virtual stages, but the warmup cost remains $P - 1$ time slots.
 
 **Example**: PP=8, M=16
-- Standard: bubble = 7/23 = 30%
-- Interleaved (v=4): bubble = 1/17 = 6%
+- Standard: bubble = $\frac{7}{23} = 30\%$
+- Interleaved (v=4): bubble = $\frac{7}{71} \approx 10\%$
 
 **Cost**: More communication (but overlapped with compute).
 
