@@ -65,9 +65,15 @@ Total activation memory:
 
 $$M_{\text{act}} = L \cdot M_{\text{act}}^{\text{layer}}$$
 
-With activation checkpointing (recompute every $k$ layers), a common peak-memory approximation is:
+With activation checkpointing (recompute every $k$ layers), peak memory has two components: (1) checkpoint storage at $L/k$ boundaries (just the hidden-state input, $\approx 2BSH$ bytes each), and (2) full per-layer activations for up to $k$ layers during recomputation:
+
+$$M_{\text{act}}^{\text{ckpt}} \approx \frac{L}{k} \cdot 2BSH + k \cdot M_{\text{act}}^{\text{layer}}$$
+
+The optimal $k = \sqrt{L}$ minimizes total memory. As a simpler (more conservative) approximation used throughout this chapter:
 
 $$M_{\text{act}}^{\text{ckpt}} \approx \left(\frac{L}{k} + k\right) \cdot M_{\text{act}}^{\text{layer}}$$
+
+This overestimates the checkpoint term (using full $M_{\text{act}}^{\text{layer}}$ instead of just $2BSH$) but is easier to compute.
 
 ### Quick Estimation Table
 
