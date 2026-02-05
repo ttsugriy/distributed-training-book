@@ -89,7 +89,7 @@ This book introduces many specialized terms. Here's a preview of the core vocabu
 | **ZeRO** | Memory optimization that shards optimizer states, gradients, or parameters across data-parallel replicas | Chapter 20 |
 | **Activation Checkpointing** | Trade compute for memory by discarding intermediate activations and recomputing them during backpropagation | Chapter 21 |
 | **MFU** (Model FLOP Utilization) | Fraction of theoretical peak FLOP/s actually achieved; the key efficiency metric | Chapter 13 |
-| **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 30 |
+| **Mixed Precision** | Use FP16/BF16 for speed while maintaining FP32 master weights for numerical stability | Chapter 30 (Part VII) |
 
 Don't worry if these don't fully click yet—each will become concrete through derivations and examples.
 

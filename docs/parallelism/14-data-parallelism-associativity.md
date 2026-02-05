@@ -409,97 +409,18 @@ class HighPrecisionAccumulator:
             self.fp32_grads[name].zero_()
 ```
 
-## Gradient Compression
+## Gradient Compression (Preview)
 
-### The Compression Opportunity
+Gradients are high-dimensional but often compressible. We can trade computation for communication bandwidth. Key approaches include:
 
-Gradients are high-dimensional but often compressible. We can trade computation for communication bandwidth.
+- **Sparsification** (Top-K, random): Send only the largest gradient elements
+- **Quantization** (1-bit SGD, QSGD): Reduce precision of communicated gradients
+- **Low-rank** (PowerSGD): Approximate gradient matrices with low-rank factors
 
-### Top-K Sparsification
+These techniques can compress communication by 10-100× while preserving convergence when combined with error feedback.
 
-Keep only the $k$ largest magnitude gradients:
-
-$$\text{TopK}(g, k) = \{g_i : |g_i| \geq |g|_{(k)}\}$$
-
-where $|g|_{(k)}$ is the $k$-th largest magnitude.
-
-**Compression ratio**: $k/d$ where $d$ is gradient dimension.
-
-**Error feedback**: Accumulate dropped gradients for next iteration:
-
-```python
-class TopKCompressor:
-    def __init__(self, model, k_ratio=0.01):
-        self.k_ratio = k_ratio
-        self.error_buffer = {
-            name: torch.zeros_like(p)
-            for name, p in model.named_parameters()
-        }
-
-    def compress(self, name, grad):
-        # Add error from previous round
-        grad = grad + self.error_buffer[name]
-
-        # Select top-k
-        k = max(1, int(self.k_ratio * grad.numel()))
-        values, indices = torch.topk(grad.abs().flatten(), k)
-
-        # Compute error (dropped values)
-        mask = torch.zeros_like(grad.flatten())
-        mask[indices] = 1
-        self.error_buffer[name] = grad * (1 - mask.view_as(grad))
-
-        # Return compressed gradient
-        return indices, grad.flatten()[indices]
-
-    def decompress(self, indices, values, shape):
-        grad = torch.zeros(shape.numel())
-        grad[indices] = values
-        return grad.view(shape)
-```
-
-### Random Sparsification
-
-Randomly sample gradients instead of top-k (faster, but higher variance):
-
-$$\tilde{g}_i = \frac{1}{p} g_i \cdot \mathbb{1}[\text{sample}_i < p]$$
-
-where $p$ is the sampling probability.
-
-**Unbiased**: $\mathbb{E}[\tilde{g}] = g$
-
-### Quantization
-
-Reduce precision of gradients:
-
-**1-bit SGD**: Sign of gradient only:
-
-$$\tilde{g}_i = \text{sign}(g_i) \cdot \|g\|_1 / d$$
-
-**TernGrad**: Three values $\{-1, 0, +1\}$
-
-**QSGD**: Stochastic quantization to $s$ levels:
-
-$$Q_s(g_i) = \|g\|_2 \cdot \text{sign}(g_i) \cdot \xi_i(s)$$
-
-where $\xi_i(s)$ is a stochastic quantization function.
-
-### PowerSGD
-
-Low-rank approximation of gradient matrix:
-
-$$G \approx PQ^T$$
-
-where $P \in \mathbb{R}^{m \times r}$, $Q \in \mathbb{R}^{n \times r}$, and $r \ll \min(m, n)$.
-
-**Algorithm**:
-1. Project gradient onto low-rank subspace
-2. Communicate low-rank factors (much smaller)
-3. Reconstruct approximate gradient
-
-**Compression ratio**: $(m + n) \cdot r / (m \cdot n)$
-
-For $m = n = 1000$, $r = 4$: compression ratio = 0.8%
+!!! info "Full treatment in Part VII"
+    [Chapter 28 (Gradient Compression)](../efficiency/28-gradient-compression.md) covers these methods in depth with convergence proofs, unbiasedness analysis, error feedback theory, and practical implementation guidance.
 
 ## Gradient Accumulation
 
