@@ -292,6 +292,9 @@ $$T_{\text{ring}} \approx 2P\alpha + \frac{2n}{\beta}$$
 
 ### Bandwidth Optimality Proof
 
+!!! question "Intuition check"
+    Ring AllReduce sends $2(P-1)/P \cdot n$ bytes per process. As $P \to \infty$, the bandwidth term approaches $2n/\beta$ — independent of $P$. Does this seem right? Can we prove no algorithm does better?
+
 **Theorem**: Ring AllReduce is bandwidth-optimal.
 
 **Proof**:

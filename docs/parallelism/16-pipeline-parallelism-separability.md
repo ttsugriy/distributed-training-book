@@ -202,6 +202,9 @@ Where:
 
 ### Bubble Analysis
 
+!!! question "Intuition check"
+    With $P$ pipeline stages and $m$ micro-batches, some stages must wait while the pipeline fills and drains. Will the wasted fraction grow with $P$, shrink with $m$, or both? Predict the form of the bubble fraction before reading the derivation.
+
 Let $t_F$ and $t_B$ be the time for forward and backward passes per stage (assumed equal across stages for now).
 
 **Total time for one batch**:

@@ -81,6 +81,9 @@ $$D = \frac{C}{6\Psi}$$
 
 **Problem**: Minimize $L(\Psi, D)$ subject to $C = 6\Psi D$
 
+!!! question "Intuition check"
+    Before we derive the optimum: if you double your compute budget, should you spend most of it on a bigger model or more data? Make a prediction — we'll see Chinchilla's surprising answer below.
+
 **Method**: Lagrange multipliers
 
 The Lagrangian:

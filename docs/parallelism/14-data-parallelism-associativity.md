@@ -38,6 +38,9 @@ $$\nabla_\theta L_B(\theta) = \frac{1}{|B|} \sum_{x \in B} \nabla_\theta \ell(x,
 
 ### The Partitioning Theorem
 
+!!! question "Intuition check"
+    We compute gradients on different data subsets on different GPUs, then average them. Will this give exactly the same gradient as computing on the full batch? What mathematical property makes this work?
+
 **Theorem**: For a batch $B$ partitioned into $P$ disjoint subsets $B = B_1 \cup B_2 \cup \cdots \cup B_P$ with $|B_i| = |B|/P$ for all $i$:
 
 $$\nabla_\theta L_B(\theta) = \frac{1}{P} \sum_{i=1}^{P} \nabla_\theta L_{B_i}(\theta)$$
