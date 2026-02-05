@@ -1157,6 +1157,124 @@ Profile step breakdown
                                  └── Small ──► Check for Python overhead
 ```
 
+## Worked Post-Mortem: The 3 AM Throughput Collapse
+
+This section walks through a realistic incident end-to-end, showing the messy reality of debugging distributed training at scale. The scenario is composite — assembled from common failure patterns — but every element is drawn from real production experience.
+
+### Incident Report
+
+**System**: 70B dense transformer, 256 H100s (32 nodes × 8 GPUs), TP=8, DP=32, ZeRO-1.
+
+**Symptom**: At 02:47 AM on day 9 of a 21-day training run, throughput drops from 142K tokens/s to 89K tokens/s (37% regression). Loss curve continues to decrease — model is still training, just slowly.
+
+**Alert**: Monitoring fires on MFU dropping from 41% to 26%.
+
+### Phase 1: Triage (5 minutes)
+
+**First action**: Check if the run is still making progress.
+
+```
+[02:52] Loss at step 48,201: 2.134 (still decreasing)
+[02:52] Throughput: 89,412 tokens/s (was 142,000)
+[02:52] Per-step time: 11.2s (was 7.0s)
+[02:52] No OOM errors in any rank's stderr
+```
+
+**Classification**: Performance degradation (not crash, not divergence). Priority: medium — training continues but wastes ~37% of GPU-hours.
+
+**Initial hypothesis list**:
+
+1. Network contention from another job
+2. Hardware degradation (thermal throttling, bad NIC)
+3. Data pipeline stall
+4. Software change (unlikely — no deploys overnight)
+
+### Phase 2: Localization (15 minutes)
+
+**Per-rank timing breakdown** (sampled from 4 ranks across different nodes):
+
+| Rank | Node | Compute (ms) | AllReduce (ms) | Total (ms) |
+|------|------|-------------|----------------|-----------|
+| 0 | node-00 | 4,100 | 2,900 | 7,000 |
+| 8 | node-01 | 4,100 | 2,900 | 7,000 |
+| 72 | node-09 | 4,100 | 7,100 | 11,200 |
+| 200 | node-25 | 4,100 | 7,100 | 11,200 |
+
+**Key observation**: Compute time is identical across all ranks (4.1s). AllReduce time is 2.9s on some nodes and 7.1s on others. The step time is determined by the slowest AllReduce (BSP synchronization).
+
+**Localized to**: Network communication. Not all nodes affected equally — rules out global contention.
+
+### Phase 3: Isolation (20 minutes)
+
+**Run `nccl-tests` on the affected vs unaffected nodes**:
+
+```
+# Unaffected nodes (node-00 to node-07):
+all_reduce_perf -b 1G -e 1G -g 8: busbw = 42.3 GB/s
+
+# Affected nodes (node-09, node-25, others):
+all_reduce_perf -b 1G -e 1G -g 8: busbw = 17.1 GB/s
+```
+
+Affected nodes see **59% bandwidth reduction** on inter-node AllReduce. Intra-node (NVLink) bandwidth is normal on both groups.
+
+**Further isolation**: Run point-to-point bandwidth tests between specific node pairs. The slow path is always through a specific spine switch (switch-04).
+
+### Phase 4: Root Cause (10 minutes)
+
+**Switch-04 diagnostics** (via network monitoring):
+
+```
+switch-04 port 17: CRC errors 14,302 (rising)
+switch-04 port 17: link flaps: 3 in last hour
+switch-04 temperature: 72°C (normal)
+```
+
+**Root cause**: A degrading optical transceiver on switch-04, port 17. CRC errors force packet retransmissions, reducing effective bandwidth. The link hasn't fully failed (no alert from network monitoring), but error rate is high enough to halve throughput on affected paths.
+
+**Five Whys**:
+
+1. Why is throughput low? → AllReduce is slow on some nodes
+2. Why is AllReduce slow? → Inter-node bandwidth is degraded
+3. Why is bandwidth degraded? → Packets are being retransmitted
+4. Why are packets retransmitted? → CRC errors on switch-04 port 17
+5. Why are there CRC errors? → Degrading optical transceiver
+
+### Phase 5: Resolution (30 minutes)
+
+**Immediate fix** (02:47 + 50 min = 03:37):
+
+1. Pause training at next checkpoint (step 48,250)
+2. Request network team to disable switch-04 port 17 and reroute
+3. Network reroutes through redundant path (fat-tree provides this)
+4. Resume training from checkpoint
+
+**Result**: Throughput recovers to 139K tokens/s (98% of baseline — small overhead from longer path).
+
+**Prevention**:
+
+- Add NCCL bus bandwidth to per-step monitoring (alert if busbw drops >20% from baseline)
+- Network team enables proactive transceiver replacement at CRC error rate > 1000/hour
+- Add `nccl-tests` to periodic health checks (every 6 hours)
+
+### Lessons Learned
+
+| Phase | Time Spent | Key Action |
+|-------|-----------|------------|
+| Triage | 5 min | Classified as perf degradation, not crash |
+| Localization | 15 min | Per-rank timing revealed asymmetric AllReduce |
+| Isolation | 20 min | `nccl-tests` on affected vs unaffected nodes |
+| Root cause | 10 min | Switch diagnostics → optical transceiver |
+| Resolution | 30 min | Reroute, resume from checkpoint |
+| **Total** | **80 min** | **Lost: ~80 min at reduced throughput + 30 min pause** |
+
+**Cost of the incident**: 80 min at 37% waste + 30 min downtime on 256 H100s ≈ 360 GPU-hours wasted ($1,440 at $4/hr).
+
+**Cost if undetected**: Running at 89K tokens/s instead of 142K for the remaining 12 days would waste ~$86K in GPU-hours. Early detection saved ~$85K.
+
+!!! tip "The meta-lesson"
+    The investigation protocol works because it *narrows the search space systematically*. The temptation at 3 AM is to restart everything and hope it fixes itself. The protocol finds the optical transceiver in 50 minutes instead of losing a day to blind restarts.
+
 ## Exercises
 
 1. **Build a Triage System**: Implement a complete triage system for your training infrastructure. It should categorize failures into OOM, network, numerical, and other. Test it by artificially inducing each failure type.
