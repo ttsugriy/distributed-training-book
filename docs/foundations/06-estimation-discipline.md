@@ -221,11 +221,11 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     | Component | Memory |
     |-----------|--------|
     | Static (ZeRO-3) | 6.5 GB |
-    | Activations (TP=4, checkpointing) | ~100+ GB (too large) |
+    | Activations (TP=4, checkpointing) | ~113 GB |
     | Temporary buffers | ~5 GB |
-    | **Total** | **~27-32 GB** |
+    | **Total** | **~125 GB** |
 
-    This does **not** fit in 80GB; you'd need more TP/PP, smaller batch/sequence, or more aggressive recompute.
+    This does **not** fit in 80 GB. Even with ZeRO-3 nearly eliminating static memory, the activation memory at this batch/sequence combination dominates. You'd need more TP/PP, smaller batch/sequence, or more aggressive recompute (e.g., full recomputation would reduce activation memory to ~4 × 8.1 = 32 GB, bringing the total to ~44 GB—which does fit).
 
 2. A training run achieves 150K tokens/s on 64 H100s for a 7B model. Calculate the MFU.
 
@@ -314,8 +314,6 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     | Extended (2T) | 2T | 640 | 22% |
     | Budget-limited | 2T | 512 | ~28% |
 
-## Key Takeaways
-
-1. **Estimation is a first-class skill**: rough numbers prevent impossible plans.
+## Key Takeaways1. **Estimation is a first-class skill**: rough numbers prevent impossible plans.
 2. **Budget, time, and MFU are interchangeable**: any two determine the third.
 3. **Always sanity-check against hardware limits**: peak FLOPs and memory ceilings bound every plan.
