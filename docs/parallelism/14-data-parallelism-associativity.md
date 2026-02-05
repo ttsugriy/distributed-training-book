@@ -792,11 +792,11 @@ model = DDP(
 
     **Practical considerations:**
 
-    | Sequence Length | Samples (b=2932) | Tokens per GPU |
+    | Sequence Length | Samples (b=1465) | Tokens per GPU |
     |-----------------|------------------|----------------|
-    | 512 | 2,932 | 1.5M |
-    | 2048 | 2,932 | 6.0M |
-    | 4096 | 2,932 | 12.0M |
+    | 512 | 1,465 | 750K |
+    | 2048 | 1,465 | 3.0M |
+    | 4096 | 1,465 | 6.0M |
 
     With 4096 sequence length, this requires ~12M tokens per GPU per step—likely too large for memory. Gradient accumulation would be needed.
 
