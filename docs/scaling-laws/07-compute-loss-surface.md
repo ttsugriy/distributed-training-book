@@ -63,7 +63,7 @@ $$C \approx 6\Psi D$$
 **Derivation**: Each token passes through layers where:
 
 - Forward pass: ~$2\Psi$ FLOPs (matrix multiply is $2 \times$ parameters)
-- Backward pass: ~$4\Psi$ FLOPs (gradient computation + weight updates)
+- Backward pass: ~$4\Psi$ FLOPs (activation gradients + weight gradients)
 - Total per token: ~$6\Psi$ FLOPs
 
 For $D$ tokens:
