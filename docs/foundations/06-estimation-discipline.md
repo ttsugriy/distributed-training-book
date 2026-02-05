@@ -314,6 +314,8 @@ For p=8, m=32: Bubble = 7/39 ≈ 18%
     | Extended (2T) | 2T | 640 | 22% |
     | Budget-limited | 2T | 512 | ~28% |
 
-## Key Takeaways1. **Estimation is a first-class skill**: rough numbers prevent impossible plans.
+## Key Takeaways
+
+1. **Estimation is a first-class skill**: rough numbers prevent impossible plans.
 2. **Budget, time, and MFU are interchangeable**: any two determine the third.
 3. **Always sanity-check against hardware limits**: peak FLOPs and memory ceilings bound every plan.
