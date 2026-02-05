@@ -549,10 +549,7 @@ Modern clusters have hierarchy: GPUs within a node, nodes within a rack, racks w
 
 ### 2D Ring (Ring-Ring)
 
-Arrange processes in a 2D grid. AllReduce in two phases:
-
-**Phase 1**: AllReduce within rows (intra-node, fast)
-**Phase 2**: AllReduce across rows (inter-node, slow)
+Arrange processes in a 2D grid. AllReduce in three phases:
 
 ```
 Intra-node rings (G=4):
@@ -570,13 +567,16 @@ Inter-node ring (one representative per node):
 [G3] —— [G7] —— [G11] —— [G3]
 ```
 
-**Phase 1** (intra-node): Ring AllReduce among GPUs in each node
+**Phase 1** (intra-node ReduceScatter): Each node reduces and scatters data among its GPUs
 - Uses NVLink (high bandwidth, low latency)
-- Each GPU gets 1/G portion of result (G = GPUs per node)
+- Each GPU ends up with 1/G of the locally-reduced result
 
-**Phase 2** (inter-node): Ring AllReduce of corresponding chunks across nodes
+**Phase 2** (inter-node AllReduce): Ring AllReduce of corresponding chunks across nodes
 - Uses network (lower bandwidth, higher latency)
-- Only 1/G of data crosses network
+- Only $n/G$ data crosses network—the key bandwidth saving
+
+**Phase 3** (intra-node AllGather): Distribute the globally-reduced chunks back to all GPUs within each node
+- Uses NVLink again
 
 **Analysis**: Let $G$ = GPUs per node, $N$ = nodes, $P = GN$
 
