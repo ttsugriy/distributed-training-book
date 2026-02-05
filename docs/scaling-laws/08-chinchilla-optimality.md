@@ -8,7 +8,7 @@ For years, the field scaled models without enough data. Chinchilla revealed the 
 </div>
 
 <div class="investigation-question" markdown>
-**The Question**: GPT-3 has 175B parameters but trained on only 300B tokens—a ratio of 1.7:1. Chinchilla, with 70B parameters and 1.4T tokens (20:1), achieved the same loss with 4× less compute. What went wrong, and how do we compute "optimal"?
+**The Question**: GPT-3 has 175B parameters but trained on only 300B tokens—a ratio of 1.7:1. Chinchilla, with 70B parameters and 1.4T tokens (20:1), achieved *better* loss than GPT-3 with comparable compute ($5.9 \times 10^{23}$ vs $3.15 \times 10^{23}$ FLOPs). A compute-optimal model at GPT-3's budget could have matched its loss at a fraction of the size. What went wrong, and how do we compute "optimal"?
 </div>
 
 <div class="notation-banner" markdown>
