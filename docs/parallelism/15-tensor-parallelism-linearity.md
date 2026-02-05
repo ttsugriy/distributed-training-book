@@ -439,9 +439,9 @@ Ratio:
 
 $$R = \frac{C/P}{T_{\text{comm}}} = \frac{4bsd^2 / (P \cdot F)}{8bsd / \beta} = \frac{d \cdot \beta}{2PF}$$
 
-For H100 ($F = 2 \times 10^{15}$ FLOP/s), NVLink ($\beta = 900$ GB/s), $d = 8192$:
+For H100 ($F = 989 \times 10^{12}$ FLOP/s dense BF16), NVLink ($\beta = 900$ GB/s), $d = 8192$:
 
-$$R = \frac{8192 \times 900 \times 10^9}{2P \times 2 \times 10^{15}} = \frac{8192 \times 900}{4P \times 10^6} \approx \frac{1.8}{P}$$
+$$R = \frac{8192 \times 900 \times 10^9}{2P \times 989 \times 10^{12}} = \frac{8192 \times 900}{1978P \times 10^3} \approx \frac{3.7}{P}$$
 
 For $P = 8$: $R \approx 0.23$ — communication-bound!
 
@@ -879,13 +879,13 @@ The tensor parallel degree $P$ is limited by:
 
     $$V_{\text{total}}^{\text{forward}} = 80 \times 224 \text{ MB} = 17.92 \text{ GB}$$
 
-3. **Compute-communication ratio**: For the same model, compute $R$ assuming H100 with 2 PFLOP/s and NVLink at 900 GB/s. Is the layer compute-bound or communication-bound?
+3. **Compute-communication ratio**: For the same model, compute $R$ assuming H100 with 989 TFLOP/s (dense BF16) and NVLink at 900 GB/s. Is the layer compute-bound or communication-bound?
 
 ??? success "Solution"
     **Given (from previous problem):**
 
     - $d = 4096$, $s = 2048$, $b = 4$, $P = 8$
-    - H100: $F = 2 \times 10^{15}$ FLOP/s (FP16 Tensor Cores)
+    - H100: $F = 989 \times 10^{12}$ FLOP/s (dense BF16 Tensor Cores)
     - NVLink: $\beta = 900 \times 10^9$ bytes/s
 
     **Compute per layer (forward pass):**
@@ -906,7 +906,7 @@ The tensor parallel degree $P$ is limited by:
 
     **Compute time per GPU:**
 
-    $$T_{\text{compute}} = \frac{C_{\text{per-GPU}}}{F} = \frac{8.59 \times 10^{10}}{2 \times 10^{15}} = 42.9 \text{ μs}$$
+    $$T_{\text{compute}} = \frac{C_{\text{per-GPU}}}{F} = \frac{8.59 \times 10^{10}}{989 \times 10^{12}} = 86.9 \text{ μs}$$
 
     **Communication time:**
 
@@ -918,13 +918,13 @@ The tensor parallel degree $P$ is limited by:
 
     **Compute-communication ratio:**
 
-    $$R = \frac{T_{\text{compute}}}{T_{\text{comm}}} = \frac{42.9}{249} = \boxed{0.17}$$
+    $$R = \frac{T_{\text{compute}}}{T_{\text{comm}}} = \frac{86.9}{249} = \boxed{0.35}$$
 
     **Conclusion:**
 
     $$\boxed{\text{Communication-bound}}$$
 
-    The layer spends $\sim 6\times$ more time communicating than computing!
+    The layer spends $\sim 3\times$ more time communicating than computing!
 
     | Metric | Value |
     |--------|-------|

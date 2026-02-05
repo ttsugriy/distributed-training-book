@@ -206,13 +206,13 @@ $$R = \frac{3b \cdot \beta}{2F}$$
 !!! note "Practice"
     If scaling stalls, compute $R$ with your actual $b$, $F$, and network $\beta$. When $R < 1$, you're communication-bound—increase local batch, accumulate gradients, or move to hierarchical AllReduce.
 
-**Example**: H100 with $F = 2 \times 10^{15}$ FLOP/s, NVLink $\beta = 900$ GB/s:
+**Example**: H100 with $F = 989 \times 10^{12}$ FLOP/s (dense BF16, see [Hardware Assumptions](../appendices/hardware-assumptions.md)), NVLink $\beta = 900$ GB/s:
 
-$$R = \frac{3b \cdot 900 \times 10^9}{2 \times 2 \times 10^{15}} = \frac{3b \cdot 900}{4 \times 10^6} = \frac{675b}{10^6}$$
+$$R = \frac{3b \cdot 900 \times 10^9}{2 \times 989 \times 10^{12}} = \frac{2700b}{1.978 \times 10^6} \approx \frac{1365b}{10^6}$$
 
 For $R > 1$ (compute-bound), need:
 
-$$b > \frac{10^6}{675} \approx 1,500 \text{ samples}$$
+$$b > \frac{10^6}{1365} \approx 733 \text{ samples}$$
 
 ### Scaling Efficiency
 
