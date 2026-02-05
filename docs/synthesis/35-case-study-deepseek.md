@@ -480,8 +480,8 @@ $$\text{Bubble}_{\text{DualPipe}} \approx \frac{p-1}{2m}$$
 
 For $p=16$, $m=32$:
 
-- Standard: $\frac{15}{32} = 47\%$
-- DualPipe: $\frac{15}{64} \approx 23\%$
+- Standard 1F1B: $\frac{p-1}{m+p-1} = \frac{15}{47} \approx 32\%$
+- DualPipe: $\frac{p-1}{2m} = \frac{15}{64} \approx 23\%$
 
 ### Communication Optimization
 
