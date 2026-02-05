@@ -108,12 +108,12 @@ For different parallelism strategies:
 
 ### Data Parallelism
 
-Let $B$ be batch size (sequences), $S$ sequence length, and $s$ bytes per parameter (e.g., $s=2$ for FP16/BF16).
-Per step: $6\Psi B S$ FLOPs (forward + backward), $2\Psi s$ bytes AllReduced (with $s$ bytes/param)
+Let $B$ be global batch size (sequences), $S$ sequence length, $P$ GPUs, and $s$ bytes per parameter (e.g., $s=2$ for FP16/BF16).
+Per step per GPU: $6\Psi B S / P$ FLOPs (forward + backward on $B/P$ samples), $\approx 2\Psi s$ bytes AllReduced (for large $P$)
 
-$$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B S}{2\Psi s} = \frac{3BS}{s}$$
+$$I_{\text{net}}^{\text{DP}} = \frac{6\Psi B S / P}{2\Psi s} = \frac{3BS}{Ps}$$
 
-As token batch $B \cdot S$ increases, communication intensity increases → less communication-bound.
+As per-GPU token batch $B \cdot S / P$ increases, communication intensity increases → less communication-bound.
 
 ### Tensor Parallelism
 
@@ -169,19 +169,19 @@ The extended roofline is our primary tool for analyzing distributed training bot
     - Tokens per step: $B_{\text{tok}} = 1 \times 10^6$
     - GPUs: $P = 64$ (data parallel)
 
-    **FLOPs per step:**
+    **Per-GPU FLOPs per step:**
 
-    $$\text{FLOPs} = 6 \times \Psi \times B_{\text{tok}} = 6 \times 7 \times 10^9 \times 10^6 = 4.2 \times 10^{16}$$
+    $$\text{FLOPs}_{\text{per-GPU}} = \frac{6 \times \Psi \times B_{\text{tok}}}{P} = \frac{6 \times 7 \times 10^9 \times 10^6}{64} = 6.56 \times 10^{14}$$
 
-    **Bytes communicated (AllReduce gradients in FP16):**
+    **Per-GPU bytes communicated (AllReduce gradients in FP16):**
 
     $$\text{Bytes} = 2 \times \frac{P-1}{P} \times \Psi \times 2 \approx 2 \times 7 \times 10^9 \times 2 = 2.8 \times 10^{10}$$
 
     **Communication intensity:**
 
-    $$I_{\text{net}} = \frac{4.2 \times 10^{16}}{2.8 \times 10^{10}} = 1.5 \times 10^6 \text{ FLOPs/byte}$$
+    $$I_{\text{net}} = \frac{6.56 \times 10^{14}}{2.8 \times 10^{10}} \approx 23{,}400 \text{ FLOPs/byte}$$
 
-    This is far above the ridge point (~19,780 FLOPs/byte for InfiniBand), so the workload is **compute-bound**. Large batch data parallelism is communication-efficient!
+    This is above the InfiniBand ridge point (~19,780 FLOPs/byte), so the workload is **compute-bound**—but just barely. Halving the batch size to 500K tokens would drop intensity to ~11,700 FLOPs/byte, making the workload communication-bound over InfiniBand.
 
 2. An H100 DGX system has 900 GB/s NVLink bandwidth within the node and 400 Gbps InfiniBand across nodes. What's the ratio of ridge points for intra-node vs inter-node communication?
 
