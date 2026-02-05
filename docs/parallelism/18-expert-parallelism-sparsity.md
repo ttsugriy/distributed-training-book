@@ -26,7 +26,7 @@ The key insight: different tokens may benefit from different computations. Rathe
 - Only the top-scoring expert(s) are activated—typically 1 or 2 out of many (8, 64, or even 128)
 - The selected expert(s) process the token and return their outputs, weighted by routing scores
 
-This creates a powerful asymmetry: the model can have many more parameters (more experts = more capacity) without proportionally increasing compute cost (only a few experts run per token). A model with 64 experts but top-2 routing has 32× more FFN parameters while using only 2× the FFN compute of a dense model.
+This creates a powerful asymmetry: the model can have many more parameters (more experts = more capacity) without proportionally increasing compute cost (only a few experts run per token). A model with 64 experts but top-2 routing has **64×** more FFN parameters (one full FFN per expert) while using only **2×** the FFN compute of a dense model (since only 2 experts are activated per token).
 
 The challenge is distribution: when experts live on different GPUs, tokens must travel to the right expert and return. This chapter explores how that communication works and how to keep load balanced across experts.
 
