@@ -13,6 +13,8 @@ Every distributed training algorithm is built from a small set of collective ope
 
 <div class="notation-banner" markdown>
 **Notation in this chapter:** $P$ = processes/GPUs, $n$ = message size (bytes), $\alpha$ = latency, $\beta$ = bandwidth. See [Notation](../appendices/notation.md).
+
+**Note on symbol reuse:** From this chapter onward, $\alpha$ denotes network latency and $\beta$ denotes network bandwidth. In Part II (Scaling Laws), these symbols were used for scaling exponents. The meaning should be clear from context—Part III–VIII are exclusively about communication and parallelism.
 </div>
 
 !!! abstract "Building On: Parts I–II"
