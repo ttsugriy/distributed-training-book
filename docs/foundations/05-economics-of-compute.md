@@ -42,11 +42,11 @@ Spot instances can provide 2-3× cost reduction but require checkpoint resilienc
 
 ### On-Prem vs Cloud Break-Even
 
-On-prem H100 costs ~USD 30,000 + infrastructure. At USD 4/hr cloud pricing:
+On-prem H100 total cost of ownership (TCO) is ~USD 50,000–60,000 per GPU when accounting for the server chassis, networking (InfiniBand switches), power, cooling, datacenter space, and operations staff—not just the ~USD 30,000 GPU cost. At USD 4/hr cloud pricing:
 
-$$\text{Break-even} = \frac{\$30,000}{\$4/\text{hr}} = 7,500 \text{ GPU-hours} \approx 10.4 \text{ months}$$
+$$\text{Break-even} = \frac{\$55{,}000}{\$4/\text{hr}} = 13{,}750 \text{ GPU-hours} \approx 19 \text{ months at 100\% utilization}$$
 
-If you'll run GPUs at ~50% utilization for ~1.7 years (or ~100% for ~0.86 years), on-prem may be cheaper.
+At a more realistic ~50% utilization, break-even extends to ~3 years. The calculation is highly sensitive to utilization rate, power costs, and whether you need the latest hardware generation.
 
 ## Efficiency Metrics
 
