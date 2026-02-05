@@ -99,6 +99,18 @@ Think of the input stack as a pipeline with queues between stages:
 Storage → Decode → Augment → Host Memory → GPU
 ```
 
+```mermaid
+flowchart LR
+    S[Storage] --> Q1[(Queue)]
+    Q1 --> D[Decode]
+    D --> Q2[(Queue)]
+    Q2 --> A[Augment]
+    A --> Q3[(Queue)]
+    Q3 --> H[Host Memory]
+    H --> Q4[(Queue)]
+    Q4 --> G[GPU]
+```
+
 Each stage has a service rate. The slowest stage sets the throughput, and if any stage is unstable (service rate < arrival rate), the queue backs up and step time grows.
 
 ### Little’s Law for Prefetch Depth
@@ -117,6 +129,20 @@ So a prefetch depth of **4 batches** is the minimum to keep the GPU busy during 
 
 !!! note "Practice"
     When you see intermittent GPU idle time, measure queue depth. If the prefetch queue often hits zero, increase prefetch or reduce per-batch decode cost.
+
+### Visual: What a Stall Looks Like
+
+```mermaid
+sequenceDiagram
+    participant S as Storage
+    participant L as Loader
+    participant G as GPU
+    S->>L: Batch 1 (200 ms)
+    L->>G: Batch 1
+    S->>L: Batch 2 (600 ms)
+    Note over G: Idle gap (queue empty)
+    L->>G: Batch 2
+```
 
 ## Shuffling, Sharding, and Read Amplification
 

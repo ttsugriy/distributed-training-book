@@ -92,4 +92,6 @@ title: "References"
 
 - Lamport, L. (1978). **Time, Clocks, and the Ordering of Events in a Distributed System**. *Communications of the ACM*.
 
+- Little, J. D. C. (1961). **A Proof for the Queuing Formula: L = λW**. *Operations Research*.
+
 - Williams, S., et al. (2009). **Roofline: An Insightful Visual Performance Model for Multicore Architectures**. *Communications of the ACM*.
