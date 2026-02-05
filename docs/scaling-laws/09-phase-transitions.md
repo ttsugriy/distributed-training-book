@@ -35,14 +35,15 @@ This is the **emergence puzzle**: smooth loss improvement hides discrete capabil
 
 Some capabilities appear suddenly at scale:
 
-| Capability | Approximate Threshold |
-|------------|----------------------|
-| In-context learning | ~1B parameters |
-| Chain-of-thought reasoning | ~60B parameters |
-| Multi-step arithmetic | ~100B parameters |
-| Theory of mind | ~100B+ parameters |
+| Capability | Approximate Threshold | Notes |
+|------------|----------------------|-------|
+| In-context learning | ~1B parameters | Observed in GPT-2 (1.5B); limited forms seen in smaller models |
+| Chain-of-thought reasoning | ~60B parameters | Wei et al. (2022); threshold depends on evaluation methodology |
+| Multi-step arithmetic | ~100B parameters | Strongly prompt-dependent |
+| Theory of mind | ~100B+ parameters | Highly contested—many researchers dispute LLMs possess this |
 
-These aren't gradual improvements. Below threshold: 0% accuracy. Above: 80%+ accuracy.
+!!! warning "Caveat on Emergence"
+    Schaeffer et al. (2023) showed that many "emergent" abilities may be artifacts of discrete evaluation metrics rather than true phase transitions. When using continuous metrics (e.g., token-level accuracy instead of exact-match), many apparent discontinuities become smooth improvements. The thresholds above are approximate, model-dependent, and should be treated with appropriate skepticism.
 
 **Mathematical model**: Let capability $c$ depend on loss via:
 
@@ -325,14 +326,16 @@ Evidence against:
 
 ## Case Study: Arithmetic Capability
 
-Tracking multi-digit addition across scales:
+Tracking multi-digit addition across scales (illustrative—exact numbers are model- and prompt-dependent):
 
 | Model Size | 2-digit | 3-digit | 4-digit | 5-digit |
 |------------|---------|---------|---------|---------|
-| 1B | 95% | 60% | 10% | 0% |
-| 10B | 99% | 90% | 50% | 5% |
-| 100B | 99% | 99% | 85% | 40% |
-| 500B | 99% | 99% | 95% | 80% |
+| 1B | ~95% | ~60% | ~10% | ~0% |
+| 10B | ~99% | ~90% | ~50% | ~5% |
+| 100B | ~99% | ~99% | ~85% | ~40% |
+| 500B | ~99% | ~99% | ~95% | ~80% |
+
+*Note: These figures are approximate and illustrative of the general pattern. Actual accuracy depends heavily on the specific model, training data, prompting format, and evaluation methodology.*
 
 Each digit complexity has its own phase transition. More digits = higher threshold.
 
