@@ -298,23 +298,27 @@ To measure α and β empirically:
 import torch.distributed as dist
 import time
 
-def measure_bandwidth(size_bytes, warmup=10, trials=100):
-    tensor = torch.zeros(size_bytes // 4, device='cuda')
+def measure_bandwidth(size_bytes, dtype=torch.bfloat16, warmup=10, trials=100):
+    elem_size = torch.tensor([], dtype=dtype).element_size()
+    tensor = torch.zeros(size_bytes // elem_size, dtype=dtype, device='cuda')
 
     # Warmup
     for _ in range(warmup):
         dist.all_reduce(tensor)
-
     torch.cuda.synchronize()
-    start = time.perf_counter()
 
+    # Use CUDA events for accurate GPU-side timing
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+
+    start_event.record()
     for _ in range(trials):
         dist.all_reduce(tensor)
-
+    end_event.record()
     torch.cuda.synchronize()
-    elapsed = time.perf_counter() - start
 
-    return elapsed / trials
+    elapsed_ms = start_event.elapsed_time(end_event)
+    return elapsed_ms / (trials * 1000)  # return seconds per op
 ```
 
 ## Exercises
