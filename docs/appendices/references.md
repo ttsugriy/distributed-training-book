@@ -88,6 +88,42 @@ title: "References"
 - NVIDIA. **DGX H100 System Architecture Guide**.
 - InfiniBand Trade Association. **InfiniBand Architecture Specification**.
 
+## Optimization and Training Dynamics
+
+- Goyal, P., et al. (2017). **Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour**. *arXiv preprint*. [arXiv:1706.02677](https://arxiv.org/abs/1706.02677)
+
+- You, Y., et al. (2019). **Large Batch Optimization for Deep Learning: Training BERT in 76 Minutes**. *ICLR 2020*. [arXiv:1904.00962](https://arxiv.org/abs/1904.00962)
+
+- McCandlish, S., et al. (2018). **An Empirical Model of Large-Batch Training**. *arXiv preprint*. [arXiv:1812.06162](https://arxiv.org/abs/1812.06162)
+
+- Smith, S. L., et al. (2018). **Don't Decay the Learning Rate, Increase the Batch Size**. *ICLR 2018*. [arXiv:1711.00489](https://arxiv.org/abs/1711.00489)
+
+## Gradient Compression and Asynchronous Methods
+
+- Alistarh, D., et al. (2017). **QSGD: Communication-Efficient SGD via Gradient Quantization and Encoding**. *NeurIPS 2017*. [arXiv:1610.02132](https://arxiv.org/abs/1610.02132)
+
+- Vogels, T., et al. (2019). **PowerSGD: Practical Low-Rank Gradient Compression for Distributed Optimization**. *NeurIPS 2019*. [arXiv:1905.13727](https://arxiv.org/abs/1905.13727)
+
+- Lin, Y., et al. (2018). **Deep Gradient Compression: Reducing the Communication Bandwidth for Distributed Training**. *ICLR 2018*. [arXiv:1712.01887](https://arxiv.org/abs/1712.01887)
+
+- Seide, F., et al. (2014). **1-Bit Stochastic Gradient Descent and its Application to Data-Parallel Distributed Training of Speech DNNs**. *Interspeech 2014*.
+
+- Stich, S. U. (2018). **Local SGD Converges Fast and Communicates Little**. *ICLR 2019*. [arXiv:1805.09767](https://arxiv.org/abs/1805.09767)
+
+- Douillard, A., et al. (2023). **DiLoCo: Distributed Low-Communication Training of Language Models**. *arXiv preprint*. [arXiv:2311.08105](https://arxiv.org/abs/2311.08105)
+
+## Checkpointing
+
+- Young, J. W. (1974). **A First Order Approximation to the Optimum Checkpoint Interval**. *Communications of the ACM*.
+
+- Daly, J. T. (2006). **A Higher Order Estimate of the Optimum Checkpoint Interval for Restart Dumps**. *Future Generation Computer Systems*.
+
+## Scaling and Emergent Abilities
+
+- Wei, J., et al. (2022). **Emergent Abilities of Large Language Models**. *TMLR*. [arXiv:2206.07682](https://arxiv.org/abs/2206.07682)
+
+- Schaeffer, R., et al. (2023). **Are Emergent Abilities of Large Language Models a Mirage?**. *NeurIPS 2023*. [arXiv:2304.15004](https://arxiv.org/abs/2304.15004)
+
 ## Classic Distributed Computing
 
 - Lamport, L. (1978). **Time, Clocks, and the Ordering of Events in a Distributed System**. *Communications of the ACM*.
