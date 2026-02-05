@@ -113,25 +113,29 @@ $$\frac{\Psi^\alpha}{D^\beta} = \frac{A\alpha}{B\beta}$$
 
 ## The Optimal Allocation
 
-Using $C = 6\Psi D$ to eliminate one variable:
+Using $C = 6\Psi D$ to eliminate one variable. Substituting $D = C/(6\Psi)$ into the optimality condition $\Psi^\alpha / D^\beta = A\alpha/(B\beta)$:
 
-$$\Psi^* = \left(\frac{A\alpha}{B\beta}\right)^{\frac{\beta}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha+\beta}}$$
+$$\Psi^{\alpha+\beta} = \frac{A\alpha}{B\beta} \cdot \left(\frac{C}{6}\right)^\beta$$
 
-$$D^* = \left(\frac{B\beta}{A\alpha}\right)^{\frac{\alpha}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\alpha}{\alpha+\beta}}$$
+$$\Psi^* = \left(\frac{A\alpha}{B\beta}\right)^{\frac{1}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\beta}{\alpha+\beta}}$$
+
+Similarly, substituting $\Psi = C/(6D)$:
+
+$$D^* = \left(\frac{B\beta}{A\alpha}\right)^{\frac{1}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\alpha}{\alpha+\beta}}$$
 
 **Key insight**: Both $\Psi^*$ and $D^*$ are power laws in $C$.
 
 If $\alpha \approx \beta$ (Chinchilla: $\alpha \approx 0.34$, $\beta \approx 0.28$):
 
-$$\Psi^* \propto C^{0.5}, \quad D^* \propto C^{0.5}$$
+$$\Psi^* \propto C^{0.45}, \quad D^* \propto C^{0.55}$$
 
 The optimal ratio:
 
-$$\frac{D^*}{\Psi^*} = \frac{B\beta}{A\alpha}$$
+$$\frac{D^*}{\Psi^*} = \left(\frac{B\beta}{A\alpha}\right)^{\frac{2}{\alpha+\beta}} \left(\frac{C}{6}\right)^{\frac{\alpha-\beta}{\alpha+\beta}}$$
 
-For Chinchilla parameters: $D^*/\Psi^* \approx 20$
+Note that the ratio depends (weakly) on $C$ unless $\alpha = \beta$. For Chinchilla parameters, the exponent $(\alpha - \beta)/(\alpha + \beta) \approx 0.10$ is small, so the ratio varies slowly with compute budget. Empirically, Chinchilla found that $D^*/\Psi^* \approx 20$ for the compute budgets they explored.
 
-**The 20:1 Rule**: Optimal training uses ~20 tokens per parameter.
+**The 20:1 Rule**: Optimal training uses ~20 tokens per parameter. This is an empirically observed ratio from Hoffmann et al. (2022), not a universal constant—it depends weakly on the compute budget $C$. See Chapter 8 for a thorough reconciliation.
 
 ## Kaplan vs Chinchilla
 
