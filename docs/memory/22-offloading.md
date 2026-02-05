@@ -296,17 +296,17 @@ class CPUOffloadOptimizer:
 
 ### Memory Savings
 
-For Adam optimizer with fp16 training, let $\Phi$ denote the number of model parameters:
+For Adam optimizer with fp16 training, let $\Psi$ denote the number of model parameters:
 
 | Component | Without Offload | With Offload |
 |-----------|-----------------|--------------|
-| Parameters (fp16) | 2Φ bytes | 2Φ bytes (GPU) |
-| Gradients (fp16) | 2Φ bytes | 2Φ bytes (peak during backward) → 0 (after transfer) |
-| Master weights (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
-| Adam m (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
-| Adam v (fp32) | 4Φ bytes | 4Φ bytes (CPU) |
-| **Total GPU (steady-state)** | **16Φ bytes** | **2Φ bytes** |
-| **Total GPU (peak)** | **16Φ bytes** | **4Φ bytes** |
+| Parameters (fp16) | $2\Psi$ bytes | $2\Psi$ bytes (GPU) |
+| Gradients (fp16) | $2\Psi$ bytes | $2\Psi$ bytes (peak during backward) → 0 (after transfer) |
+| Master weights (fp32) | $4\Psi$ bytes | $4\Psi$ bytes (CPU) |
+| Adam m (fp32) | $4\Psi$ bytes | $4\Psi$ bytes (CPU) |
+| Adam v (fp32) | $4\Psi$ bytes | $4\Psi$ bytes (CPU) |
+| **Total GPU (steady-state)** | **$16\Psi$ bytes** | **$2\Psi$ bytes** |
+| **Total GPU (peak)** | **$16\Psi$ bytes** | **$4\Psi$ bytes** |
 
 **Memory reduction**: 4× on GPU memory.
 
