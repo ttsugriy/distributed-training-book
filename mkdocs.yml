@@ -6,7 +6,7 @@ site_url: https://ttsugriy.github.io/distributed-training-book/
 repo_name: ttsugriy/distributed-training-book
 repo_url: https://github.com/ttsugriy/distributed-training-book
 
-copyright: Copyright &copy; 2025 Taras Tsugrii
+copyright: Copyright &copy; 2025–2026 Taras Tsugrii
 
 theme:
   name: material
