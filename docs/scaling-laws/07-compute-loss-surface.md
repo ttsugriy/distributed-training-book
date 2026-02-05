@@ -217,7 +217,7 @@ $$C = 6 \times 70 \times 10^9 \times 1.4 \times 10^{12} = 5.9 \times 10^{23} \te
 
 On 1000 H100s (~989 TFLOP/s dense FP16/BF16 each) at 40% MFU:
 
-$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 9.89 \times 10^{14} \times 0.4} \approx 8.6 \text{ days}$$
+$$\text{Time} = \frac{5.9 \times 10^{23}}{1000 \times 9.89 \times 10^{14} \times 0.4} = \frac{5.9 \times 10^{23}}{3.96 \times 10^{17}} \approx 1.49 \times 10^6 \text{ s} \approx 17.3 \text{ days}$$
 
 ## Beyond Simple Scaling
 
