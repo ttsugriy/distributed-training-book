@@ -205,6 +205,67 @@ xychart-beta
 
 At low $I_{\text{io}}$, performance scales with storage bandwidth. At high $I_{\text{io}}$, compute dominates. The ridge point sits where the two lines meet.
 
+## Data Quality, Mixing, and Curriculum
+
+The sections above address the *mechanics* of data delivery. But the *content* of the data matters just as much for the training outcome, and data quality decisions have systems implications.
+
+### Data Quality as a Scaling Multiplier
+
+Recall from Chapter 7 that loss depends on an effective data quantity:
+
+$$L(\Psi, D, q) = \frac{A}{\Psi^\alpha} + \frac{B}{(qD)^\beta} + L_\infty$$
+
+where $q \in (0, 1]$ is a data quality multiplier. High-quality, deduplicated, well-filtered data can achieve the same loss with fewer tokens — effectively multiplying your data budget.
+
+**Systems implication**: Investing in data quality (deduplication, filtering, domain classification) reduces the total tokens $D$ needed, which directly reduces training time and I/O bandwidth requirements.
+
+### Data Mixing Ratios
+
+Frontier models train on mixtures of domains (web, code, books, math, multilingual). The mixing ratio affects both loss and capability:
+
+| Domain | Typical Fraction | Effect of Increasing |
+|--------|-----------------|---------------------|
+| Web crawl (filtered) | 60–80% | General language capability |
+| Code | 5–15% | Reasoning, structured output |
+| Books/academic | 5–10% | Long-range coherence |
+| Math/science | 2–5% | Quantitative reasoning |
+| Multilingual | 5–15% | Cross-lingual transfer |
+
+**Systems implication for distributed training**: Different domains may come from different storage systems with different read characteristics. A pipeline that mixes domains must maintain the target ratio across all workers — this requires either:
+
+1. **Pre-shuffled shards**: Interleave domains before sharding (simple, but inflexible)
+2. **Per-domain samplers**: Each worker samples from domain-specific streams at prescribed ratios (flexible, but requires coordination)
+3. **Global mixing service**: A centralized or hierarchical scheduler assigns batches with correct ratios (most flexible, highest complexity)
+
+### Curriculum and Annealing
+
+Some training runs change the data mix during training:
+
+- **Warmup phase**: Simpler, higher-quality data for initial stability
+- **Main phase**: Full mixture at target ratios
+- **Annealing phase**: Upweight high-quality domains (reduces loss on benchmarks)
+
+LLaMA 3 used a late-stage annealing phase that upweighted code and math data. This requires the data pipeline to support **dynamic mixing ratios** — switching data sources mid-run without stopping training.
+
+### Deduplication at Scale
+
+Training on repeated data has diminishing returns (Chapter 8: $L \propto \gamma \cdot \log(r)$ for repetition ratio $r$). Deduplication is essential but has I/O cost:
+
+- **Exact dedup**: Hash-based, O(1) per document, but misses near-duplicates
+- **Fuzzy dedup** (MinHash/SimHash): Catches paraphrases, but $O(n \log n)$ and I/O-intensive
+- **Bloom filters**: Memory-efficient approximate membership testing for streaming dedup
+
+**Systems implication**: Deduplication is a preprocessing cost that reduces $D_{\text{unique}}$ but improves $q$. For a multi-trillion-token dataset, fuzzy dedup can take days on hundreds of CPUs — budget this into the total training timeline.
+
+### Practical Guidance
+
+| Decision | When It Matters | Systems Impact |
+|----------|----------------|----------------|
+| Data quality filtering | Always | Reduces $D$ needed → shorter training |
+| Domain mixing ratios | Multi-domain training | Requires coordinated sampling across workers |
+| Curriculum / annealing | Large-scale runs (>1T tokens) | Dynamic mix changes mid-run |
+| Deduplication | Web crawl data | Preprocessing cost; reduces I/O during training |
+
 ## Practical Diagnostics
 
 1. **Measure tokens/s** vs the theoretical requirement.
