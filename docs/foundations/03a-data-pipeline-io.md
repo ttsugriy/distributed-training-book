@@ -73,7 +73,7 @@ $$B_{\text{req}} = \text{tokens/s} \cdot b_{\text{tok}} \cdot \rho$$
 
 ### Example Bandwidth
 
-Assume each token averages 2 KB (text + metadata) and read amplification is 1.2:
+Assume each token averages 2 KB (text + metadata) and read amplification is 1.2. This is a pessimistic upper bound for heavy metadata or multimodal datasets; text-only corpora are typically closer to 2--8 bytes/token after compression and shuffling overhead.
 
 $$B_{\text{req}} = 2.41 \times 10^5 \cdot 2048 \cdot 1.2 \approx 0.59 \;\text{GB/s}$$
 
