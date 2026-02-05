@@ -128,7 +128,7 @@ $$\Psi^* \approx \sqrt{\frac{C}{6 \times 20}} = \sqrt{\frac{C}{120}}$$
 **Step 2**: Estimate optimal tokens
 $$D^* \approx 20 \cdot \Psi^*$$
 
-**Worked Example**: $C = 10^{24}$ FLOPs (≈GPT-4 training budget)
+**Worked Example**: $C = 10^{24}$ FLOPs (≈Chinchilla-scale training budget)
 
 $$\Psi^* \approx \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}} \approx 2.9 \times 10^{10}$$
 
@@ -382,11 +382,11 @@ Where $r = D / D_{\text{unique}}$ is the repetition ratio and $\gamma$ is an emp
     | < 5.6 quadrillion | 70B Chinchilla |
     | > 5.6 quadrillion | 7B overtrained |
 
-    For context, ChatGPT reportedly serves ~100T tokens/day. At that rate:
+    For context, a high-volume inference service might serve ~1–10T tokens/day. At 5T tokens/day:
 
-    $$\text{Break-even time} = \frac{5.6 \times 10^{15}}{100 \times 10^{12}} \approx 56 \text{ days}$$
+    $$\text{Break-even time} = \frac{5.6 \times 10^{15}}{5 \times 10^{12}} \approx 1{,}120 \text{ days} \approx 3 \text{ years}$$
 
-    For high-volume inference, overtraining pays off quickly.
+    For very high-volume inference, overtraining can pay off—but the break-even timeline depends heavily on actual serving volume.
 
 4. **Data budget**: You have exactly 500B high-quality tokens. What's the largest model you should train?
 
