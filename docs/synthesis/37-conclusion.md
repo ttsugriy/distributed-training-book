@@ -333,17 +333,38 @@ These exercises integrate concepts across the entire book:
 
 1. **System design**: You need to train a 175B parameter dense transformer on 512 H100 GPUs with 80GB memory each. Design the parallelism strategy, estimate memory per GPU, calculate expected MFU, and identify the likely bottlenecks.
 
+    ??? hint "Approach"
+        Start with memory: $16\Psi = 2.8$ TB static. You need at least 35 GPUs just for model state, so ZeRO-3 or 3D parallelism is required. Try TP=8 (within node), PP=8 (64 layers / 8 stages), DP=8 (512/64). Check activation memory per micro-batch. Estimate bubble fraction from $m$ micro-batches. Communication: TP dominates (Ch. 13 formulas), DP AllReduce can overlap. Target MFU ~35-40% initially.
+
 2. **Architecture analysis**: A new model proposes "local attention" where each token only attends to 256 neighboring tokens. Analyze the implications for distributed training: How does this affect tensor parallelism? Pipeline parallelism? What communication patterns change?
+
+    ??? hint "Approach"
+        Local attention eliminates the $O(S^2)$ activation memory term — it becomes $O(S \cdot w)$ where $w=256$. This dramatically reduces memory pressure (Ch. 19), making longer sequences feasible without CP. For TP: attention AllReduce volume stays the same ($BSH$) since the linear projections are unchanged. For PP: smaller activations at boundaries. Key win: context parallelism (Ch. 17) becomes unnecessary for moderate $S$.
 
 3. **Fault tolerance**: Your 2-week training run fails every 3 days on average due to hardware issues. Design a fault tolerance strategy including checkpointing frequency, recovery time, and total overhead as a fraction of training time.
 
+    ??? hint "Approach"
+        MTBF = 3 days = 259,200s. Use Young/Daly: $I^* = \sqrt{2 T_{\text{ckpt}} / \lambda}$ where $\lambda = 1/\text{MTBF}$. If async checkpoint takes 5 min ($T_{\text{ckpt}} = 300$s): $I^* = \sqrt{2 \times 300 \times 259200} \approx 12,470$s $\approx 3.5$ hours. Expected failures in 14 days: ~4.7. Recovery time per failure: checkpoint restore (~5 min) + lost work (~1.75 hrs avg). Total overhead: checkpoint writes (5min/3.5hrs $\approx$ 2.4%) + recovery (~4.7 × 1.8hrs / 336hrs $\approx$ 2.5%). Budget ~5% total overhead.
+
 4. **Novel hardware**: A new accelerator offers 2× FLOPs but 0.5× memory bandwidth compared to H100. How does this change optimal parallelism strategies? Which operations become bottlenecks?
+
+    ??? hint "Approach"
+        Ridge point shifts: $I_{\text{ridge}} = F/\beta$. With 2× FLOPs and 0.5× mem BW, memory ridge is 4× higher — many more operations become memory-bound. Attention, LayerNorm, element-wise ops all hit the memory ceiling harder. Optimal response: more kernel fusion, aggressive recomputation (trade cheap FLOPs for memory bandwidth), larger TP degree to reduce per-GPU activation size, and FP8 to halve memory traffic. Network ridge also doubles — DP needs larger batches to stay compute-bound.
 
 5. **Scaling prediction**: You trained a 7B model in 1 week on 64 GPUs. How long will a 70B model take on 640 GPUs, assuming ideal scaling? What factors will cause actual time to exceed this estimate?
 
-6. **Economic optimization**: GPU-hours cost $3 each. Training a 13B model to target loss takes 100K GPU-hours with optimal batch size. Doubling batch size reduces convergence by 20%. At what GPU-hour price does the larger batch become cost-effective despite worse convergence?
+    ??? hint "Approach"
+        Ideal: $T = 6\Psi D / (P \cdot F \cdot \text{MFU})$. If same MFU and Chinchilla-optimal $D \propto \Psi$: compute scales as $\Psi^2$ while GPUs scale 10×. So $T_{\text{ideal}} = 7 \times (70/7)^2 / 10 = 70$ days. Reality will exceed this because: (1) MFU drops at 640 GPUs (more communication), (2) 70B requires TP/PP adding bubble/comm overhead, (3) larger batch may exceed $B_{\text{crit}}$, (4) failure recovery at scale. Expect 1.5-2× ideal.
+
+6. **Economic optimization**: GPU-hours cost \$3 each. Training a 13B model to target loss takes 100K GPU-hours with optimal batch size. Doubling batch size reduces convergence by 20%. At what GPU-hour price does the larger batch become cost-effective despite worse convergence?
+
+    ??? hint "Approach"
+        Small batch: 100K GPU-hours, cost = 100K × $R$. Large batch (2×): same FLOPs per step but 20% more steps → 120K GPU-hours of compute. However, large batch halves wall-clock (if below $B_{\text{crit}}$) — relevant for time-constrained scenarios. Cost comparison: 120K × $R$ vs 100K × $R$. The large batch is **never** cheaper in pure GPU-hour cost. It only wins when wall-clock time has value (e.g., opportunity cost, deadline). If deadline value $> 0.2 \times 100K \times R$, large batch wins.
 
 7. **Comparative analysis**: Compare LLaMA 3 405B, DeepSeek-V3 671B, and Mixtral 8x22B on: (a) memory per GPU for inference, (b) FLOPs per forward pass, (c) expected training throughput on 1024 H100s. Which is most efficient for training? For inference?
+
+    ??? hint "Approach"
+        (a) Inference memory (FP16): LLaMA 405B → 810 GB (~11 H100s); DeepSeek 671B total but 37B active → 1.34 TB total but can offload inactive experts; Mixtral 8×22B = 176B total, 44B active → 352 GB. (b) FLOPs/token: LLaMA $2 \times 405B$; DeepSeek $2 \times 37B$ (MoE); Mixtral $2 \times 44B$ (MoE). (c) Training: DeepSeek's MoE + FP8 gives highest tokens/s per GPU; LLaMA 405B needs most communication. **Most efficient for training**: DeepSeek (FP8 + sparse). **Most efficient for inference**: Mixtral (smallest active params, fits fewer GPUs).
 
 ## Acknowledgments
 
