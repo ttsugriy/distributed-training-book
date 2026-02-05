@@ -13,6 +13,9 @@ The roofline model transformed how we reason about single-device performance. Fo
 
 ## The Original Roofline
 
+!!! info "Connection to *The Algebra of Speed*"
+    The single-device roofline model is covered in depth in the companion book [*The Algebra of Speed*](https://ttsugriy.github.io/performance-book/). There, the focus is on memory-bandwidth and compute ceilings for individual kernels. Here we extend it with a **third ceiling—network bandwidth**—which often dominates at distributed scale.
+
 The roofline model, introduced by Williams, Waterman, and Patterson (2009), bounds performance by two ceilings:
 
 $$\text{Performance} \leq \min\left(\text{Peak FLOP/s}, \quad \text{Memory BW} \times \text{Arithmetic Intensity}\right)$$

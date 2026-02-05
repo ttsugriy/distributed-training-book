@@ -99,6 +99,18 @@ This book is a companion to [*The Algebra of Speed: Mathematical Foundations of 
 
 Here we extend those ideas to distributed systems, where communication costs introduce a new dimension to the optimization landscape. The thesis remains the same: **every optimization traces to a mathematical property**.
 
+Specific connections between the two books:
+
+| Property | *Algebra of Speed* (single-machine) | *Algebra of Distributed Training* |
+|----------|--------------------------------------|-----------------------------------|
+| **Associativity** | Loop reordering, reduction trees | Gradient accumulation → Data Parallelism (Ch. 14) |
+| **Linearity** | BLAS tiling, vectorization | Matrix sharding → Tensor Parallelism (Ch. 15) |
+| **Separability** | Function decomposition, memoization | Layer partition → Pipeline Parallelism (Ch. 16) |
+| **Sparsity** | Branch prediction, sparse algebra | Conditional routing → Expert Parallelism (Ch. 18) |
+| **Locality** | Cache hierarchies, prefetching | Memory hierarchy → Topology-aware collectives (Ch. 13a) |
+
+The single-machine roofline (Ch. 2 of *Speed*) extends to a three-ceiling model here (Ch. 2). Where *Speed* ends at the memory wall, this book begins at the network wall.
+
 ## Acknowledgments
 
 This book builds on the work of many researchers and engineers who have developed and documented distributed training techniques. Particular thanks to:

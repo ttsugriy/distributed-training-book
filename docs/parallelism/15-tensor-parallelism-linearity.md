@@ -18,6 +18,9 @@ Matrix multiplication is linear: $f(aX) = af(X)$ and $f(X + Y) = f(X) + f(Y)$. T
 
 ## The Linearity Property
 
+!!! info "Connection to *The Algebra of Speed*"
+    Linearity is one of the core algebraic properties explored in the companion book [*The Algebra of Speed*](https://ttsugriy.github.io/performance-book/), where it enables single-machine optimizations like BLAS-level tiling and vectorization. Here the same property enables a fundamentally different optimization: **splitting a single operation across multiple devices**. The algebra is the same; the payoff is distributed.
+
 ### Definition
 
 A function $f: V \to W$ between vector spaces is **linear** if for all vectors $X, Y \in V$ and scalars $a, b$:
