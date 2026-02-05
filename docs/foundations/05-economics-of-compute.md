@@ -114,6 +114,55 @@ Solution: Find minimum $P$ that meets deadline, accounting for efficiency.
 
 For a given model, there's often a "sweet spot" of parallelism where cost per FLOP is minimized. This requires empirical measurement of the efficiency curve.
 
+## Multi-Tenancy and Shared Clusters
+
+Most practitioners don't have dedicated clusters. Shared infrastructure introduces costs that the basic equation $C = P \cdot R \cdot T$ does not capture.
+
+### Contention Effects
+
+When multiple jobs share network fabric, effective bandwidth drops:
+
+$$\beta_{\text{eff}} = \frac{\beta_{\text{raw}}}{\sigma}$$
+
+where $\sigma \geq 1$ is the oversubscription/contention factor. On shared clusters, $\sigma = 1.5$–$3.0$ is typical during peak hours. This directly increases AllReduce time and can shift a training run from compute-bound to communication-bound.
+
+**Diagnosing contention vs. your own bottleneck**: If your NCCL bus bandwidth is 50% of what `nccl-tests` achieves on the same hardware at 2 AM (low contention), the gap is likely external traffic, not your configuration.
+
+### Preemption and Gang Scheduling
+
+Cloud spot/preemptible instances add a probabilistic cost:
+
+$$C_{\text{effective}} = \frac{C_{\text{spot}}}{1 - p_{\text{preempt}} \cdot f_{\text{lost}}}$$
+
+where $p_{\text{preempt}}$ is hourly preemption probability and $f_{\text{lost}}$ is the fraction of work lost per preemption (determined by checkpoint frequency).
+
+**Gang scheduling** ensures all GPUs for a job start and stop together. Without it, partial allocation wastes the running GPUs while waiting for the rest. When sharing clusters:
+
+- Request the minimum viable GPU count (e.g., 64 instead of 128 if efficiency is acceptable)
+- Smaller allocations schedule faster and get preempted less
+- Design for elastic restart: checkpoint frequently, resume on different node counts
+
+### Scheduling Priority and Queue Time
+
+Queue wait time $T_q$ adds to wall-clock but not GPU cost:
+
+$$T_{\text{wall}} = T_q + T_{\text{train}}$$
+
+For time-constrained projects, $T_q$ can dominate. Strategies:
+
+- **Backfill-friendly sizing**: Jobs that fit in scheduling gaps run sooner
+- **Off-peak scheduling**: Queue times can be 5–10× shorter at night
+- **Incremental checkpointing**: Short jobs that checkpoint and re-queue avoid long queue waits
+
+### Resource Allocation Decisions
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Shared fabric, communication-bound | Increase gradient accumulation to raise $I_{\text{net}}$ |
+| Frequent preemption ($>10\%$/hr) | Checkpoint every 15–30 min; use async checkpointing |
+| Long queue times ($>4$ hrs) | Split into shorter jobs; use backfill-friendly sizes |
+| Multi-job contention | Schedule communication-heavy phases at off-peak times |
+
 ## Case Study: DeepSeek's USD 5.6M Training
 
 DeepSeek V3 (671B MoE, 37B active) is reported/estimated to have trained for ~USD 5.6M:
