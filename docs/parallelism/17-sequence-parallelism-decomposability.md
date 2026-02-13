@@ -192,8 +192,9 @@ def sequence_parallel_attention(q, k, v, tp_group):
     # Standard attention on full sequence
     output = attention(q_full, k_full, v_full)  # (batch, seq, hidden)
 
-    # Scatter back to local sequence chunk
-    output_local = reduce_scatter_sequence(output, tp_group)
+    # Shard back to local sequence chunk.
+    # This pedagogical helper is a pure scatter (no reduction).
+    output_local = scatter_sequence_chunk(output, tp_group)
 
     return output_local  # (batch, seq_local, hidden)
 
@@ -204,8 +205,8 @@ def all_gather_sequence(x: torch.Tensor, group) -> torch.Tensor:
     dist.all_gather(gathered, x, group=group)
     return torch.cat(gathered, dim=1)  # Concat along seq dimension
 
-def reduce_scatter_sequence(x: torch.Tensor, group) -> torch.Tensor:
-    """Scatter along sequence dimension (no reduction)."""
+def scatter_sequence_chunk(x: torch.Tensor, group) -> torch.Tensor:
+    """Shard tensor along sequence dimension (no reduction)."""
     world_size = dist.get_world_size(group)
     seq_len = x.size(1)
     if seq_len % world_size != 0:

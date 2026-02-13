@@ -130,11 +130,11 @@ $$D^* \approx 20 \cdot \Psi^*$$
 
 **Worked Example**: $C = 10^{24}$ FLOPs (≈Chinchilla-scale training budget)
 
-$$\Psi^* \approx \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}} \approx 2.9 \times 10^{10}$$
+$$\Psi^* \approx \sqrt{\frac{10^{24}}{120}} = \sqrt{8.33 \times 10^{21}} \approx 9.1 \times 10^{10}$$
 
-$$D^* \approx 20 \times 2.9 \times 10^{10} = 5.8 \times 10^{11}$$
+$$D^* \approx 20 \times 9.1 \times 10^{10} = 1.82 \times 10^{12}$$
 
-**Compute-optimal**: ~29B parameters, ~580B tokens.
+**Compute-optimal**: ~91B parameters, ~1.82T tokens.
 
 Reported estimates vary; one commonly cited rumor is 1.8T parameters (mixture-of-experts) trained on 13T tokens. Treat this as speculative. If true, it would be heavily **overtrained** relative to Chinchilla—deliberately so for inference efficiency.
 

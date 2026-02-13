@@ -4,7 +4,7 @@ subtitle: "Fault Tolerance as a Mathematical Invariant"
 ---
 
 <div class="chapter-opener" markdown>
-At scale, failures are not exceptions—they are expectations. A 10,000 GPU cluster with 4-hour MTBF per GPU will lose one GPU every 1.4 seconds on average. The mathematics of checkpointing determines whether training completes or collapses.
+At scale, failures are not exceptions—they are expectations. In a deliberately pessimistic stress test (10,000 GPUs at 4-hour MTBF per GPU), you would lose one GPU every 1.4 seconds. In this chapter's baseline model (20,000-hour GPU MTBF plus host failures), the system still experiences a failure roughly every 96 minutes. The mathematics of checkpointing determines whether training completes or collapses.
 </div>
 
 <div class="investigation-question" markdown>
