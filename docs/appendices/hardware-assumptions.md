@@ -4,6 +4,10 @@ title: "Hardware Assumptions and Units"
 
 This book uses back-of-envelope estimates. To keep calculations consistent, we use the following defaults unless stated otherwise. Most examples target **H100 SXM**; the table below provides reference values for other common accelerators so readers can adapt calculations to their own hardware.
 
+!!! warning "Time-sensitive hardware references"
+    Hardware specifications and interconnect offerings evolve quickly and can vary by SKU, cloud provider, and firmware.
+    **Last verified:** 2026-02-12. Confirm current vendor datasheets and instance documentation for production planning.
+
 ## Accelerator Reference Table
 
 | Spec | A100 80 GB SXM | H100 80 GB SXM | H200 141 GB SXM | AMD MI300X 192 GB |

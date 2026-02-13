@@ -12,7 +12,7 @@ In 2017, the largest language models could be trained on a single node or small 
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $B$ = batch tokens, $P$ = GPUs. See [Notation](../appendices/notation.md).
+**Notation in this chapter:** $\Psi$ = parameters, $D$ = training tokens, $B$ = global batch size (sequences), $B_{\text{tok}} = B \cdot S$ = batch tokens, $P$ = GPUs. See [Notation](../appendices/notation.md).
 </div>
 
 ## The Three Walls

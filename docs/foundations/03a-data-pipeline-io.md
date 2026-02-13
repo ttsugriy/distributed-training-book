@@ -12,7 +12,7 @@ We optimize FLOPs, memory, and communication, then watch GPUs idle because data 
 </div>
 
 <div class="notation-banner" markdown>
-**Notation in this chapter:** $\Psi$ = parameters, $B$ = batch tokens, $S$ = sequence length, $P$ = GPUs, $F$ = peak FLOP/s per GPU, MFU = Model FLOP Utilization. See [Notation](../appendices/notation.md).
+**Notation in this chapter:** $\Psi$ = parameters, $B$ = global batch size (sequences), $B_{\text{tok}} = B \cdot S$ = batch tokens, $S$ = sequence length, $P$ = GPUs, $F$ = peak FLOP/s per GPU, MFU = Model FLOP Utilization. See [Notation](../appendices/notation.md).
 </div>
 
 ## The Fourth Ceiling

@@ -137,7 +137,7 @@ The correction factor depends on the collective:
 | AllReduce | $\frac{2(P-1)}{P}$ |
 | AllGather | $\frac{P-1}{P}$ |
 | ReduceScatter | $\frac{P-1}{P}$ |
-| AlltoAll | $\frac{P-1}{P}$ |
+| All-to-All (AlltoAll) | $\frac{P-1}{P}$ |
 
 ### Example Calculation
 

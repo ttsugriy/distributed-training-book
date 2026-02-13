@@ -79,7 +79,7 @@ For collective operations, we extend the model with additional terms.
     - **AllReduce**: Every GPU contributes a value → everyone receives the sum
     - **ReduceScatter**: Every GPU contributes a value → each GPU receives 1/P of the reduced result
     - **AllGather**: Each GPU has one piece → everyone receives the complete concatenation
-    - **AllToAll**: Each GPU sends *different* data to each other GPU (a "transpose" across processes)
+    - **All-to-All**: Each GPU sends *different* data to each other GPU (a "transpose" across processes)
 
     The formulas below show how the α-β model applies to these operations. Don't worry about the details yet—focus on the structure: *latency terms grow with P, but bandwidth terms often don't*.
 
@@ -152,7 +152,7 @@ flowchart LR
     before -- "concatenate" --> after
 ```
 
-**AllToAll** — Transpose across processes:
+**All-to-All** — Transpose across processes:
 
 ```mermaid
 flowchart LR
@@ -208,11 +208,11 @@ $$T_{\text{AllGather}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}
 
 Each GPU starts with a piece of size $n/P$ and ends with the complete tensor of size $n$. The ring algorithm passes each piece around the ring, requiring $P-1$ steps. AllGather is the complementary second half of ring AllReduce.
 
-### AllToAll
+### All-to-All
 
-$$T_{\text{AllToAll}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
+$$T_{\text{AlltoAll}}(n, P) = (P-1)\alpha + \frac{P-1}{P} \cdot \frac{n}{\beta}$$
 
-AllToAll performs a *transpose* across processes. Each GPU has $P$ chunks of data, one destined for each GPU (including itself). After AllToAll, each GPU has received the chunks that were addressed to it from all other GPUs.
+All-to-All performs a *transpose* across processes. Each GPU has $P$ chunks of data, one destined for each GPU (including itself). After All-to-All, each GPU has received the chunks that were addressed to it from all other GPUs.
 
 Think of it as a matrix transpose where rows are source GPUs and columns are destination GPUs:
 
@@ -223,13 +223,13 @@ Think of it as a matrix transpose where rows are source GPUs and columns are des
 | **GPU 2 has** | c₀ | c₁ | c₂ | c₃ |
 | **GPU 3 has** | d₀ | d₁ | d₂ | d₃ |
 
-After AllToAll, GPU $j$ holds column $j$: the chunks that were in position $j$ on every GPU.
+After All-to-All, GPU $j$ holds column $j$: the chunks that were in position $j$ on every GPU.
 
 **Why the same cost as AllGather?** For the direct-exchange implementation, each GPU sends $(P-1)/P$ of its data (everything except the chunk it keeps) and receives $(P-1)/P$ from others. The total data movement is identical; other algorithms have different constants.
 
 **Use cases:**
 
-- **Expert parallelism** (MoE models like Mixtral, Switch Transformer): Route tokens to their assigned experts across GPUs, then AllToAll again to return results
+- **Expert parallelism** (MoE models like Mixtral, Switch Transformer): Route tokens to their assigned experts across GPUs, then All-to-All again to return results
 - **Sequence parallelism ↔ Tensor parallelism transitions**: Transform data layouts when switching between parallelism strategies
 - **FFT and other transpose-heavy algorithms**: Redistribute data for the next computation phase
 

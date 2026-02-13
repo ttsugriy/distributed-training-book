@@ -58,7 +58,7 @@ $$T_{\text{hier}} = \underbrace{2(G{-}1)\alpha_{\text{NV}} + 2\tfrac{G{-}1}{G}\t
 | Collective | Correction Factor |
 |------------|-------------------|
 | AllReduce | $2(P-1)/P$ |
-| AllGather / ReduceScatter / AlltoAll | $(P-1)/P$ |
+| AllGather / ReduceScatter / All-to-All (AlltoAll) | $(P-1)/P$ |
 | Broadcast / Reduce | 1 |
 
 $$\text{busbw} = \text{algbw} \times \text{correction factor} \qquad \text{algbw} = n / T$$

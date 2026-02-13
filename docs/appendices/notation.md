@@ -4,6 +4,10 @@ title: "Notation and Minimal Formalism"
 
 This appendix defines the core symbols used throughout the book. When in doubt, refer back here.
 
+!!! note "Terminology and local aliases"
+    We use **All-to-All** as the canonical prose term for the many-to-many transpose collective (you may also see API-style names such as `AlltoAll` or `all_to_all` in code).
+    Chapter-level notation banners may introduce local aliases such as $B_{\text{tok}} = B \cdot S$ for batch tokens while preserving the global symbols defined below.
+
 ## Minimal Formalism
 
 We model distributed training as the interaction of three resources:

@@ -113,7 +113,7 @@ Every high-efficiency system overlaps communication with computation:
 - AllGather parameters during forward pass
 - ReduceScatter gradients during backward pass
 - Prefetch pipeline stages asynchronously
-- AlltoAll expert routing overlapped with local compute
+- All-to-All expert routing overlapped with local compute
 
 The goal is simple: **no GPU should ever wait for the network**. The implementation is complex: bucketing, stream management, and careful dependency tracking.
 

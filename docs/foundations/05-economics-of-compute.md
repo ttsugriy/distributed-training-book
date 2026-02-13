@@ -11,6 +11,10 @@ Hardware is expensive. Time is expensive. Inefficiency is waste. Capacity Engine
 **The Question**: You have a USD 10M budget to train a 70B parameter model. Do you rent 1000 H100s for 2 weeks or 500 H100s for 4 weeks? The answer depends on efficiency curves, not just total GPU-hours.
 </div>
 
+!!! warning "Time-sensitive estimates"
+    Cloud prices and utilization assumptions in this chapter are market-dependent snapshots.
+    **Last verified:** 2026-02-12. Re-check current provider pricing, reserved discounts, and spot interruption rates before making capacity decisions.
+
 ## The Basic Cost Equation
 
 Total training cost:
