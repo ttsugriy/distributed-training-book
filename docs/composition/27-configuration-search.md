@@ -14,6 +14,10 @@ With 5 parallelism dimensions and dozens of hyperparameters, the configuration s
 !!! note "Code style"
     Code examples in this chapter illustrate search *algorithms and data structures*. They are simplified for clarity — production configuration search tools (e.g., Alpa, Megatron's auto-parallelism) handle many additional constraints. Focus on the algorithmic ideas, not the implementation details.
 
+!!! tip "Recommended reading path"
+    If you want the core ideas first, read each section's problem statement, formulas, and decision rules before diving into implementation blocks.
+    Treat long code listings as optional deep dives you can return to when building an optimizer.
+
 ## The Configuration Space
 
 ### Dimensions of Configuration

@@ -11,6 +11,12 @@ DeepSeek-V3 demonstrates that training cost can be reduced by an order of magnit
 **The Question**: DeepSeek claims to have trained a 671B parameter model for $5.5M—roughly 10× cheaper than comparable models. What architectural and systems innovations enabled this efficiency, and how do they map to our theoretical frameworks?
 </div>
 
+!!! note "Evidence labels used in this chapter"
+    - **Reported**: Explicitly stated in public sources.
+    - **Derived estimate**: Computed from reported values with transparent assumptions.
+    - **Speculative**: Reasonable inference where public details are incomplete.
+    Keep this distinction in mind when comparing absolute numbers across sources.
+
 !!! tip "New Concepts Introduced"
     This case study introduces several innovations not covered in earlier chapters:
 
@@ -34,7 +40,7 @@ DeepSeek-V3's key specifications:
 | GPUs used | 2,048 H800s |
 | Training time | ~2 months |
 
-For comparison, a dense 671B model would require ~10× more compute.
+The table combines reported metrics with derived estimates; where public details are incomplete, assumptions are stated explicitly. For comparison, a dense 671B model would require ~10× more compute.
 
 ### The Efficiency Advantage
 

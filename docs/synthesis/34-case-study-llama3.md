@@ -11,6 +11,12 @@ LLaMA 3 represents the state of the art in open-weight large language models. By
 **The Question**: How did Meta train a 405B parameter model on 16,000 H100 GPUs across 15 trillion tokens? What constraints drove their parallelism choices, and how do these align with the theoretical frameworks we've developed?
 </div>
 
+!!! note "Evidence labels used in this chapter"
+    - **Reported**: Explicitly stated in public sources.
+    - **Derived estimate**: Computed from reported numbers using formulas from this book.
+    - **Speculative**: Plausible but not confirmed publicly.
+    Treat derived and speculative values as modeling aids, not authoritative disclosures.
+
 ## The Scale of the Challenge
 
 LLaMA 3 405B required unprecedented scale:
@@ -23,7 +29,7 @@ LLaMA 3 405B required unprecedented scale:
 | Training time | ~54 days |
 | Estimated FLOPs | ~$3.8 \times 10^{25}$ |
 
-Let's derive these numbers and understand the constraints.
+The table mixes reported values (for example, model size and token count) with derived estimates (for example, total FLOPs). Let's derive the estimates and understand the constraints.
 
 ### Compute Requirements
 

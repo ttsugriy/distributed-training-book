@@ -11,6 +11,10 @@ When training fails at 3 AM across 256 GPUs, you need a methodology, not luck. T
 **The Question**: Your training run has stalled. Loss hasn't decreased in hours. Some GPUs show 100% utilization, others 20%. One node is unreachable. Where do you start? In what order do you investigate? How do you isolate the problem?
 </div>
 
+!!! tip "Recommended reading path"
+    Read the five-phase flow first to build the diagnostic mental model, then use the longer code blocks as implementation reference.
+    This keeps the protocol actionable even if you are not adopting every script verbatim.
+
 ## The Investigation Mindset
 
 Distributed training problems are fundamentally different from single-machine bugs:
