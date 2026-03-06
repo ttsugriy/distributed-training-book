@@ -48,6 +48,8 @@ title: "References"
 
 - Chen, T., et al. (2016). **Training Deep Nets with Sublinear Memory Cost**. *arXiv preprint*. [arXiv:1604.06174](https://arxiv.org/abs/1604.06174)
 
+- Ainslie, J., et al. (2023). **GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints**. *EMNLP 2023*. [arXiv:2305.13245](https://arxiv.org/abs/2305.13245)
+
 ## Large-Scale Systems
 
 - Dubey, A., et al. (2024). **The Llama 3 Herd of Models**. *arXiv preprint*. [arXiv:2407.21783](https://arxiv.org/abs/2407.21783)
@@ -69,6 +71,8 @@ title: "References"
 - Rabenseifner, R. (2004). **Optimization of Collective Reduction Operations**. *ICCS 2004*.
 
 - Dean, J., et al. (2012). **Large Scale Distributed Deep Networks**. *NeurIPS 2012*.
+
+- Recht, B., et al. (2011). **Hogwild!: A Lock-Free Approach to Parallelizing Stochastic Gradient Descent**. *NeurIPS 2011*. [arXiv:1106.5730](https://arxiv.org/abs/1106.5730)
 
 ## Automatic Parallelization
 
@@ -105,6 +109,8 @@ title: "References"
 - Vogels, T., et al. (2019). **PowerSGD: Practical Low-Rank Gradient Compression for Distributed Optimization**. *NeurIPS 2019*. [arXiv:1905.13727](https://arxiv.org/abs/1905.13727)
 
 - Lin, Y., et al. (2018). **Deep Gradient Compression: Reducing the Communication Bandwidth for Distributed Training**. *ICLR 2018*. [arXiv:1712.01887](https://arxiv.org/abs/1712.01887)
+
+- Wen, W., et al. (2017). **TernGrad: Ternary Gradients to Reduce Communication in Distributed Deep Learning**. *NeurIPS 2017*. [arXiv:1705.07878](https://arxiv.org/abs/1705.07878)
 
 - Seide, F., et al. (2014). **1-Bit Stochastic Gradient Descent and its Application to Data-Parallel Distributed Training of Speech DNNs**. *Interspeech 2014*.
 
