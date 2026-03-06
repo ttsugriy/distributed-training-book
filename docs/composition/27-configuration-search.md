@@ -11,6 +11,11 @@ With 5 parallelism dimensions and dozens of hyperparameters, the configuration s
 **The Question**: Given a model architecture, target batch size, and cluster specification, how do you systematically find the configuration that minimizes training time while satisfying memory constraints? Can we do better than exhaustive search?
 </div>
 
+!!! abstract "Chapter Map"
+    **Building On**: [Chapter 23](23-device-mesh.md) (device mesh abstraction), [Chapter 24](24-3d-parallelism.md) (3D parallelism composition), [Chapter 25](25-4d-5d-parallelism.md) (4D/5D parallelism), [Chapter 26](26-failures-checkpoints.md) (resilience constraints)
+
+    **Key insight**: The configuration space grows exponentially with parallelism dimensions, but memory constraints, communication costs, and hardware topology prune most candidates. Systematic search—from heuristics to Bayesian optimization—finds near-optimal configurations without exhaustive enumeration.
+
 !!! note "Code style"
     Code examples in this chapter illustrate search *algorithms and data structures*. They are simplified for clarity — production configuration search tools (e.g., Alpa, Megatron's auto-parallelism) handle many additional constraints. Focus on the algorithmic ideas, not the implementation details.
 
