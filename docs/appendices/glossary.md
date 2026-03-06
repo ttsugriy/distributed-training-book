@@ -20,7 +20,11 @@ title: "Glossary"
 
 **Bucket**: Collection of small tensors aggregated for a single AllReduce to amortize latency.
 
+**Bus Bandwidth (busbw)**: Effective bandwidth metric that normalizes collective communication time by the algorithm-specific correction factor, allowing fair comparison across different collective operations and GPU counts.
+
 ## C
+
+**Capacity Factor**: In MoE models, the ratio of expert buffer size to the expected number of tokens per expert. A capacity factor of 1.0 means each expert can handle exactly its fair share; values >1.0 allow for routing imbalance at the cost of memory.
 
 **Chinchilla Scaling**: Compute-optimal training where tokens ≈ 20× parameters.
 
@@ -45,6 +49,8 @@ title: "Glossary"
 **Expert Parallelism (EP)**: Parallelism strategy distributing MoE experts across devices.
 
 ## F
+
+**FP8**: 8-bit floating-point format for training. Two variants: E4M3 (4-bit exponent, 3-bit mantissa) for forward pass activations, and E5M2 (5-bit exponent, 2-bit mantissa) for gradients. Requires per-tensor or per-block scaling factors.
 
 **FlashAttention**: IO-aware exact attention algorithm that avoids materializing the full $O(S^2)$ attention matrix by tiling the computation to exploit GPU SRAM, reducing memory from $O(S^2)$ to $O(S)$.
 
@@ -90,6 +96,8 @@ title: "Glossary"
 
 **ReduceScatter**: Collective operation reducing values and scattering shards to each process.
 
+**Ring Attention**: Context parallelism technique that distributes key-value blocks across GPUs arranged in a logical ring. Each GPU computes attention against its local KV block while simultaneously sending/receiving blocks from neighbors, overlapping communication with computation.
+
 **Ring Algorithm**: Bandwidth-optimal collective algorithm organizing processes in a logical ring.
 
 **RoPE (Rotary Position Embedding)**: Position encoding method applying rotation matrices to query and key vectors, enabling relative position awareness and length extrapolation.
@@ -101,6 +109,8 @@ title: "Glossary"
 **Sequence Parallelism (SP)**: Parallelism strategy splitting along the sequence dimension.
 
 **Speculative Decoding**: Inference optimization using a smaller "draft" model to generate candidate tokens that are verified in parallel by the larger model, improving latency without changing outputs.
+
+**SwiGLU**: Activation function combining Swish and Gated Linear Unit: $\text{SwiGLU}(x) = \text{Swish}(xW_1) \odot (xW_2)$. Widely adopted in modern LLMs (LLaMA, Mistral, DeepSeek) for improved quality over standard GELU, at the cost of an extra linear projection.
 
 ## T
 
