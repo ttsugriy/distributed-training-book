@@ -112,7 +112,7 @@ where:
 
 $$\text{KV cache (MLA)} = d_c \times s \text{ per token per layer}$$
 
-With $d_c = 512$ and $H = 7168$ (DeepSeek-V3): compression ratio $\approx H/d_c \approx 14\times$ beyond even GQA.
+With $d_c = 512$ and $H = 7168$ (DeepSeek-V3): the latent dimension is $14\times$ smaller than the hidden dimension. The actual KV cache compression vs MHA is even larger—about $65\times$—because MHA stores $2 \times A \times d_h$ values per token while MLA stores only $d_c$ (see comparison table below).
 
 ### Comparison
 
@@ -176,7 +176,7 @@ See [Chapter 35](../synthesis/35-case-study-deepseek.md) for DualPipe's role in 
 |------------|---------------|------------------|------------|
 | GQA | KV cache memory | 4–64× | LLaMA 2/3, Mistral, Gemma |
 | SWA | Attention memory/compute | $S/w$ × | Mistral, Mixtral |
-| MLA | KV cache + activation memory | 14–65× | DeepSeek-V2/V3 |
+| MLA | KV cache + activation memory | ~65× vs MHA ($H/d_c$ = 14× latent compression) | DeepSeek-V2/V3 |
 | DualPipe | Pipeline bubble time | ~2× | DeepSeek-V3 |
 
 These are not systems optimizations — they are **architectural choices that change the fundamental resource requirements**. Understanding them is essential for the case studies that follow.
