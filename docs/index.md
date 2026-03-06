@@ -53,7 +53,13 @@ Every distributed training system obeys three invariants. All strategies are tra
 2. **Compute**: How much work per step can the hardware sustain?
 3. **Communication**: What data must cross which links, how often?
 
-Throughout the book we return to these invariants. When you get stuck, ask which invariant is violated and which lever fixes it.
+Each invariant has a foundational equation that we derive and use throughout the book:
+
+- **Memory Equation** (Ch. 19): $M_{\text{total}} = 16\Psi + M_{\text{act}} + M_{\text{temp}}$ — the "16x rule" for model states, plus activations and temporaries.
+- **Alpha-Beta Model** (Ch. 4): $T(n) = \alpha + n/\beta$ — every communication cost reduces to latency plus bandwidth.
+- **MFU** (Ch. 5): $\text{MFU} = \text{Achieved FLOP/s} / \text{Peak FLOP/s}$ — the single number that measures how well you use your hardware.
+
+Throughout the book we return to these invariants and their equations. When you get stuck, ask which invariant is violated and which lever fixes it.
 
 ## A Simple Decision Procedure
 
