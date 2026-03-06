@@ -1596,4 +1596,4 @@ PP naturally stages memory across time. Combine with offloading:
 
 6. **Know your bandwidths**: PCIe (32 GB/s), NVMe (7 GB/s). Design accordingly.
 
-7. **Compression can help**: For NVMe, light compression often improves effective bandwidth.
+7. **Compression can help—sometimes**: For NVMe with GPU-accelerated compression (e.g., nvCOMP), compression can improve effective bandwidth. CPU-based compression (e.g., LZ4 at ~2 GB/s) is typically slower than uncompressed NVMe (~7 GB/s). Always benchmark for your specific hardware.
