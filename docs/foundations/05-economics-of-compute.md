@@ -34,7 +34,7 @@ GPU cost typically dominates (80%+ of total), so we often approximate $C_{\text{
 
 ## GPU-Hour Economics
 
-### Cloud Pricing (2024-2025)
+### Cloud Pricing (2025-2026)
 
 | GPU | On-Demand | Reserved (1yr) | Spot |
 |-----|-----------|----------------|------|
