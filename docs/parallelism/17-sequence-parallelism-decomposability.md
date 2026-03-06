@@ -11,6 +11,11 @@ When sequences grow to millions of tokens, even a single attention computation w
 **The Question**: Attention is O(S²) in sequence length. For S=1M tokens, that's 10^12 attention scores. How do we compute this when no single GPU can hold the attention matrix?
 </div>
 
+!!! abstract "Chapter Map"
+    **Prerequisites**: [Chapter 11](../collectives/11-primitives-properties.md) (AllGather, ReduceScatter, AlltoAll), [Chapter 15](15-tensor-parallelism-linearity.md) (tensor parallelism and Megatron-LM patterns)
+
+    **Key insight**: Sequence parallelism exploits the *decomposability* of attention—specifically, the associativity of online softmax—to split computation along the sequence dimension. Megatron SP shards non-tensor-parallel regions (LayerNorm, Dropout) to save activation memory, while context parallelism (Ring Attention, Ulysses) enables sequences too long for a single GPU's memory.
+
 ## Why Sequence Parallelism?
 
 As models process longer contexts—documents, codebases, video—the sequence length $S$ becomes the bottleneck.
