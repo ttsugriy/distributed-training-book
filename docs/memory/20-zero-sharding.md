@@ -1388,7 +1388,7 @@ Each stage has its own ZeRO group for sharding.
 2. **Three stages with different trade-offs**:
 
    - ZeRO-1: 4× memory savings, no *additional* bandwidth if using RS+AG
-   - ZeRO-2: 8× savings, typically ~2× communication vs standard DP
+   - ZeRO-2: 8× savings, same communication volume as standard DP
    - ZeRO-3: Linear scaling, 50% overhead
 
 3. **ZeRO-3 enables arbitrary model sizes**: With enough GPUs, any model fits.
