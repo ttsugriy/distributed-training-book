@@ -798,7 +798,7 @@ Only 12.5% of memory holds actual model parameters!
     **Maximum batch size:** $\boxed{B = 4}$ (or 5 with careful tuning)
 
     **Practical verification:**
-    - Total tokens per step: $7 \times 2048 = 14,336$ tokens
+    - Total tokens per step: $4 \times 2048 = 8{,}192$ tokens
     - This is typical for 7B models on 40GB GPUs
 
 4. **Memory profiling**: Write code to identify which layer in a transformer consumes the most activation memory.
