@@ -931,9 +931,9 @@ The tensor parallel degree $P$ is limited by:
 
     | Metric | Value |
     |--------|-------|
-    | Compute time | 42.9 μs |
+    | Compute time | 86.9 μs |
     | Communication time | 249 μs |
-    | Ratio $R$ | 0.17 |
+    | Ratio $R$ | 0.35 |
     | Regime | Communication-bound |
 
     **Implications:**
