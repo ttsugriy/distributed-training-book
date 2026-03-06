@@ -803,15 +803,15 @@ $$M_{\text{optimizer}} = 4 \times M_{\text{params}}$$
 
 $$M_{\text{activations}} = \frac{B \times S \times H}{T \times C} \times L_{\text{stage}} \times k_{\text{buffer}}$$
 
-**Example**: 1T MoE (200B dense + 800B experts), 128K context, 16K GPUs, $B=128$, $k_{\text{buffer}}=4$
+**Example**: 1T MoE (200B dense + 800B experts), 128K context, 16K GPUs, micro-batch $B_\mu=16$, $k_{\text{buffer}}=4$
 
-Configuration: DP=8, PP=16, TP=8, CP=4, EP=4
+Configuration: DP=8, PP=16, TP=8, CP=4, EP=4 (global batch $B = B_\mu \times \text{DP} = 128$)
 
 - Dense params: $\frac{200\text{B} \times 2}{8 \times 16} = 3.1\text{ GB}$
 - Expert params: $\frac{800\text{B} \times 2}{8 \times 16 \times 4} = 3.1\text{ GB}$
 - Optimizer: $4 \times 6.2 = 24.8\text{ GB}$
-- Activations: $\frac{128 \times 128\text{K} \times 8192 \times 2}{8 \times 4} \times 4 \approx 34\text{ GB}$
-- **Total**: ~65 GB (fits 80GB A100)
+- Activations: $\frac{16 \times 128\text{K} \times 8192 \times 2}{8 \times 4} \times 4 \approx 4.3\text{ GB}$
+- **Total**: ~35 GB (fits 80GB A100)
 
 ## Practical Considerations
 
