@@ -30,9 +30,9 @@ $$\text{Memory per GPU} = M_{\text{model}} + M_{\text{optimizer}} + M_{\text{act
 
 For a 175B model with Adam optimizer in mixed precision:
 
-$$M_{\text{model}} + M_{\text{optimizer}} = 175\text{B} \times (2 + 8 + 4) = 2.45\text{ TB}$$
+$$M_{\text{model}} + M_{\text{optimizer}} = 175\text{B} \times (2 + 2 + 8 + 4) = 2.80\text{ TB}$$
 
-(If you omit FP32 master weights, this drops to $1.75$ TB.)
+Here: 2 bytes (fp16 parameters) + 2 bytes (fp16 gradients) + 8 bytes (Adam $m$ + $v$ in fp32) + 4 bytes (fp32 master weights) = 16 bytes/parameter, consistent with the $16\Psi$ rule from Chapter 19.
 
 No GPU can hold this.
 
