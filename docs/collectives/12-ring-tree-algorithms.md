@@ -787,13 +787,8 @@ PyTorch DDP uses 25MB buckets by default.
     - P2 sends 16 (pos 1) → P3, receives 6 (pos 0) from P1 → accumulates at position 0
     - P3 sends 26 (pos 2) → P0, receives 16 (pos 1) from P2 → accumulates at position 1
 
-    ```
-    After Step 2:
-    P0: [1, 2, 3+26=29, 20]           position 2 = 3+11+16 = 30? Let me recalculate...
-    ```
-
-    Actually, let me trace more carefully. After Step 1, P3 has 26 at position 2 (that's 15+11 = C2+D2).
-    P0 receives 26, accumulates: 3 + 26 = 29 at position 2.
+    After Step 1, P3 has 26 at position 2 (that's 15+11 = C2+D2).
+    P0 receives 26 and accumulates: 3 + 26 = 29 at position 2.
 
     ```
     After Step 2:
