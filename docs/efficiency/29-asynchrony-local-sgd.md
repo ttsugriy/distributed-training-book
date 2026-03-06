@@ -11,6 +11,13 @@ Synchronous training is mathematically clean but operationally costly. Every wor
 **The Question**: If workers can compute gradients in parallel without waiting, why does asynchronous training often converge slower than synchronous? What's lost in translation, and can we recover it?
 </div>
 
+<div class="notation-banner" markdown>
+**Notation in this chapter:** $P$ = workers/GPUs, $\tau$ = staleness, $H$ = sync interval (Local SGD steps between synchronizations), $\eta$ = learning rate. See [Notation](../appendices/notation.md).
+</div>
+
+!!! abstract "Building On: Parts III–IV"
+    [Part III](../collectives/11-primitives-properties.md) established the cost of collective communication. [Part IV](../parallelism/14-data-parallelism-associativity.md) showed that data parallelism requires AllReduce every step. This chapter asks: what if we synchronize *less often*—or not at all? The trade-off is between communication savings and convergence degradation from stale or divergent gradients.
+
 ## The Synchronization Tax
 
 In synchronous data parallelism, each step requires:
