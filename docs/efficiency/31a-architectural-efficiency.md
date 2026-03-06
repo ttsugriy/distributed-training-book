@@ -192,3 +192,30 @@ These are not systems optimizations — they are **architectural choices that ch
 4. **DualPipe halves effective bubble fraction**: Bidirectional micro-batch streams hide inter-stage communication.
 
 5. **Architecture co-designs with distribution**: The best efficiency gains come from reducing the work at its source, not just distributing it better.
+
+## Exercises
+
+1. **GQA memory savings**: A model has $A=64$ attention heads with $d_h=128$. Compare the KV cache size per token per layer (in BF16) for: (a) standard MHA, (b) GQA with 8 KV groups, (c) GQA with 1 KV group (MQA). What are the reduction factors?
+
+??? success "Solution"
+    - **MHA**: $2 \times 64 \times 128 \times 2 = 32{,}768$ bytes = 32 KB
+    - **GQA-8**: $2 \times 8 \times 128 \times 2 = 4{,}096$ bytes = 4 KB → **8× reduction**
+    - **MQA** (GQA-1): $2 \times 1 \times 128 \times 2 = 512$ bytes → **64× reduction**
+
+    The reduction factor equals $A/g$ where $g$ is the number of KV groups.
+
+2. **SWA effective context**: A model has $L=32$ layers with sliding window size $w=4{,}096$. (a) What is the maximum effective context? (b) If input length is $S=128{,}000$, how many layers can "see" the first token from position $S$?
+
+??? success "Solution"
+    **(a)** Maximum effective context $= L \times w = 32 \times 4{,}096 = 131{,}072$ tokens.
+
+    **(b)** The first token is reachable from position $S$ only if $S \leq L \times w$. Since $128{,}000 < 131{,}072$, the first token is reachable. The number of layers needed to propagate information from position $S$ to position 1 is $\lceil S/w \rceil = \lceil 128{,}000/4{,}096 \rceil = 32$ layers. So only the final layer can "see" the first token, and only barely.
+
+3. **DualPipe vs 1F1B**: Compare the bubble fraction for a pipeline with $P=16$ stages and $m=32$ micro-batches under: (a) standard 1F1B, (b) DualPipe. How many additional micro-batches would 1F1B need to match DualPipe's bubble fraction?
+
+??? success "Solution"
+    **(a)** 1F1B bubble: $\frac{P-1}{m+P-1} = \frac{15}{32+15} = \frac{15}{47} \approx 31.9\%$
+
+    **(b)** DualPipe bubble: $\approx \frac{P-1}{2m} = \frac{15}{64} \approx 23.4\%$
+
+    To match DualPipe with 1F1B: $\frac{15}{m'+15} = \frac{15}{64}$, so $m'+15 = 64$, giving $m' = 49$. 1F1B would need **49 micro-batches** (vs 32 with DualPipe) to achieve the same bubble fraction—a 53% increase.
