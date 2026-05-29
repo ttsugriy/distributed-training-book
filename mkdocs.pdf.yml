@@ -1,0 +1,48 @@
+# =============================================================================
+# MkDocs config overlay used ONLY for PDF / book generation.
+#
+#   mkdocs build -f mkdocs.pdf.yml -d site_pdf
+#
+# It INHERITs the normal site config (mkdocs.yml) and layers on the
+# `print-site` plugin, which concatenates every page into a single HTML page
+# at /print_page/.  All cross-page links are rewritten to in-page anchors, so
+# they become clickable "jump" links inside the final PDF.
+# =============================================================================
+INHERIT: ./mkdocs.yml
+
+plugins:
+  - search
+  - tags
+  - print-site:
+      # Keep the giant combined page out of the normal nav.
+      add_to_navigation: false
+      print_page_title: "The Algebra of Distributed Training"
+      add_print_site_banner: false
+      # A clickable table of contents at the front of the book.
+      add_table_of_contents: true
+      toc_title: "Table of Contents"
+      toc_depth: 3
+      # Don't print raw URLs after links (we want clean cross-references).
+      add_full_urls: false
+      # Avoid double numbering — chapters are already numbered in their titles.
+      enumerate_headings: false
+      enumerate_figures: false
+      # Simple title/cover page at the very front.
+      add_cover_page: true
+      include_css: true
+      enabled: true
+
+# extra_css is a list, so the child config replaces the parent's list entirely.
+# Re-list the originals and append the print-specific stylesheet.
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/notation.css
+  - stylesheets/print.css
+
+# extra_javascript is a list, so it also fully replaces the parent's.
+# Swap the CHTML MathJax bundle for the SVG bundle (+ SVG config) so the huge
+# combined page paginates fast when Chromium prints it.
+extra_javascript:
+  - javascripts/mathjax-pdf.js
+  - javascripts/stepper.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-svg.js

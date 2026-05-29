@@ -1,0 +1,73 @@
+/* =============================================================================
+ * Print / PDF-only styling.
+ * Loaded exclusively via mkdocs.pdf.yml (the print-site build).
+ * Goal: make the single combined page read like a book when Chromium prints it.
+ * ========================================================================== */
+
+/* Page geometry handled by Chromium's print engine. Playwright also passes
+ * margins; this keeps things sane if printed straight from a browser. */
+@page {
+  margin: 18mm 16mm 20mm 16mm;
+}
+
+@media print {
+  /* Each top-level page/chapter starts on a fresh sheet. print-site renders
+   * every source page's leading "# Title" as an <h1>. */
+  .md-typeset h1 {
+    page-break-before: always;
+    break-before: page;
+  }
+  /* ...but never force a blank page before the very first heading
+   * (cover page + table of contents come first). */
+  #print-site-page > .md-typeset > h1:first-of-type,
+  .md-typeset h1:first-child {
+    page-break-before: avoid;
+    break-before: auto;
+  }
+
+  /* Avoid ugly splits inside cohesive blocks. */
+  .md-typeset pre,
+  .md-typeset .admonition,
+  .md-typeset details,
+  .md-typeset table,
+  .md-typeset figure,
+  .md-typeset .mermaid,
+  mjx-container {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Keep headings attached to the content that follows them. */
+  .md-typeset h2,
+  .md-typeset h3,
+  .md-typeset h4 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  /* Expand collapsible "??? Solution" blocks so nothing is hidden in print. */
+  .md-typeset details {
+    display: block;
+  }
+  .md-typeset details > summary {
+    list-style: none;
+  }
+
+  /* Long code lines should wrap rather than clip off the page edge. */
+  .md-typeset pre > code {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* Mermaid SVGs should never overflow the printable width. */
+  .md-typeset .mermaid svg {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Hide interactive chrome that has no meaning on paper. */
+  .md-clipboard,
+  .headerlink {
+    display: none !important;
+  }
+}

@@ -14,6 +14,8 @@ The goal: develop the intuition to reason about any distributed training problem
 
 📖 **[Read online](https://ttsugriy.github.io/distributed-training-book/)** — Free, no login required
 
+📄 **[Download the PDF](distributed-training-book.pdf)** — Single navigable file with a clickable table of contents and cross-reference links
+
 ## Who This Is For
 
 **Capacity Engineers** and ML practitioners who want deep understanding of:
@@ -81,6 +83,46 @@ pip install -r requirements.txt
 mkdocs serve      # Live development server
 mkdocs build      # Build static site
 ```
+
+## Build the PDF Book
+
+You can generate a single, navigable PDF of the entire book (clickable table of
+contents, working cross-reference links, rendered math and Mermaid diagrams).
+
+The PDF pipeline renders the real Material site and prints it with a headless
+Chromium browser, so everything (math, diagrams, admonitions) stays faithful.
+
+### Prerequisites
+- Python 3.10+ (a conda env or venv works)
+- No Node.js, pandoc, or LaTeX required — the scripts install everything they need
+
+### One-time setup
+```bash
+./scripts/install_pdf_deps.sh
+```
+This installs the lean PDF dependencies from `scripts/requirements-pdf.txt`
+(MkDocs, Material, the print-site plugin, and Playwright) and downloads the
+Chromium browser used for printing.
+
+### Build
+```bash
+./scripts/build_pdf.sh
+```
+This builds a combined single-page site with `mkdocs.pdf.yml` and prints it to
+**`distributed-training-book.pdf`** (~974 A4 pages). The full build takes
+several minutes.
+
+### How it works
+- `mkdocs.pdf.yml` — inherits `mkdocs.yml` and adds the
+  [`print-site`](https://timvink.github.io/mkdocs-print-site-plugin/) plugin,
+  which combines all pages into one and rewrites cross-page links into in-page
+  anchors.
+- `docs/javascripts/mathjax-pdf.js` — renders math as **SVG** (CHTML output
+  makes the browser's PDF export hang on a document this large).
+- `docs/stylesheets/print.css` — page breaks, expanded `<details>`, and
+  print-friendly styling.
+- `scripts/print_to_pdf.py` — serves the built site locally and prints the
+  combined page with Playwright/Chromium to a tagged PDF.
 
 ## Contributing
 
