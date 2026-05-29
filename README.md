@@ -14,6 +14,8 @@ The goal: develop the intuition to reason about any distributed training problem
 
 📖 **[Read online](https://ttsugriy.github.io/distributed-training-book/)** — Free, no login required
 
+📄 **[Download the PDF](build/distributed-training-book.pdf)** — Single navigable file with a clickable table of contents and cross-reference links
+
 ## Who This Is For
 
 **Capacity Engineers** and ML practitioners who want deep understanding of:

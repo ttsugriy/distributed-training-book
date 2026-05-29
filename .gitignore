@@ -4,7 +4,9 @@ _site/
 
 # PDF / book build artifacts
 site_pdf/
-build/
+build/*
+# ...but keep the published PDF so it can be viewed/downloaded from GitHub
+!build/distributed-training-book.pdf
 
 # Python
 __pycache__/
