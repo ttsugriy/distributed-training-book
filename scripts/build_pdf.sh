@@ -10,7 +10,7 @@
 #   2. print_to_pdf.py                  -> headless Chromium prints that page to
 #      a tagged PDF with clickable internal links + heading bookmarks.
 #
-# Output: build/distributed-training-book.pdf
+# Output: distributed-training-book.pdf (repo root)
 # =============================================================================
 set -euo pipefail
 
@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 SITE_DIR="site_pdf"
-OUTPUT="build/distributed-training-book.pdf"
+OUTPUT="distributed-training-book.pdf"
 
 # Activate conda base if nothing is active.
 if [[ -z "${CONDA_DEFAULT_ENV:-}" ]]; then

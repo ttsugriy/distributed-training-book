@@ -135,7 +135,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-dir", default="site_pdf", help="Built site directory.")
     parser.add_argument(
-        "--output", default="build/distributed-training-book.pdf", help="Output PDF."
+        "--output", default="distributed-training-book.pdf", help="Output PDF."
     )
     parser.add_argument(
         "--page-path",
