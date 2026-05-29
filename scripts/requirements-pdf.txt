@@ -1,0 +1,7 @@
+# Lean dependency set for building the PDF / book.
+# (Intentionally excludes torch/numpy/etc. — not needed to render docs.)
+mkdocs>=1.5
+mkdocs-material>=9.5
+pymdown-extensions>=10
+mkdocs-print-site-plugin>=2.4
+playwright>=1.40

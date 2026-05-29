@@ -2,6 +2,10 @@
 site/
 _site/
 
+# PDF / book build artifacts
+site_pdf/
+build/
+
 # Python
 __pycache__/
 *.py[cod]
